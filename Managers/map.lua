@@ -1,7 +1,9 @@
+local clamp = require ("Libraries.lume").clamp
+
 local map = {
     inputGrid = {}, -- Tracks all the tiles in the map environment
     cellGrid = {}, -- Sparse matrix that tracks all the cells in the map environment
-    inputRender = nil, -- Contains a pre-rendered image of the background data
+    -- inputRender = nil, -- Contains a pre-rendered image of the background data
     width = 0, -- Width of the input grid
     height = 0, --- Height of the input grid
     lastTick = 0, --- Time since the last tick, in seconds
@@ -12,15 +14,19 @@ local map = {
         y = 0,
         zoom = 1,
     }, -- Contains camera position information
+    inputBounds = {
+        min = 0,
+        max = 1,
+    },
     title = "Untitled Map", -- The title of the map. Mostly used in menus
 }
 
 --- Initializes the map manager and prepares it for processing.
 --- @param title string The name of the map.
-function map:init (title, inputLayers, cellLayers)
-    self.title = title
-    self.inputLayers = inputLayers
-    self.cellLayers = cellLayers
+function map:init (title, inputMin, inputMax)
+    self.title = title or "Untitled Map"
+    self.inputBounds.min = inputMin or 0
+    self.inputBounds.max = inputMax or 1
 end
 
 --- Resets the map with a new size and input data.
@@ -33,7 +39,7 @@ function map:reset (width, height, sparseInput)
     -- Generates the input grid and input render
     local inputGrid = {}
     local cellGrid = {}
-    local inputRender = love.image.newImageData (self.width, self.height)
+    -- local inputRender = love.image.newImageData (self.width, self.height)
     for i = 1, self.width do
         local inputRow = {}
         inputGrid[i] = inputRow -- Add row to input grid
@@ -49,14 +55,14 @@ function map:reset (width, height, sparseInput)
             end
 
             inputRow[j] = tile -- Add tile to grid
-            inputRender:setPixel (i - 1, j - 1, tile, tile, tile, 1) -- Render tile to image
+            -- inputRender:setPixel (i - 1, j - 1, tile, tile, tile, 1) -- Render tile to image
         end
     end
 
     self.inputGrid = inputGrid
     self.cellGrid = cellGrid
-    self.inputRender = love.graphics.newImage (inputRender)
-    self.inputRender:setFilter ("nearest", "nearest")
+    -- self.inputRender = love.graphics.newImage (inputRender)
+    -- self.inputRender:setFilter ("nearest", "nearest")
 end
 
 function map:update (dt)
@@ -97,18 +103,26 @@ function map:draw ()
     love.graphics.scale (self.camera.zoom)
 
     -- Draw input image
-    love.graphics.draw (self.inputRender, 0, 0)
+    -- love.graphics.draw (self.inputRender, 0, 0)
 
     -- Draw cells
+    local inputGrid = self.inputGrid
     local cellGrid = self.cellGrid
     for i = 1, self.width do
         local cellRow = cellGrid[i]
+        local inputRow = inputGrid[i]
 
         for j = 1, self.height do
             local cell = cellRow[j]
+            local input = inputRow[j]
+
+            -- Render input tile
+            love.graphics.setColor (input, input, input, 1)
+            love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
 
             -- Check if cell exists at this position
             if cell ~= nil then
+                -- Render cell
                 love.graphics.setColor (1, 0, 0, 1)
                 love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
             end
@@ -138,6 +152,11 @@ function map:setCamera (x, y, zoom)
     self.camera.zoom = zoom or self.camera.zoom
 end
 
+--- Translates a screen position into a map position
+--- @param screenX number The horizontal screen position
+--- @param screenY number The vertical screen position
+--- @return integer mapX The horizontal map position
+--- @return integer mapY The vertical map position
 function map:screenToMap (screenX, screenY)
     love.graphics.push ()
     love.graphics.translate (-self.camera.x, -self.camera.y)
@@ -148,6 +167,51 @@ function map:screenToMap (screenX, screenY)
     love.graphics.pop ()
 
     return math.ceil (mapX), math.ceil (mapY)
+end
+
+--- Checks if the provided position is within the bounds of the map
+--- @param tileX integer The horizontal map position
+--- @param tileY integer The vertical map position
+--- @return boolean inBounds True if the provided position is within bounds
+function map:inBounds (tileX, tileY)
+    return tileX >= 1 and tileX <= self.width and tileY >= 1 and tileY <= self.height
+end
+
+--- Gets the value of the input tile at the provided position
+--- @param tileX integer The horizontal map position
+--- @param tileY integer The vertical map position
+--- @return number | nil inputValue The value of the input tile or nil if the provided position was out of bounds
+function map:getInputTile (tileX, tileY)
+    if self:inBounds (tileX, tileY) == true then
+        return self.inputGrid[tileX][tileY]
+
+    else
+        return nil
+    end
+end
+
+--- Sets the value of the input tile at the provided position
+--- @param tileX integer The horizontal map position
+--- @param tileY integer The vertical map position
+--- @param value number The new value of the input tile
+function map:setInputTile (tileX, tileY, value)
+    assert (type (value) == "number", "Provided value is not a number")
+
+    if self:inBounds (tileX, tileY) == true then
+        self.inputGrid[tileX][tileY] = clamp (value, self.inputBounds.min, self.inputBounds.max)
+    end
+end
+
+--- Increments the value of the input tile at the provided position
+--- @param tileX integer The horizontal map position
+--- @param tileY integer The vertical map position
+--- @param value number The amount to increment the input value by
+function map:incrInputTile (tileX, tileY, value)
+    assert (type (value) == "number", "Provided value is not a number")
+
+    if self:inBounds (tileX, tileY) == true then
+        self.inputGrid[tileX][tileY] = clamp (self.inputGrid[tileX][tileY] + value, self.inputBounds.min, self.inputBounds.max)
+    end
 end
 
 return map

@@ -52,7 +52,10 @@ function thisScene:keypressed (key, scancode, isrepeat)
 end
 
 function thisScene:mousereleased (x, y, button)
+    local tileX, tileY = map:screenToMap (x, y)
 
+    map:incrInputTile (tileX, tileY, (button == 1) and 0.1 or -0.1)
+    print (map:getInputTile (tileX, tileY))
 end
 
 return thisScene
