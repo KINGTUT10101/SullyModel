@@ -1,4 +1,5 @@
 local clamp = require ("Libraries.lume").clamp
+local cycleValue = require ("Helpers.cycleValue")
 
 local map = {
     inputGrid = {}, -- Tracks all the tiles in the map environment
@@ -19,11 +20,13 @@ local map = {
         max = 1,
     },
     title = "Untitled Map", -- The title of the map. Mostly used in menus
+    cellManager = nil,
 }
 
 --- Initializes the map manager and prepares it for processing.
 --- @param title string The name of the map.
-function map:init (title, inputMin, inputMax)
+function map:init (cellManager, title, inputMin, inputMax)
+    self.cellManager = cellManager
     self.title = title or "Untitled Map"
     self.inputBounds.min = inputMin or 0
     self.inputBounds.max = inputMax or 1
@@ -87,7 +90,7 @@ function map:update (dt)
                     if cell.lastUpdate < updateStartTime then
                         cell.lastUpdate = updateStartTime
 
-                        -- Call cell update function
+                        self.cellManager:update (cell, i, j) -- Call cell update function
                     end
                 end
             end
@@ -132,7 +135,17 @@ function map:draw ()
     love.graphics.pop ()
 end
 
---- comment
+function map:getTickSpeed ()
+    return self.tickSpeed
+end
+
+function map:setTickSpeed (value)
+    assert (type (value) == "number", "Provided value is not a number")
+
+    self.tickSpeed = value
+end
+
+--- Gets the current camera information
 --- @return number camX
 --- @return number camY
 --- @return number camZoom
@@ -211,6 +224,110 @@ function map:incrInputTile (tileX, tileY, value)
 
     if self:inBounds (tileX, tileY) == true then
         self.inputGrid[tileX][tileY] = clamp (self.inputGrid[tileX][tileY] + value, self.inputBounds.min, self.inputBounds.max)
+    end
+end
+
+--- Checks if the provided position is clear of any cells.
+--- It also implicitly checks if the provided position is within bounds.
+--- @param tileX integer The horizontal map position.
+--- @param tileY integer The vertical map position.
+--- @return boolean isClear True if the provided position does not have a cell.
+function map:isClear (tileX, tileY)
+    return self:inBounds (tileX, tileY) and self.cellGrid[tileX][tileY] == nil
+end
+
+--- Checks if the provided position is taken by a cells.
+--- It also implicitly checks if the provided position is within bounds.
+--- @param tileX integer The horizontal map position.
+--- @param tileY integer The vertical map position.
+--- @return boolean isClear True if the provided position contains a cell.
+function map:isTaken (tileX, tileY)
+    return self:inBounds (tileX, tileY) and self.cellGrid[tileX][tileY] ~= nil
+end
+
+function map:spawnCell (tileX, tileY, health, energy)
+    if self:isClear (tileX, tileY) == true then
+        self.cellGrid[tileX][tileY] = {} -- Call cell constructor
+        
+        return true
+    else
+        return false
+    end
+end
+
+function map:deleteCell (tileX, tileY)
+    if self:inBounds (tileX, tileY) == true then
+        self.cellGrid[tileX][tileY] = nil
+    end
+end
+
+function map:swapCells (tileX1, tileY1, tileX2, tileY2)
+    if self:isTaken (tileX1, tileY1) == true and self:isClear (tileX2, tileY2) == true then
+        self.cellGrid[tileX1][tileY1], self.cellGrid[tileX2][tileY2] = self.cellGrid[tileX2][tileY2], self.cellGrid[tileX1][tileY1]
+
+        return tileX2, tileY2
+    else
+        return tileX1, tileY1
+    end
+end
+
+local directionVects = {
+    [1] = {0, -1}, -- Up
+    [2] = {1, 0}, -- Right
+    [3] = {0, 1}, -- Down
+    [4] = {-1, 0}, -- Left
+}
+function map:getForwardPos (tileX, tileY, amount)
+    local cellDirection = self.cellGrid[tileX][tileY].direction
+    local vect = directionVects[cellDirection]
+
+    return tileX + vect[1] * amount, tileY + vect[2] * amount
+end
+
+function map:moveForward (tileX, tileY)
+    if self:isTaken (tileX, tileY) == true then
+        local cellDirection = self.cellGrid[tileX][tileY].direction
+        local vect = directionVects[cellDirection]
+
+        return self:swapCells (tileX, tileY, tileX + vect[1], tileY + vect[2])
+    else
+        return tileX, tileY
+    end
+end
+
+function map:turnLeft (tileX, tileY)
+    if self:isTaken (tileX, tileY) == true then
+        local cell = self.cellGrid[tileX][tileY]
+        cell.direction = cycleValue (cell.direction, -1, 4)
+    end
+end
+
+function map:turnRight (tileX, tileY)
+    if self:isTaken (tileX, tileY) == true then
+        local cell = self.cellGrid[tileX][tileY]
+        cell.direction = cycleValue (cell.direction, 1, 4)
+    end
+end
+
+function map:adjustCellEnergy (tileX, tileY, amount)
+    if self:isTaken (tileX, tileY) == true then
+        local cell = self.cellGrid[tileX][tileY]
+        cell.energy = math.min (100, cell.energy + amount)
+
+        if cell.energy < 0 then
+            map:adjustCellHealth (tileX, tileY, cell.energy)
+        end
+    end
+end
+
+function map:adjustCellHealth (tileX, tileY, amount)
+    if self:isTaken (tileX, tileY) == true then
+        local cell = self.cellGrid[tileX][tileY]
+        cell.health = math.min (100, cell.health + amount)
+
+        if cell.health <= 0 then
+            self:deleteCell (tileX, tileY)
+        end
     end
 end
 

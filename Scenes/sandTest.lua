@@ -1,12 +1,13 @@
 local thisScene = {}
 local sceneMan = require ("Libraries.sceneMan")
 local map = require ("Managers.map")
+local cell = require ("Managers.cell")
 
 local camVelocity = 15
 local zoomVelocity = 25
 
 function thisScene:load (...)
-    map:init ("Test Map")
+    map:init (cell, "Test Map", 0, math.huge ())
     map:reset (100, 100, {{1, 0.75, 0.25, 0, 0.25, 0.75, 1}})
     map:setCamera (nil, nil, 20)
 end
