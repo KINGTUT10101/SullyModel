@@ -2,12 +2,17 @@
 local cellScriptRecursive = {
     {
         id = "readInput",
-        args = {2,},
+        args = {
+            2,
+        },
     },
     {
         id = "ifStruct",
-        args = {1, 3},
-        hyperparams = {
+        args = {
+            1,
+            3,
+        },
+        hyperargs = {
             2,
         },
         scope = {
@@ -21,13 +26,18 @@ local cellScriptRecursive = {
 local cellScriptLinear = {
     {
         id = "readInput",
-        args = {2,},
+        args = {
+            "var2",
+        },
     },
     {
         id = "ifStruct",
-        args = {1, 3},
-        hyperparams = {
-            2,
+        args = {
+            "var1",
+            "var3",
+        },
+        hyperargs = {
+            "=="
         },
     },
     {
@@ -46,3 +56,5 @@ local variables = {
     0,
     77,
 }
+
+return cellScriptRecursive, cellScriptLinear, variables
