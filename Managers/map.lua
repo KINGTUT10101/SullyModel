@@ -1,6 +1,6 @@
 local clamp = require ("Libraries.lume").clamp
 local cycleValue = require ("Helpers.cycleValue")
-local copyTable = require ("Helpers.copyTable")
+local mapToScale = require ("Helpers.mapToScale")
 
 local map = {
     inputGrid = {}, -- Tracks all the tiles in the map environment
@@ -138,7 +138,8 @@ function map:draw ()
 
             else
                 -- Render input tile
-                love.graphics.setColor (input, input, input, 1)
+                local scaledColor = mapToScale (input, self.inputBounds.min, self.inputBounds.max, 0, 1)
+                love.graphics.setColor (scaledColor, scaledColor, scaledColor, 1)
                 love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
             end
         end
@@ -263,12 +264,15 @@ function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
 
         -- Mutate cell if a parent is given
         if parentCellObj ~= nil then
-            self.cellManager:mutate (newCellObj, parentCellObj)
-            self.cellManager:compileScript (newCellObj)
+            local mutSuccess, mutErr = pcall (self.cellManager.mutate, self.cellManager.mutate, newCellObj, parentCellObj)
+            local compSuccess, compErr = pcall (self.cellManager.compileScript, self.cellManager.compileScript, newCellObj)
+
+            assert (mutSuccess == true, "ERROR: Problem with mutation:" .. mutErr)
+            assert (compSuccess == true, "ERROR: Problem with script compilation:" .. compErr)
+            self.cellManager:printCellInfo (parentCellObj)
         end
 
         self.cellGrid[tileX][tileY] = newCellObj
-
         self.stats.cells = self.stats.cells + 1
         
         return true
@@ -279,6 +283,11 @@ end
 
 function map:deleteCell (tileX, tileY)
     if self:isTaken (tileX, tileY) == true then
+        local cellObj = self.cellGrid[tileX][tileY]
+
+        -- Add cell's remaining energy and health to the ground
+        map:adjustInputTile (tileX, tileY, cellObj.health + math.max (10, cellObj.energy))
+
         self.cellGrid[tileX][tileY] = nil
         self.stats.cells = self.stats.cells - 1
     end

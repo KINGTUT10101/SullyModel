@@ -358,16 +358,12 @@ function cell:update (tileX, tileY, cellObj, map)
         self.map:adjustCellHealth (tileX, tileY, cellObj.energy)
     end
 
-    if self.map:isTaken (tileX, tileY) == true then
-        if cellObj.health <= 0 then
-            -- Delete cell
-            self.map:deleteCell (tileX, tileY)
-            -- Add cell's remaining energy and health to the ground
-            self.map:adjustInputTile (tileX, tileY, cell.health + math.min (10, cell.energy))
-        else
-            -- Run cell script
-            cellObj.scriptFunc (tileX, tileY, cellObj, map)
-        end
+    if cellObj.health <= 0 or self.map:isTaken (tileX, tileY) == false then
+        -- Delete cell
+        self.map:deleteCell (tileX, tileY)
+    else
+        -- Run cell script
+        cellObj.scriptFunc (tileX, tileY, cellObj, map)
     end
 end
 
@@ -593,9 +589,9 @@ function cell:compileScript (cellObj)
     -- Assemble full script string
     local scriptStr = table.concat (scriptLines, "")
 
-    print ("======================")
-    print(scriptStr)
-    print ()
+    -- print ("======================")
+    -- print(scriptStr)
+    -- print ()
 
     local scriptFunc, err = load (scriptStr)
     assert (err == nil, err)
@@ -603,11 +599,17 @@ function cell:compileScript (cellObj)
     cellObj.scriptFunc = scriptFunc
 end
 
-local cellScriptRecursive, cellScriptLinear, variables = loadfile ("testCellScript.lua") ()
-
-cell:compileScript ({
-    scriptList = cellScriptLinear,
-    vars = variables,
-})
+function cell:printCellInfo (cellObj)
+    print ("==========" .. "Cell Object - " .. tostring (cellObj) .. "==========")
+    for k, v in pairs (cellObj) do
+        print (k, v)
+        if type (v) == "table" then
+            for k, v in pairs (v) do
+                print ("  ", k, v)
+            end
+        end
+    end
+    print ()
+end
 
 return cell

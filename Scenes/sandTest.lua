@@ -19,23 +19,10 @@ local failsafeActivations = -1
 
 local superSpeed = false
 
-local function printCellInfo (cellObj)
-    print ("==========" .. "Cell Object - " .. tostring (cellObj) .. "==========")
-    for k, v in pairs (cellObj) do
-        print (k, v)
-        if type (v) == "table" then
-            for k, v in pairs (v) do
-                print ("  ", k, v)
-            end
-        end
-    end
-    print ()
-end
-
 function thisScene:load (...)
     cell:init (map)
-    map:init (cell, "Test Map", 0, math.huge)
-    map:reset (mapSize, mapSize, {{1, 0.75, 0.25, 0, 0.25, 0.75, 1}})
+    map:init (cell, "Test Map", 0, 1000)
+    map:reset (mapSize, mapSize, {{100, 750, 250, 0, 250, 750, 1000}})
     map:setCamera (nil, nil, 20)
     map:setTickSpeed (1/8)
 
@@ -91,7 +78,7 @@ function thisScene:update (dt)
             table.insert (captures, 1, capture)
             table.remove (captures, 11)
 
-            printCellInfo (capture)
+            cell:printCellInfo (capture)
         else
             print ("WARNING: Capture failed", os.date("%H:%M:%S - %Y-%m-%d"))
             print ("Cells left: " .. map.stats.cells)
@@ -207,7 +194,17 @@ function thisScene:keypressed (key, scancode, isrepeat)
 
         map:spawnCell (tileX, tileY, 100, 100, testCell)
         print ("Cell spawned at :", tileX, tileY)
+    
+    -- Kills  a cell in the map
+    elseif key == "k" then
+        local tileX, tileY = map:screenToMap (love.mouse.getPosition ())
+        map:deleteCell (tileX, tileY)
 
+    -- Prints an input tile's value
+    elseif key == "i" then
+        print (map:getInputTile (map:screenToMap (love.mouse.getPosition ())))
+    
+    -- Toggles superspeed
     elseif key == "tab" then
         superSpeed = not superSpeed
 
@@ -222,7 +219,7 @@ end
 function thisScene:mousereleased (x, y, button)
     local tileX, tileY = map:screenToMap (x, y)
 
-    map:adjustInputTile (tileX, tileY, (button == 1) and 0.1 or -0.1)
+    map:adjustInputTile (tileX, tileY, (button == 1) and 100 or -100)
     print (map:getInputTile (tileX, tileY))
 end
 
