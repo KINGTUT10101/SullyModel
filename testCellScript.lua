@@ -29,6 +29,7 @@ local cellScriptLinear = {
         args = {
             "var2",
         },
+        hyperargs = {},
     },
     {
         id = "ifStruct",
@@ -37,24 +38,36 @@ local cellScriptLinear = {
             "var3",
         },
         hyperargs = {
-            "=="
+            ">"
         },
     },
     {
-        id = "reproduce",
+        id = "moveForward",
+        args = {},
+        hyperargs = {},
+    },
+    {
+        id = "addVariables",
+        args = {
+            "var3",
+            "var3",
+            "var4",
+        },
+        hyperargs = {},
     },
     {
         id = "endStruct",
-        startScope = 2,
+        args = {},
+        hyperargs = {},
     }
 }
 
 -- Starting values for the variables
 local variables = {
-    42,
+    4,
     62,
     0,
-    77,
+    1,
 }
 
 return cellScriptRecursive, cellScriptLinear, variables

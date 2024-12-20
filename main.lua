@@ -17,6 +17,7 @@ DevMode = false
 function love.load ()
 	-- Sets up scenes for SceneMan
     sceneMan:newScene ("sandTest", require ("Scenes.sandTest"))
+    -- sceneMan:newScene ("rngTesting", require ("Scenes.rngTesting"))
 
     sceneMan:push ("sandTest")
 end

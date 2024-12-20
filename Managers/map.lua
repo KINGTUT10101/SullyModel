@@ -8,7 +8,7 @@ local map = {
     width = 0, -- Width of the input grid
     height = 0, --- Height of the input grid
     lastTick = 0, --- Time since the last tick, in seconds
-    tickSpeed = 32, -- Intended number of ticks per second
+    tickSpeed = 1/32, -- Intended number of ticks per second
     evenTick = true,
     camera = {
         x = 0,
@@ -90,7 +90,7 @@ function map:update (dt)
                     if cell.lastUpdate < updateStartTime then
                         cell.lastUpdate = updateStartTime
 
-                        self.cellManager:update (cell, i, j) -- Call cell update function
+                        self.cellManager:update (i, j, cell, self) -- Call cell update function
                     end
                 end
             end
@@ -119,14 +119,15 @@ function map:draw ()
             local cell = cellRow[j]
             local input = inputRow[j]
 
-            -- Render input tile
-            love.graphics.setColor (input, input, input, 1)
-            love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
-
             -- Check if cell exists at this position
             if cell ~= nil then
                 -- Render cell
-                love.graphics.setColor (1, 0, 0, 1)
+                love.graphics.setColor (cell.color)
+                love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
+
+            else
+                -- Render input tile
+                love.graphics.setColor (input, input, input, 1)
                 love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
             end
         end
@@ -219,7 +220,7 @@ end
 --- @param tileX integer The horizontal map position
 --- @param tileY integer The vertical map position
 --- @param value number The amount to increment the input value by
-function map:incrInputTile (tileX, tileY, value)
+function map:adjustInputTile (tileX, tileY, value)
     assert (type (value) == "number", "Provided value is not a number")
 
     if self:inBounds (tileX, tileY) == true then
@@ -245,9 +246,17 @@ function map:isTaken (tileX, tileY)
     return self:inBounds (tileX, tileY) and self.cellGrid[tileX][tileY] ~= nil
 end
 
-function map:spawnCell (tileX, tileY, health, energy)
+function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
     if self:isClear (tileX, tileY) == true then
-        self.cellGrid[tileX][tileY] = {} -- Call cell constructor
+        local newCellObj = self.cellManager:new (health, energy) -- Create default cell
+
+        -- Mutate cell if a parent is given
+        if parentCellObj ~= nil then
+            self.cellManager:mutate (newCellObj, parentCellObj)
+            self.cellManager:compileScript (newCellObj)
+        end
+
+        self.cellGrid[tileX][tileY] = newCellObj
         
         return true
     else
@@ -278,6 +287,9 @@ local directionVects = {
     [4] = {-1, 0}, -- Left
 }
 function map:getForwardPos (tileX, tileY, amount)
+    print (tileX, tileY)
+    print (self.cellGrid[tileX])
+    print (self.cellGrid[tileX][tileY])
     local cellDirection = self.cellGrid[tileX][tileY].direction
     local vect = directionVects[cellDirection]
 
