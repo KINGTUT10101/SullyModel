@@ -2,32 +2,44 @@ local thisScene = {}
 local sceneMan = require ("Libraries.sceneMan")
 local map = require ("Managers.map")
 local cell = require ("Managers.cell")
+local mapToScale = require ("Helpers.mapToScale")
+local round = require ("Libraries.lume").round
+
+local mapSize = 100
 
 local camVelocity = 15
 local zoomVelocity = 25
 
 local testCell = cell:new (100, 100)
 
+local maxCaptureTimer = 120
+local captureTimer = maxCaptureTimer
+local captures = {} -- Holds the last 10 captures
+local failsafeActivations = -1
+
+local superSpeed = false
+
+local function printCellInfo (cellObj)
+    print ("==========" .. "Cell Object - " .. tostring (cellObj) .. "==========")
+    for k, v in pairs (cellObj) do
+        print (k, v)
+        if type (v) == "table" then
+            for k, v in pairs (v) do
+                print ("  ", k, v)
+            end
+        end
+    end
+    print ()
+end
+
 function thisScene:load (...)
     cell:init (map)
     map:init (cell, "Test Map", 0, math.huge)
-    map:reset (100, 100, {{1, 0.75, 0.25, 0, 0.25, 0.75, 1}})
+    map:reset (mapSize, mapSize, {{1, 0.75, 0.25, 0, 0.25, 0.75, 1}})
     map:setCamera (nil, nil, 20)
     map:setTickSpeed (1/8)
 
-    local cellScriptRecursive, cellScriptLinear, variables = loadfile ("testCellScript.lua") ()
-
-    map:spawnCell (20, 20, 100, 100, {
-        scriptList = cellScriptLinear,
-        vars = variables,
-        color = {1, 0, 0, 1},
-        mutationRates = {
-            major = 0.1,
-            moderate = 0.1,
-            minor = 0.1,
-            meta = 0.1,
-        }
-    })
+    captures[1] = cell:new (100, 100)
 end
 
 function thisScene:update (dt)
@@ -68,19 +80,84 @@ function thisScene:update (dt)
         zoom = zoom + zoomVelocity * dt
     end
 
+    -- Update map and camera
     map:setCamera (camX, camY, zoom)
-    map:update (dt)
+    local capture = map:update (dt)
+
+    -- Save cell to captures table
+    captureTimer = captureTimer - dt
+    if captureTimer <= 0 then
+        if capture ~= nil then
+            table.insert (captures, 1, capture)
+            table.remove (captures, 11)
+
+            printCellInfo (capture)
+        else
+            print ("WARNING: Capture failed", os.date("%H:%M:%S - %Y-%m-%d"))
+            print ("Cells left: " .. map.stats.cells)
+        end
+
+        captureTimer = maxCaptureTimer
+    end
+
+    -- Activate failsafe if all cells are dead
+    if map.stats.cells <= 0 then
+        local cellsSpawned = 0
+
+        while cellsSpawned < 10 do
+            for i = 1, #captures do
+                local selectedCell = captures[i]
+
+                -- Heavily mutate cell
+                for i = 1, round (mapToScale (love.math.randomNormal (), 0, 1, 0, 50)) do
+                    local newCell = cell:new (100, 100)
+                    cell:mutate (newCell, testCell)
+                    cell:compileScript (newCell)
+                    testCell = newCell
+                end
+
+                -- Attempt to spawn the cell
+                if map:spawnCell (math.random (1, map.width), math.random (1, map.height)) == true then
+                    cellsSpawned = cellsSpawned + 1
+                end
+            end
+        end
+
+        failsafeActivations = failsafeActivations + 1
+        print ("WARNING: Failsafe activated", os.date("%H:%M:%S - %Y-%m-%d"))
+    end
 end
 
 function thisScene:draw ()
     love.graphics.setBackgroundColor (0, 0, 1, 1)
     map:draw ()
 
+    -- Super speed border
+    if superSpeed == true then
+        love.graphics.setColor (0, 1, 0, 1)
+        love.graphics.rectangle ("fill", 0, 0, love.graphics.getWidth (), 5)
+        love.graphics.rectangle ("fill", 0, 0, 5, love.graphics.getHeight ())
+        love.graphics.rectangle ("fill", love.graphics.getWidth (), 0, -5, love.graphics.getHeight ())
+        love.graphics.rectangle ("fill", 0, love.graphics.getHeight (), love.graphics.getWidth (), -5)
+    end
+
     -- Show FPS
     love.graphics.setColor (0, 0, 0, 0.75)
     love.graphics.rectangle ("fill", 10, 10, 35, 25)
     love.graphics.setColor (1, 1, 1, 1)
     love.graphics.printf (love.timer.getFPS (), 15, 15, 25, "center")
+
+    -- Show number of cells
+    love.graphics.setColor (0, 0, 0, 0.75)
+    love.graphics.rectangle ("fill", 720, 10, 76, 25)
+    love.graphics.setColor (1, 1, 1, 1)
+    love.graphics.printf ("Cells: " .. map.stats.cells, 725, 15, 100, "left")
+
+    -- Show number of failsafe activations
+    love.graphics.setColor (0, 0, 0, 0.75)
+    love.graphics.rectangle ("fill", 720, 45, 76, 25)
+    love.graphics.setColor (1, 1, 1, 1)
+    love.graphics.printf ("FSs: " .. failsafeActivations, 725, 50, 100, "left")
 end
 
 function thisScene:keypressed (key, scancode, isrepeat)
@@ -103,7 +180,7 @@ function thisScene:keypressed (key, scancode, isrepeat)
 
     -- Rapidly mutate the cell
     elseif key == "n" then
-        for i = 1, 100 do
+        for i = 1, 25 do
             local newCell = cell:new (100, 100)
             cell:mutate (newCell, testCell)
             cell:compileScript (newCell)
@@ -130,6 +207,15 @@ function thisScene:keypressed (key, scancode, isrepeat)
 
         map:spawnCell (tileX, tileY, 100, 100, testCell)
         print ("Cell spawned at :", tileX, tileY)
+
+    elseif key == "tab" then
+        superSpeed = not superSpeed
+
+        if superSpeed == true then
+            map:setTickSpeed (0)
+        else
+            map:setTickSpeed (1/8)
+        end
     end
 end
 

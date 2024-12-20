@@ -289,6 +289,19 @@ end
 %s = cellObj.energy
 ]]
     },
+    earlyStop = {
+        desc = "Stops the cell's script early",
+        type = "action",
+        params = 0,
+        hyperparams = {},
+        interOrder = {},
+        funcString =
+[[
+if true then
+    return
+end
+]]
+    },
 }
 local actionList = {}
 

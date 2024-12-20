@@ -1,5 +1,6 @@
 local clamp = require ("Libraries.lume").clamp
 local cycleValue = require ("Helpers.cycleValue")
+local copyTable = require ("Helpers.copyTable")
 
 local map = {
     inputGrid = {}, -- Tracks all the tiles in the map environment
@@ -21,6 +22,9 @@ local map = {
     },
     title = "Untitled Map", -- The title of the map. Mostly used in menus
     cellManager = nil,
+    stats = {
+        cells = 0,
+    },
 }
 
 --- Initializes the map manager and prepares it for processing.
@@ -64,12 +68,15 @@ function map:reset (width, height, sparseInput)
 
     self.inputGrid = inputGrid
     self.cellGrid = cellGrid
+    self.stats.cells = 0
     -- self.inputRender = love.graphics.newImage (inputRender)
     -- self.inputRender:setFilter ("nearest", "nearest")
 end
 
 function map:update (dt)
     self.lastTick = self.lastTick + dt -- Update last tick
+
+    local capture = nil
 
     -- Check if enough time has passed since the last tick
     local cellGrid = self.cellGrid
@@ -92,12 +99,16 @@ function map:update (dt)
 
                         self.cellManager:update (i, j, cell, self) -- Call cell update function
                     end
+
+                    capture = cell
                 end
             end
         end
 
         self.lastTick = 0 -- Reset last tick
     end
+
+    return capture
 end
 
 function map:draw ()
@@ -257,6 +268,8 @@ function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
         end
 
         self.cellGrid[tileX][tileY] = newCellObj
+
+        self.stats.cells = self.stats.cells + 1
         
         return true
     else
@@ -265,8 +278,9 @@ function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
 end
 
 function map:deleteCell (tileX, tileY)
-    if self:inBounds (tileX, tileY) == true then
+    if self:isTaken (tileX, tileY) == true then
         self.cellGrid[tileX][tileY] = nil
+        self.stats.cells = self.stats.cells - 1
     end
 end
 
