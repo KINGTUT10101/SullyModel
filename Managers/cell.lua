@@ -29,10 +29,9 @@ local actionDict = {
         interOrder = {},
         funcString = 
 [[
-local origInputVal = map:getInputTile (tileX, tileY)
-map:adjustInputTile (tileX, tileY, -10)
-map:adjustCellEnergy (tileX, tileY, origInputVal - map:getInputTile (tileX, tileY) - 2)
+map:transferInputToCell (tileX, tileY, 25)
 if map:isTaken(tileX, tileY) == false then
+    print ("Cell death: Consume input", tileX, tileY)
     return
 end
 ]]
@@ -48,6 +47,7 @@ end
 tileX, tileY = map:moveForward (tileX, tileY)
 map:adjustCellEnergy (tileX, tileY, -3)
 if map:isTaken(tileX, tileY) == false then
+    print ("Cell death: Move forward", tileX, tileY)
     return
 end
 ]]
@@ -61,10 +61,10 @@ end
         funcString = 
 [[
 map:turnLeft (tileX, tileY)
-map:adjustCellEnergy (tileX, tileY, -1)
-if map:isTaken(tileX, tileY) == false then
-    return
-end
+-- map:adjustCellEnergy (tileX, tileY, -1)
+-- if map:isTaken(tileX, tileY) == false then
+--     return
+-- end
 ]]
     },
     turnRight = {
@@ -76,10 +76,10 @@ end
         funcString = 
 [[
 map:turnRight (tileX, tileY)
-map:adjustCellEnergy (tileX, tileY, -1)
-if map:isTaken(tileX, tileY) == false then
-    return
-end
+-- map:adjustCellEnergy (tileX, tileY, -1)
+-- if map:isTaken(tileX, tileY) == false then
+--     return
+-- end
 ]]
     },
     applyDamage = {
@@ -90,10 +90,11 @@ end
         interOrder = {},
         funcString = 
 [[
-local enemyTileX, enemyTileY = map:getForwardPos (tileX, tileY, 1)
+enemyTileX, enemyTileY = map:getForwardPos (tileX, tileY, 1)
 map:adjustCellEnergy (tileX, tileY, -4)
 map:adjustCellHealth (enemyTileX, enemyTileY, -5)
 if map:isTaken(tileX, tileY) == false then
+    print ("Cell death: Apply damage", tileX, tileY)
     return
 end
 ]]
@@ -109,6 +110,7 @@ end
 map:adjustCellEnergy (tileX, tileY, -12)
 map:adjustCellHealth (tileX, tileY, 10)
 if map:isTaken(tileX, tileY) == false then
+    print ("Cell death: Heal self", tileX, tileY)
     return
 end
 ]]
@@ -126,6 +128,7 @@ if map:isTaken (tileX, tileY) == true then
     map:adjustCellEnergy (tileX, tileY, -12)
 end
 if map:isTaken(tileX, tileY) == false then
+    print ("Cell death: Energize self", tileX, tileY)
     return
 end
     ]]
@@ -160,25 +163,32 @@ for i = 1, %s do
 ]]
     },
     reproduce = {
-        desc = "Uses some energy to create a clone of the current cell. The child cell will split the energy equally among health/energy. It will fail if the parent dies.",
+        desc = "Halves the cell's health and energy to split and create a new cell",
         type = "action",
         params = 0,
         hyperparams = {},
         interOrder = {},
         funcString =
 [[
-local babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
+babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
 if map:isClear (babyTileX, babyTileY) == true then
-    map:adjustCellEnergy (tileX, tileY, -100)
-    if map:isTaken (tileX, tileY) == true then
-        map:spawnCell (babyTileX, babyTileY, 50, 50, cellObj)
-    end
-
-    if map:isClear (tileX, tileY) == true then
-    return
+    parentHalfHealth = map:getCellHealth (tileX, tileY) / 2
+    parentHalfEnergy = map:getCellEnergy (tileX, tileY) / 2
+    map:adjustCellEnergy (tileX, tileY, -math.ceil (parentHalfEnergy) * 2)
+    
+    if map:isTaken(tileX, tileY) == true then
+        map:adjustCellHealth (tileX, tileY, -math.ceil (parentHalfHealth) * 2)
+        
+        if map:isTaken(tileX, tileY) == true then
+            map:spawnCell (babyTileX, babyTileY, math.floor (parentHalfHealth), math.floor (parentHalfEnergy), cellObj)
+            print ("Cell spawned")
+        else
+            return
+        end
+    else
+        return
     end
 end
-
 ]]
     },
     isTaken = {
@@ -207,11 +217,11 @@ end
         interOrder = {"hyper", "param"},
         funcString =
 [[
-local otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
-local allSimilar = false
+otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
+allSimilar = false
 if map:isTaken (otherTileX, otherTileY) == true then
-    local currCellColor = cellObj.color
-    local otherCellColor = map.cellGrid[otherTileX][otherTileY].color
+    currCellColor = cellObj.color
+    otherCellColor = map.cellGrid[otherTileX][otherTileY].color
 
     allSimilar = true
     for i = 1, 3 do
@@ -334,8 +344,8 @@ function cell:new (health, energy)
         scriptList = {},
         scriptFunc = function () end,
         vars = {0,0,0,0,0},
-        health = clamp (health or 100, 0, 100),
-        energy = clamp (energy or 100, 0, 100),
+        health = clamp (health or 500, 0, 500),
+        energy = clamp (energy or 500, 0, 500),
         direction = 1,
         lastUpdate  = 0,
         mutationRates = {
@@ -391,7 +401,7 @@ function cell:mutate (childCellObj, parentCellObj)
     -- Mutate color slightly
     local colorIndex = math.random (1, 3)
     local newColor = copyTable (parentCellObj.color)
-    newColor[colorIndex] = newColor[colorIndex] + math.random (0, 10) / 1000
+    newColor[colorIndex] = newColor[colorIndex] + math.random (-5, 5) / 100
     childCellObj.color = newColor
 
     -- Copy script list and variables
@@ -401,7 +411,7 @@ function cell:mutate (childCellObj, parentCellObj)
 
     -- Major mutations
     if math.random () < childMutRates.major then
-        local changeType = weightedchoice ({add = 65, delete = 20, replace = 10, swap = 50})
+        local changeType = weightedchoice ({add = 65, delete = 20, replace = 10, swap = 5})
         local actionIndex = math.random (1, #childScriptList)
 
         if changeType == "add" or #childScriptList <= 0 then
@@ -537,7 +547,15 @@ function cell:compileScript (cellObj)
     local scope = 0 -- Level of indentation
     -- Add arguments to script
     local scriptLines = {
-        "local tileX, tileY, cellObj, map = ...\n\n"
+        "local tileX, tileY, cellObj, map = ...\n\n",
+        "local origInputVal = 0\n",
+        "local enemyTileX, enemyTileY = 1, 1\n",
+        "local babyTileX, babyTileY = 1, 1\n",
+        "local otherTileX, otherTileY = 1, 1\n",
+        "local allSimilar = false\n",
+        "local currCellColor, otherCellColor = {1, 1, 1, 1}, {1, 1, 1, 1}\n",
+        "local parentHalfHealth, parentHalfEnergy = 0, 0\n",
+        "\n",
     }
     
     -- Add cell variables to script
@@ -600,16 +618,43 @@ function cell:compileScript (cellObj)
 end
 
 function cell:printCellInfo (cellObj)
-    print ("==========" .. "Cell Object - " .. tostring (cellObj) .. "==========")
+    print ("==========" .. "Cell Info - " .. tostring (cellObj) .. "==========")
     for k, v in pairs (cellObj) do
-        print (k, v)
+        print (tostring(k) .. ": " .. tostring(v))
         if type (v) == "table" then
             for k, v in pairs (v) do
-                print ("  ", k, v)
+                print ("  " .. tostring(k) .. ": " .. tostring(v))
             end
         end
     end
     print ()
+end
+
+function cell:printCellScriptList (cellObj)
+    print ("==========" .. "Cell Script List - " .. tostring (cellObj) .. "==========")
+    for i = 1, #cellObj.scriptList do
+        -- Action number and type
+        local action = cellObj.scriptList[i]
+        print ("  Action " .. i .. " - " .. action.id)
+
+        -- Parameters
+        if #action.args > 0 then
+            for k, v in ipairs (action.args) do
+                print ("    " .. k .. ": " .. v)
+            end
+        else
+            print ("    No arguments used")
+        end
+
+        -- Hyperparameters
+        if #action.hyperargs > 0 then
+            for k, v in ipairs (action.hyperargs) do
+                print ("    " .. k .. ": " .. v)
+            end
+        else
+            print ("    No hyperarguments used")
+        end
+    end
 end
 
 return cell

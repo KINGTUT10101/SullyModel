@@ -4,6 +4,7 @@ local map = require ("Managers.map")
 local cell = require ("Managers.cell")
 local mapToScale = require ("Helpers.mapToScale")
 local round = require ("Libraries.lume").round
+local copyTable = require ("Helpers.copyTable")
 
 local mapSize = 100
 
@@ -12,21 +13,119 @@ local zoomVelocity = 25
 
 local testCell = cell:new (100, 100)
 
-local maxCaptureTimer = 120
-local captureTimer = maxCaptureTimer
+local maxCaptures = 25
+local maxCaptureCycles = 50
+local captureTimer = maxCaptureCycles
 local captures = {} -- Holds the last 10 captures
-local failsafeActivations = -1
 
-local superSpeed = false
+local failsafeSpawns = 50
+local failsafeActivations = -1
+local lastCell = nil
+
+local baseX = 1000000 * love.math.random()
+local baseY = 1000000 * love.math.random()
+local function mapInput (tileX, tileY)
+    return mapToScale (love.math.noise(baseX+.05*tileX, baseY+.07*tileY), 0, 1, 0, 500)
+end
 
 function thisScene:load (...)
     cell:init (map)
-    map:init (cell, "Test Map", 0, 1000)
-    map:reset (mapSize, mapSize, {{100, 750, 250, 0, 250, 750, 1000}})
-    map:setCamera (nil, nil, 20)
+    map:init (cell, "Test Map", 0, 2500)
+    map:reset (mapSize, mapSize, mapInput)
+    map:setCamera (-110, -10, 5.8)
     map:setTickSpeed (1/8)
 
     captures[1] = cell:new (100, 100)
+    captures[1].scriptList = {
+        -- Set variables
+        {
+            id = "readInput",
+            args = {
+                "var2",
+            },
+            hyperargs = {},
+        },
+        {
+            id = "getHealth",
+            args = {
+                "var5",
+            },
+            hyperargs = {},
+        },
+        {
+            id = "getEnergy",
+            args = {
+                "var4",
+            },
+            hyperargs = {},
+        },
+        {
+            id = "addVariables",
+            args = {
+                "var5",
+                "var4",
+                "var5"
+            },
+            hyperargs = {},
+        },
+        
+        -- Consume input
+        {
+            id = "ifStruct",
+            args = {
+                "var1",
+                "var2",
+            },
+            hyperargs = {
+                "<"
+            },
+        },
+        {
+            id = "consumeInput",
+            args = {},
+            hyperargs = {},
+        },
+        {
+            id = "endStruct",
+            args = {},
+            hyperargs = {},
+        },
+
+        -- Check if there's enough energy to reproduce
+        {
+            id = "ifStruct",
+            args = {
+                "var3",
+                "var5",
+            },
+            hyperargs = {
+                "<"
+            },
+        },
+        {
+            id = "reproduce",
+            args = {},
+            hyperargs = {},
+        },
+        {
+            id = "endStruct",
+            args = {},
+            hyperargs = {},
+        },
+
+        -- Move forward
+        {
+            id = "moveForward",
+            args = {},
+            hyperargs = {},
+        },
+    }
+    captures[1].vars[1] = 2 -- Minimum input value needed to consume
+    captures[1].vars[1] = 0 -- Stores the input value
+    captures[1].vars[3] = 250 -- Minimum total health/energy needed to reproduce
+    captures[1].vars[4] = 0 -- Temp variable
+    captures[1].vars[5] = 0 -- Holds the total health/energy
+    cell:compileScript (captures[1])
 end
 
 function thisScene:update (dt)
@@ -48,17 +147,18 @@ function thisScene:update (dt)
     end
 
     local camX, camY, zoom = map:getCamera ()
+    local speedMult = (love.keyboard.isDown ("lshift") == true) and 5 or 1
 
     if love.keyboard.isDown("w") then
-        camY = camY - camVelocity * dt * zoom
+        camY = camY - camVelocity * dt * zoom * speedMult
     elseif love.keyboard.isDown("s") then
-        camY = camY + camVelocity * dt * zoom
+        camY = camY + camVelocity * dt * zoom * speedMult
     end
 
     if love.keyboard.isDown("a") then
-        camX = camX - camVelocity * dt * zoom
+        camX = camX - camVelocity * dt * zoom * speedMult
     elseif love.keyboard.isDown("d") then
-        camX = camX + camVelocity * dt * zoom
+        camX = camX + camVelocity * dt * zoom * speedMult
     end
 
     if love.keyboard.isDown("q") then
@@ -72,46 +172,67 @@ function thisScene:update (dt)
     local capture = map:update (dt)
 
     -- Save cell to captures table
-    captureTimer = captureTimer - dt
-    if captureTimer <= 0 then
-        if capture ~= nil then
-            table.insert (captures, 1, capture)
-            table.remove (captures, 11)
+    -- if capture ~= nil then
+    --     captureTimer = captureTimer - 1
 
-            cell:printCellInfo (capture)
-        else
-            print ("WARNING: Capture failed", os.date("%H:%M:%S - %Y-%m-%d"))
-            print ("Cells left: " .. map.stats.cells)
-        end
+    --     if captureTimer <= 0 then
+    --         if capture ~= nil then
+    --             table.insert (captures, 1, capture)
+    --             table.remove (captures, maxCaptures)
 
-        captureTimer = maxCaptureTimer
+    --             print ("INFO: Cell captured successfully")
+    --             cell:printCellInfo (capture)
+    --         else
+    --             print ("WARNING: Capture failed", os.date("%H:%M:%S - %Y-%m-%d"))
+    --             print ("Cells left: " .. map.stats.cells)
+    --         end
+
+    --         captureTimer = maxCaptureCycles
+    --     end
+    -- end
+
+    if map.stats.cells == 1 and map:getTickSpeed () < math.huge and capture ~= nil then
+        lastCell = capture
     end
 
     -- Activate failsafe if all cells are dead
     if map.stats.cells <= 0 then
+        print ("WARNING: Failsafe #" .. failsafeActivations .. " activated", os.date("%H:%M:%S - %Y-%m-%d"))
+        print ("Number of available captures: " .. #captures)
+
+        -- Add last surviving cell to captures list
+        if lastCell ~= nil then
+            table.insert (captures, 1, lastCell)
+            table.remove (captures, maxCaptures + 1)
+        end
+
+        map:reset (mapSize, mapSize, mapInput)
+
         local cellsSpawned = 0
 
-        while cellsSpawned < 10 do
+        while cellsSpawned < failsafeSpawns do
             for i = 1, #captures do
-                local selectedCell = captures[i]
+                local newCell = copyTable (captures[i])
 
                 -- Heavily mutate cell
                 for i = 1, round (mapToScale (love.math.randomNormal (), 0, 1, 0, 50)) do
-                    local newCell = cell:new (100, 100)
-                    cell:mutate (newCell, testCell)
-                    cell:compileScript (newCell)
-                    testCell = newCell
+                    cell:mutate (newCell, newCell)
                 end
 
+                cell:compileScript (newCell)
+
+                -- print ("INFO:", i)
+                -- cell:printCellInfo (newCell)
+                -- cell:printCellScriptList (newCell)
+
                 -- Attempt to spawn the cell
-                if map:spawnCell (math.random (1, map.width), math.random (1, map.height)) == true then
+                if map:spawnCell (math.random (1, map.width), math.random (1, map.height), 500, 500, newCell) == true then
                     cellsSpawned = cellsSpawned + 1
                 end
             end
         end
 
         failsafeActivations = failsafeActivations + 1
-        print ("WARNING: Failsafe activated", os.date("%H:%M:%S - %Y-%m-%d"))
     end
 end
 
@@ -120,8 +241,15 @@ function thisScene:draw ()
     map:draw ()
 
     -- Super speed border
-    if superSpeed == true then
+    local tickSpeed = map:getTickSpeed ()
+    if tickSpeed == 0 then
         love.graphics.setColor (0, 1, 0, 1)
+        love.graphics.rectangle ("fill", 0, 0, love.graphics.getWidth (), 5)
+        love.graphics.rectangle ("fill", 0, 0, 5, love.graphics.getHeight ())
+        love.graphics.rectangle ("fill", love.graphics.getWidth (), 0, -5, love.graphics.getHeight ())
+        love.graphics.rectangle ("fill", 0, love.graphics.getHeight (), love.graphics.getWidth (), -5)
+    elseif tickSpeed == math.huge then
+        love.graphics.setColor (1, 0, 0, 1)
         love.graphics.rectangle ("fill", 0, 0, love.graphics.getWidth (), 5)
         love.graphics.rectangle ("fill", 0, 0, 5, love.graphics.getHeight ())
         love.graphics.rectangle ("fill", love.graphics.getWidth (), 0, -5, love.graphics.getHeight ())
@@ -192,7 +320,7 @@ function thisScene:keypressed (key, scancode, isrepeat)
     elseif key == "p" then
         local tileX, tileY = map:screenToMap (love.mouse.getPosition ())
 
-        map:spawnCell (tileX, tileY, 100, 100, testCell)
+        map:spawnCell (tileX, tileY, 500, 500, testCell)
         print ("Cell spawned at :", tileX, tileY)
     
     -- Kills  a cell in the map
@@ -202,16 +330,36 @@ function thisScene:keypressed (key, scancode, isrepeat)
 
     -- Prints an input tile's value
     elseif key == "i" then
-        print (map:getInputTile (map:screenToMap (love.mouse.getPosition ())))
+        local tileX, tileY = map:screenToMap (love.mouse.getPosition ())
+
+        if love.keyboard.isDown ("lshift") then
+            print ("Input @ (" .. tileX .. ", " .. tileY .. "): " .. map:getInputTile (map:screenToMap (love.mouse.getPosition ())))
+        else
+            local cellToPrint = map:getCell (tileX, tileY)
+
+            if cellToPrint ~= nil then
+                if love.keyboard.isDown ("lctrl") == true then
+                    cell:printCellScriptList (map:getCell (tileX, tileY))
+                else
+                    cell:printCellInfo (map:getCell (tileX, tileY))
+                end
+            end
+        end
     
     -- Toggles superspeed
     elseif key == "tab" then
-        superSpeed = not superSpeed
-
-        if superSpeed == true then
-            map:setTickSpeed (0)
-        else
+        if map:getTickSpeed () == 0 then
             map:setTickSpeed (1/8)
+        else
+            map:setTickSpeed (0)
+        end
+
+    -- Toggles pause mode
+    elseif key == "space" then
+        if map:getTickSpeed () == math.huge then
+            map:setTickSpeed (1/8)
+        else
+            map:setTickSpeed (math.huge)
         end
     end
 end

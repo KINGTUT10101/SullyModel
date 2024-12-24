@@ -1,6 +1,7 @@
 local clamp = require ("Libraries.lume").clamp
 local cycleValue = require ("Helpers.cycleValue")
 local mapToScale = require ("Helpers.mapToScale")
+local copyTable  = require("Helpers.copyTable")
 
 local map = {
     inputGrid = {}, -- Tracks all the tiles in the map environment
@@ -39,8 +40,8 @@ end
 --- Resets the map with a new size and input data.
 --- @param width integer The width of the input data.
 --- @param height integer The height of the input data.
---- @param sparseInput number[][] A sparse matrix containing the input data. Blank tiles will be set to 0.
-function map:reset (width, height, sparseInput)
+--- @param mapInput fun(param:integer, param:integer):number Used to map the value of each input tile
+function map:reset (width, height, mapInput)
     self.width, self.height = width, height
 
     -- Generates the input grid and input render
@@ -57,8 +58,10 @@ function map:reset (width, height, sparseInput)
         for j = 1, self.height do
             local tile = 0
 
-            if sparseInput[i] ~= nil and sparseInput[i][j] ~= nil then
-                tile = sparseInput[i][j]
+            if mapInput ~= nil then
+                tile = mapInput (i, j)
+            else
+                tile = 0
             end
 
             inputRow[j] = tile -- Add tile to grid
@@ -267,9 +270,9 @@ function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
             local mutSuccess, mutErr = pcall (self.cellManager.mutate, self.cellManager.mutate, newCellObj, parentCellObj)
             local compSuccess, compErr = pcall (self.cellManager.compileScript, self.cellManager.compileScript, newCellObj)
 
-            assert (mutSuccess == true, "ERROR: Problem with mutation:" .. mutErr)
-            assert (compSuccess == true, "ERROR: Problem with script compilation:" .. compErr)
-            self.cellManager:printCellInfo (parentCellObj)
+            assert (mutSuccess == true, "ERROR: Problem with mutation:" .. tostring (mutErr))
+            assert (compSuccess == true, "ERROR: Problem with script compilation:" .. tostring (compErr))
+            -- self.cellManager:printCellInfo (parentCellObj)
         end
 
         self.cellGrid[tileX][tileY] = newCellObj
@@ -286,7 +289,7 @@ function map:deleteCell (tileX, tileY)
         local cellObj = self.cellGrid[tileX][tileY]
 
         -- Add cell's remaining energy and health to the ground
-        map:adjustInputTile (tileX, tileY, cellObj.health + math.max (10, cellObj.energy))
+        map:adjustInputTile (tileX, tileY, 1 * (cellObj.health + math.max (500 * 0.1, cellObj.energy)))
 
         self.cellGrid[tileX][tileY] = nil
         self.stats.cells = self.stats.cells - 1
@@ -303,6 +306,12 @@ function map:swapCells (tileX1, tileY1, tileX2, tileY2)
     end
 end
 
+function map:getCell (tileX, tileY)
+    if self:isTaken (tileX, tileY) == true then
+        return copyTable (self.cellGrid[tileX][tileY])
+    end
+end
+
 local directionVects = {
     [1] = {0, -1}, -- Up
     [2] = {1, 0}, -- Right
@@ -310,9 +319,6 @@ local directionVects = {
     [4] = {-1, 0}, -- Left
 }
 function map:getForwardPos (tileX, tileY, amount)
-    print (tileX, tileY)
-    print (self.cellGrid[tileX])
-    print (self.cellGrid[tileX][tileY])
     local cellDirection = self.cellGrid[tileX][tileY].direction
     local vect = directionVects[cellDirection]
 
@@ -344,10 +350,35 @@ function map:turnRight (tileX, tileY)
     end
 end
 
+function map:transferInputToCell (tileX, tileY, amount)
+    if self:isTaken (tileX, tileY) == true then
+        local cellObj = self.cellGrid[tileX][tileY]
+        local inputVal = self:getInputTile (tileX, tileY)
+
+        -- Energy cost of consuming a tile
+        cellObj.energy = cellObj.energy - 2
+
+        if inputVal <= amount then
+            cellObj.energy = cellObj.energy + inputVal
+            inputVal = 0
+        else
+            cellObj.energy = cellObj.energy + amount
+            inputVal = inputVal - amount
+        end
+        
+        if cellObj.energy > 500 then -- Cell energy max
+            inputVal = inputVal + cellObj.energy - 500
+            cellObj.energy = 500
+        end
+
+        self:setInputTile (tileX, tileY, inputVal)
+    end
+end
+
 function map:adjustCellEnergy (tileX, tileY, amount)
     if self:isTaken (tileX, tileY) == true then
         local cell = self.cellGrid[tileX][tileY]
-        cell.energy = math.min (100, cell.energy + amount)
+        cell.energy = math.min (500, cell.energy + amount)
 
         if cell.energy < 0 then
             map:adjustCellHealth (tileX, tileY, cell.energy)
@@ -358,11 +389,27 @@ end
 function map:adjustCellHealth (tileX, tileY, amount)
     if self:isTaken (tileX, tileY) == true then
         local cell = self.cellGrid[tileX][tileY]
-        cell.health = math.min (100, cell.health + amount)
+        cell.health = math.min (500, cell.health + amount)
 
         if cell.health <= 0 then
             self:deleteCell (tileX, tileY)
         end
+    end
+end
+
+function map:getCellHealth (tileX, tileY)
+    if self:isTaken (tileX, tileY) == true then
+        return self.cellGrid[tileX][tileY].health
+    else
+        return 0
+    end
+end
+
+function map:getCellEnergy (tileX, tileY)
+    if self:isTaken (tileX, tileY) == true then
+        return self.cellGrid[tileX][tileY].energy
+    else
+        return 0
     end
 end
 
