@@ -434,10 +434,12 @@ function cell:mutate (childCellObj, parentCellObj)
 
             if actionToDelete.id == "endStruct" then
                 local aboveActionDef = actionDict[childScriptList[actionIndex - 1].id]
+
                 -- Delete two lines if above line is a control type
                 if aboveActionDef ~= nil and aboveActionDef.type == "control" then
                     table.remove (childScriptList, actionIndex)
                     table.remove (childScriptList, actionIndex - 1)
+                    actionIndex = actionIndex - 1
                 
                 -- Only delete line above
                 else

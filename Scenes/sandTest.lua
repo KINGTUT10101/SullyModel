@@ -36,96 +36,96 @@ function thisScene:load (...)
     map:setTickSpeed (1/8)
 
     captures[1] = cell:new (100, 100)
-    captures[1].scriptList = {
-        -- Set variables
-        {
-            id = "readInput",
-            args = {
-                "var2",
-            },
-            hyperargs = {},
-        },
-        {
-            id = "getHealth",
-            args = {
-                "var5",
-            },
-            hyperargs = {},
-        },
-        {
-            id = "getEnergy",
-            args = {
-                "var4",
-            },
-            hyperargs = {},
-        },
-        {
-            id = "addVariables",
-            args = {
-                "var5",
-                "var4",
-                "var5"
-            },
-            hyperargs = {},
-        },
+    -- captures[1].scriptList = {
+    --     -- Set variables
+    --     {
+    --         id = "readInput",
+    --         args = {
+    --             "var2",
+    --         },
+    --         hyperargs = {},
+    --     },
+    --     {
+    --         id = "getHealth",
+    --         args = {
+    --             "var5",
+    --         },
+    --         hyperargs = {},
+    --     },
+    --     {
+    --         id = "getEnergy",
+    --         args = {
+    --             "var4",
+    --         },
+    --         hyperargs = {},
+    --     },
+    --     {
+    --         id = "addVariables",
+    --         args = {
+    --             "var5",
+    --             "var4",
+    --             "var5"
+    --         },
+    --         hyperargs = {},
+    --     },
         
-        -- Consume input
-        {
-            id = "ifStruct",
-            args = {
-                "var1",
-                "var2",
-            },
-            hyperargs = {
-                "<"
-            },
-        },
-        {
-            id = "consumeInput",
-            args = {},
-            hyperargs = {},
-        },
-        {
-            id = "endStruct",
-            args = {},
-            hyperargs = {},
-        },
+    --     -- Consume input
+    --     {
+    --         id = "ifStruct",
+    --         args = {
+    --             "var1",
+    --             "var2",
+    --         },
+    --         hyperargs = {
+    --             "<"
+    --         },
+    --     },
+    --     {
+    --         id = "consumeInput",
+    --         args = {},
+    --         hyperargs = {},
+    --     },
+    --     {
+    --         id = "endStruct",
+    --         args = {},
+    --         hyperargs = {},
+    --     },
 
-        -- Check if there's enough energy to reproduce
-        {
-            id = "ifStruct",
-            args = {
-                "var3",
-                "var5",
-            },
-            hyperargs = {
-                "<"
-            },
-        },
-        {
-            id = "reproduce",
-            args = {},
-            hyperargs = {},
-        },
-        {
-            id = "endStruct",
-            args = {},
-            hyperargs = {},
-        },
+    --     -- Check if there's enough energy to reproduce
+    --     {
+    --         id = "ifStruct",
+    --         args = {
+    --             "var3",
+    --             "var5",
+    --         },
+    --         hyperargs = {
+    --             "<"
+    --         },
+    --     },
+    --     {
+    --         id = "reproduce",
+    --         args = {},
+    --         hyperargs = {},
+    --     },
+    --     {
+    --         id = "endStruct",
+    --         args = {},
+    --         hyperargs = {},
+    --     },
 
-        -- Move forward
-        {
-            id = "moveForward",
-            args = {},
-            hyperargs = {},
-        },
-    }
-    captures[1].vars[1] = 2 -- Minimum input value needed to consume
-    captures[1].vars[1] = 0 -- Stores the input value
-    captures[1].vars[3] = 250 -- Minimum total health/energy needed to reproduce
-    captures[1].vars[4] = 0 -- Temp variable
-    captures[1].vars[5] = 0 -- Holds the total health/energy
-    cell:compileScript (captures[1])
+    --     -- Move forward
+    --     {
+    --         id = "moveForward",
+    --         args = {},
+    --         hyperargs = {},
+    --     },
+    -- }
+    -- captures[1].vars[1] = 2 -- Minimum input value needed to consume
+    -- captures[1].vars[1] = 0 -- Stores the input value
+    -- captures[1].vars[3] = 250 -- Minimum total health/energy needed to reproduce
+    -- captures[1].vars[4] = 0 -- Temp variable
+    -- captures[1].vars[5] = 0 -- Holds the total health/energy
+    -- cell:compileScript (captures[1])
 end
 
 function thisScene:update (dt)
@@ -216,7 +216,9 @@ function thisScene:update (dt)
 
                 -- Heavily mutate cell
                 for i = 1, round (mapToScale (love.math.randomNormal (), 0, 1, 0, 50)) do
-                    cell:mutate (newCell, newCell)
+                    local mutCell = cell:new (100, 100)
+                    cell:mutate (mutCell, newCell)
+                    newCell = mutCell
                 end
 
                 cell:compileScript (newCell)
