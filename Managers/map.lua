@@ -375,6 +375,33 @@ function map:transferInputToCell (tileX, tileY, amount)
     end
 end
 
+function map:shareInputToCell (tileX1, tileY1, tileX2, tileY2, amount)
+    if self:isTaken (tileX1, tileY1) == true and self:isTaken (tileX2, tileY2) == true then
+        local currCellObj = self.cellGrid[tileX1][tileY1]
+        local otherCellObj = self.cellGrid[tileX2][tileY2]
+
+        -- Energy cost of sharing energy
+        currCellObj.energy = currCellObj.energy - 3
+
+        if currCellObj.energy <= amount then
+            otherCellObj.energy = otherCellObj.energy + currCellObj.energy
+            currCellObj.energy = 0
+        else
+            otherCellObj.energy = otherCellObj.energy + amount
+            currCellObj.energy = currCellObj.energy - amount
+        end
+        
+        if otherCellObj.energy > 500 then -- Cell energy max
+            currCellObj.energy = currCellObj.energy + otherCellObj.energy - 500
+            otherCellObj.energy = 500
+        end
+
+        if currCellObj.energy <= 0 then
+            self:deleteCell (tileX1, tileY1)
+        end
+    end
+end
+
 function map:adjustCellEnergy (tileX, tileY, amount)
     if self:isTaken (tileX, tileY) == true then
         local cell = self.cellGrid[tileX][tileY]

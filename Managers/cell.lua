@@ -191,6 +191,22 @@ for i = 1, %s do
 -- end
 -- ]]
 --     },
+    shareEnergy = {
+        desc = "Shares some energy with the cell in front of the current cell",
+        type = "action",
+        params = 0,
+        hyperparams = {},
+        interOrder = {},
+        funcString =
+[[
+otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
+map:shareInputToCell (tileX, tileY, otherTileX, otherTileY, 25)
+if map:isTaken(tileX, tileY) == false then
+    print ("Cell death: Share energy", tileX, tileY)
+    return
+end
+]]
+    },
     isTaken = {
         desc = "Determines if the position in front of the current cell contains another cell",
         type = "assign",
@@ -297,6 +313,18 @@ end
         funcString =
 [[
 %s = cellObj.energy
+]]
+    },
+    getOtherCellEnergy = {
+        desc = "Saves the energy of the cell in front of the current cell to a variable",
+        type = "assign",
+        params = 1,
+        hyperparams = {},
+        interOrder = {"param"},
+        funcString =
+[[
+otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
+%s = map:getCellEnergy (otherTileX, otherTileY)
 ]]
     },
     earlyStop = {
