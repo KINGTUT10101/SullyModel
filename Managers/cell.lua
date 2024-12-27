@@ -82,23 +82,23 @@ map:turnRight (tileX, tileY)
 -- end
 ]]
     },
-    applyDamage = {
-        desc = "Applies damage to the cell the current cell is facing",
-        type = "action",
-        params = 0,
-        hyperparams = {},
-        interOrder = {},
-        funcString = 
-[[
-enemyTileX, enemyTileY = map:getForwardPos (tileX, tileY, 1)
-map:adjustCellEnergy (tileX, tileY, -4)
-map:adjustCellHealth (enemyTileX, enemyTileY, -5)
-if map:isTaken(tileX, tileY) == false then
-    print ("Cell death: Apply damage", tileX, tileY)
-    return
-end
-]]
-    },
+--     applyDamage = {
+--         desc = "Applies damage to the cell the current cell is facing",
+--         type = "action",
+--         params = 0,
+--         hyperparams = {},
+--         interOrder = {},
+--         funcString = 
+-- [[
+-- enemyTileX, enemyTileY = map:getForwardPos (tileX, tileY, 1)
+-- map:adjustCellEnergy (tileX, tileY, -4)
+-- map:adjustCellHealth (enemyTileX, enemyTileY, -5)
+-- if map:isTaken(tileX, tileY) == false then
+--     print ("Cell death: Apply damage", tileX, tileY)
+--     return
+-- end
+-- ]]
+--     },
     healSelf = {
         desc = "Uses energy to heal the cell",
         type = "action",
@@ -162,35 +162,35 @@ if %s %s %s then
 for i = 1, %s do
 ]]
     },
-    reproduce = {
-        desc = "Halves the cell's health and energy to split and create a new cell",
-        type = "action",
-        params = 0,
-        hyperparams = {},
-        interOrder = {},
-        funcString =
-[[
-babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
-if map:isClear (babyTileX, babyTileY) == true then
-    parentHalfHealth = map:getCellHealth (tileX, tileY) / 2
-    parentHalfEnergy = map:getCellEnergy (tileX, tileY) / 2
-    map:adjustCellEnergy (tileX, tileY, -math.ceil (parentHalfEnergy) * 2)
+--     reproduce = {
+--         desc = "Halves the cell's health and energy to split and create a new cell",
+--         type = "action",
+--         params = 0,
+--         hyperparams = {},
+--         interOrder = {},
+--         funcString =
+-- [[
+-- babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
+-- if map:isClear (babyTileX, babyTileY) == true then
+--     parentHalfHealth = map:getCellHealth (tileX, tileY) / 2
+--     parentHalfEnergy = map:getCellEnergy (tileX, tileY) / 2
+--     map:adjustCellEnergy (tileX, tileY, -math.ceil (parentHalfEnergy) * 2)
     
-    if map:isTaken(tileX, tileY) == true then
-        map:adjustCellHealth (tileX, tileY, -math.ceil (parentHalfHealth) * 2)
+--     if map:isTaken(tileX, tileY) == true then
+--         map:adjustCellHealth (tileX, tileY, -math.ceil (parentHalfHealth) * 2)
         
-        if map:isTaken(tileX, tileY) == true then
-            map:spawnCell (babyTileX, babyTileY, math.floor (parentHalfHealth), math.floor (parentHalfEnergy), cellObj)
-            print ("Cell spawned")
-        else
-            return
-        end
-    else
-        return
-    end
-end
-]]
-    },
+--         if map:isTaken(tileX, tileY) == true then
+--             map:spawnCell (babyTileX, babyTileY, math.floor (parentHalfHealth), math.floor (parentHalfEnergy), cellObj)
+--             print ("Cell spawned")
+--         else
+--             return
+--         end
+--     else
+--         return
+--     end
+-- end
+-- ]]
+--     },
     isTaken = {
         desc = "Determines if the position in front of the current cell contains another cell",
         type = "assign",
