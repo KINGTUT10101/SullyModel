@@ -14,9 +14,11 @@ local zoomVelocity = 25
 local testCell = cell:new (100, 100)
 
 local maxCaptures = 25
-local maxCaptureCycles = 50
+local maxCaptureCycles = 500
 local captureTimer = maxCaptureCycles
 local captures = {} -- Holds the last 10 captures
+
+local cyclesSinceLastFail = 0
 
 local failsafeSpawns = 50
 local failsafeActivations = -1
@@ -171,6 +173,10 @@ function thisScene:update (dt)
     map:setCamera (camX, camY, zoom)
     local capture = map:update (dt)
 
+    if capture ~= nil then
+        cyclesSinceLastFail = cyclesSinceLastFail + 1
+    end
+
     -- Save cell to captures table
     -- if capture ~= nil then
     --     captureTimer = captureTimer - 1
@@ -206,6 +212,8 @@ function thisScene:update (dt)
             table.remove (captures, maxCaptures + 1)
         end
 
+        baseX = 1000000 * love.math.random()
+        baseY = 1000000 * love.math.random()
         map:reset (mapSize, mapSize, mapInput)
 
         local cellsSpawned = 0
@@ -235,6 +243,7 @@ function thisScene:update (dt)
         end
 
         failsafeActivations = failsafeActivations + 1
+        cyclesSinceLastFail = 0
     end
 end
 
@@ -263,6 +272,12 @@ function thisScene:draw ()
     love.graphics.rectangle ("fill", 10, 10, 35, 25)
     love.graphics.setColor (1, 1, 1, 1)
     love.graphics.printf (love.timer.getFPS (), 15, 15, 25, "center")
+
+    -- Show the number of cycles the current generation has survived
+    love.graphics.setColor (0, 0, 0, 0.75)
+    love.graphics.rectangle ("fill", 10, 45, 95, 25)
+    love.graphics.setColor (1, 1, 1, 1)
+    love.graphics.printf ("Cycles: " .. cyclesSinceLastFail, 15, 50, 85, "left")
 
     -- Show number of cells
     love.graphics.setColor (0, 0, 0, 0.75)
