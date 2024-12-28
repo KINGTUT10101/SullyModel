@@ -6,12 +6,11 @@ local copyTable  = require("Helpers.copyTable")
 local map = {
     inputGrid = {}, -- Tracks all the tiles in the map environment
     cellGrid = {}, -- Sparse matrix that tracks all the cells in the map environment
-    -- inputRender = nil, -- Contains a pre-rendered image of the background data
+    startCell = nil, -- The first cell object in the linked list used for updating the cells
     width = 0, -- Width of the input grid
     height = 0, --- Height of the input grid
     lastTick = 0, --- Time since the last tick, in seconds
-    tickSpeed = 1/32, -- Intended number of ticks per second
-    evenTick = true,
+    tickSpeed = 1/32, -- Time between ticks
     camera = {
         x = 0,
         y = 0,
@@ -47,7 +46,6 @@ function map:reset (width, height, mapInput)
     -- Generates the input grid and input render
     local inputGrid = {}
     local cellGrid = {}
-    -- local inputRender = love.image.newImageData (self.width, self.height)
     for i = 1, self.width do
         local inputRow = {}
         inputGrid[i] = inputRow -- Add row to input grid
@@ -65,64 +63,44 @@ function map:reset (width, height, mapInput)
             end
 
             inputRow[j] = tile -- Add tile to grid
-            -- inputRender:setPixel (i - 1, j - 1, tile, tile, tile, 1) -- Render tile to image
         end
     end
 
     self.inputGrid = inputGrid
     self.cellGrid = cellGrid
     self.stats.cells = 0
-    -- self.inputRender = love.graphics.newImage (inputRender)
-    -- self.inputRender:setFilter ("nearest", "nearest")
+    self.lastTick = 0
+    self.startCell = nil
 end
 
+--- Updates the cells on the map if enough time has passed since the last tick.
+--- @param dt number Delta time. AKA the amount of time since the last frame.
 function map:update (dt)
     self.lastTick = self.lastTick + dt -- Update last tick
-
-    local capture = nil
 
     -- Check if enough time has passed since the last tick
     local cellGrid = self.cellGrid
     if self.lastTick >= self.tickSpeed then
-        local updateStartTime = love.timer.getTime()
+        local currCell = self.startCell
 
-        -- Iterate over active grid and update cells
-        -- TODO: Optimize this system so it doesn't have to iterate over the entire grid
-        for i = 1, self.width do
-            local cellRow = cellGrid[i]
+        -- Iterate over the cell object's linked list until no more cells are found
+        while currCell ~= nil do
+            -- Call cell object's update script
 
-            for j = 1, self.height do
-                local cell = cellRow[j]
-
-                -- Check if cell exists at this position
-                if cell ~= nil then
-                    -- Skip cells that have already been updated this tick
-                    if cell.lastUpdate < updateStartTime then
-                        cell.lastUpdate = updateStartTime
-
-                        self.cellManager:update (i, j, cell, self) -- Call cell update function
-                    end
-
-                    capture = cell
-                end
-            end
+            currCell = currCell.nextCell
         end
 
         self.lastTick = 0 -- Reset last tick
     end
-
-    return capture
 end
 
+--- Renders the cell objects and input tiles based on the current camera position.
 function map:draw ()
     love.graphics.push ()
     love.graphics.translate (-self.camera.x, -self.camera.y)
     love.graphics.scale (self.camera.zoom)
 
-    -- Draw input image
-    -- love.graphics.draw (self.inputRender, 0, 0)
-
-    -- Draw cells
+    -- Draw tiles
     local inputGrid = self.inputGrid
     local cellGrid = self.cellGrid
     for i = 1, self.width do
@@ -130,17 +108,17 @@ function map:draw ()
         local inputRow = inputGrid[i]
 
         for j = 1, self.height do
-            local cell = cellRow[j]
-            local input = inputRow[j]
+            local cellObj = cellRow[j]
 
             -- Check if cell exists at this position
-            if cell ~= nil then
-                -- Render cell
-                love.graphics.setColor (cell.color)
+            if cellObj ~= nil then
+                -- Render cell object
+                love.graphics.setColor (cellObj.color)
                 love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
 
             else
                 -- Render input tile
+                local input = inputRow[j]
                 local scaledColor = mapToScale (input, self.inputBounds.min, self.inputBounds.max, 0, 1)
                 love.graphics.setColor (scaledColor, scaledColor, scaledColor, 1)
                 love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
@@ -151,10 +129,14 @@ function map:draw ()
     love.graphics.pop ()
 end
 
+--- Gets the current tick speed.
+--- @return number tickSpeed The amount of time between map updates.
 function map:getTickSpeed ()
     return self.tickSpeed
 end
 
+--- Sets the tick speed.
+--- @param value number The new amount of time between map updates. Expects a value between 0 and infinity.
 function map:setTickSpeed (value)
     assert (type (value) == "number", "Provided value is not a number")
 
@@ -247,7 +229,7 @@ end
 --- It also implicitly checks if the provided position is within bounds.
 --- @param tileX integer The horizontal map position.
 --- @param tileY integer The vertical map position.
---- @return boolean isClear True if the provided position does not have a cell.
+--- @return boolean isClear True if the provided position does not have a cell object.
 function map:isClear (tileX, tileY)
     return self:inBounds (tileX, tileY) and self.cellGrid[tileX][tileY] == nil
 end
@@ -256,16 +238,24 @@ end
 --- It also implicitly checks if the provided position is within bounds.
 --- @param tileX integer The horizontal map position.
 --- @param tileY integer The vertical map position.
---- @return boolean isClear True if the provided position contains a cell.
+--- @return boolean isClear True if the provided position contains a cell object.
 function map:isTaken (tileX, tileY)
     return self:inBounds (tileX, tileY) and self.cellGrid[tileX][tileY] ~= nil
 end
 
+--- Spawns a new cell object into the map.
+--- The new cell object will have n rounds of mutations applied to it if a parent is provided, depending on the value of map.cellManager.meanMut.
+--- @param tileX integer The horizontal map position.
+--- @param tileY integer The vertical map position.
+--- @param health number The health value of the new cell object.
+--- @param energy number The energy value of the new cell object.
+--- @param parentCellObj? table The parent cell object object.
+--- @return boolean success True if a cell object was spawned successfully.
 function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
     if self:isClear (tileX, tileY) == true then
-        local newCellObj = self.cellManager:new (health, energy) -- Create default cell
+        local newCellObj = self.cellManager:new (health, energy) -- Create default cell object
 
-        -- Mutate cell if a parent is given
+        -- Mutate cell object if a parent is given
         if parentCellObj ~= nil then
             local mutSuccess, mutErr = pcall (self.cellManager.mutate, self.cellManager.mutate, newCellObj, parentCellObj)
             local compSuccess, compErr = pcall (self.cellManager.compileScript, self.cellManager.compileScript, newCellObj)
@@ -284,11 +274,14 @@ function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
     end
 end
 
+--- Removes a cell object from the map.
+--- @param tileX integer The horizontal map position.
+--- @param tileY integer The vertical map position.
 function map:deleteCell (tileX, tileY)
     if self:isTaken (tileX, tileY) == true then
         local cellObj = self.cellGrid[tileX][tileY]
 
-        -- Add cell's remaining energy and health to the ground
+        -- Add cell object's remaining energy and health to the ground
         map:adjustInputTile (tileX, tileY, 1 * (cellObj.health + math.max (500 * 0.1, cellObj.energy)))
 
         self.cellGrid[tileX][tileY] = nil
@@ -296,6 +289,13 @@ function map:deleteCell (tileX, tileY)
     end
 end
 
+--- Swaps the positions of two cells in the map.
+--- @param tileX1 integer The horizontal map position of the first cell object.
+--- @param tileY1 integer The vertical map position of the first cell object.
+--- @param tileX2 integer The horizontal map position of the second cell object.
+--- @param tileY2 integer The vertical map position of the second cell object.
+--- @return integer newTileX1 The new horizontal position of the first cell object.
+--- @return integer newTileY1 The new vertical position of the first cell object.
 function map:swapCells (tileX1, tileY1, tileX2, tileY2)
     if self:isTaken (tileX1, tileY1) == true and self:isClear (tileX2, tileY2) == true then
         self.cellGrid[tileX1][tileY1], self.cellGrid[tileX2][tileY2] = self.cellGrid[tileX2][tileY2], self.cellGrid[tileX1][tileY1]
@@ -306,137 +306,13 @@ function map:swapCells (tileX1, tileY1, tileX2, tileY2)
     end
 end
 
+--- Gets a copy of the cell object at the specified map position.
+--- @param tileX integer The horizontal map position.
+--- @param tileY integer The vertical map position.
+--- @return table|nil cellObj The cell object at the given position or nil if a cell object doesn't exist there.
 function map:getCell (tileX, tileY)
     if self:isTaken (tileX, tileY) == true then
         return copyTable (self.cellGrid[tileX][tileY])
-    end
-end
-
-local directionVects = {
-    [1] = {0, -1}, -- Up
-    [2] = {1, 0}, -- Right
-    [3] = {0, 1}, -- Down
-    [4] = {-1, 0}, -- Left
-}
-function map:getForwardPos (tileX, tileY, amount)
-    local cellDirection = self.cellGrid[tileX][tileY].direction
-    local vect = directionVects[cellDirection]
-
-    return tileX + vect[1] * amount, tileY + vect[2] * amount
-end
-
-function map:moveForward (tileX, tileY)
-    if self:isTaken (tileX, tileY) == true then
-        local cellDirection = self.cellGrid[tileX][tileY].direction
-        local vect = directionVects[cellDirection]
-
-        return self:swapCells (tileX, tileY, tileX + vect[1], tileY + vect[2])
-    else
-        return tileX, tileY
-    end
-end
-
-function map:turnLeft (tileX, tileY)
-    if self:isTaken (tileX, tileY) == true then
-        local cell = self.cellGrid[tileX][tileY]
-        cell.direction = cycleValue (cell.direction, -1, 4)
-    end
-end
-
-function map:turnRight (tileX, tileY)
-    if self:isTaken (tileX, tileY) == true then
-        local cell = self.cellGrid[tileX][tileY]
-        cell.direction = cycleValue (cell.direction, 1, 4)
-    end
-end
-
-function map:transferInputToCell (tileX, tileY, amount)
-    if self:isTaken (tileX, tileY) == true then
-        local cellObj = self.cellGrid[tileX][tileY]
-        local inputVal = self:getInputTile (tileX, tileY)
-
-        -- Energy cost of consuming a tile
-        cellObj.energy = cellObj.energy - 2
-
-        if inputVal <= amount then
-            cellObj.energy = cellObj.energy + inputVal
-            inputVal = 0
-        else
-            cellObj.energy = cellObj.energy + amount
-            inputVal = inputVal - amount
-        end
-        
-        if cellObj.energy > 500 then -- Cell energy max
-            inputVal = inputVal + cellObj.energy - 500
-            cellObj.energy = 500
-        end
-
-        self:setInputTile (tileX, tileY, inputVal)
-    end
-end
-
-function map:shareInputToCell (tileX1, tileY1, tileX2, tileY2, amount)
-    if self:isTaken (tileX1, tileY1) == true and self:isTaken (tileX2, tileY2) == true then
-        local currCellObj = self.cellGrid[tileX1][tileY1]
-        local otherCellObj = self.cellGrid[tileX2][tileY2]
-
-        -- Energy cost of sharing energy
-        currCellObj.energy = currCellObj.energy - 3
-
-        if currCellObj.energy <= amount then
-            otherCellObj.energy = otherCellObj.energy + currCellObj.energy
-            currCellObj.energy = 0
-        else
-            otherCellObj.energy = otherCellObj.energy + amount
-            currCellObj.energy = currCellObj.energy - amount
-        end
-        
-        if otherCellObj.energy > 500 then -- Cell energy max
-            currCellObj.energy = currCellObj.energy + otherCellObj.energy - 500
-            otherCellObj.energy = 500
-        end
-
-        if currCellObj.energy <= 0 then
-            self:deleteCell (tileX1, tileY1)
-        end
-    end
-end
-
-function map:adjustCellEnergy (tileX, tileY, amount)
-    if self:isTaken (tileX, tileY) == true then
-        local cell = self.cellGrid[tileX][tileY]
-        cell.energy = math.min (500, cell.energy + amount)
-
-        if cell.energy < 0 then
-            map:adjustCellHealth (tileX, tileY, cell.energy)
-        end
-    end
-end
-
-function map:adjustCellHealth (tileX, tileY, amount)
-    if self:isTaken (tileX, tileY) == true then
-        local cell = self.cellGrid[tileX][tileY]
-        cell.health = math.min (500, cell.health + amount)
-
-        if cell.health <= 0 then
-            self:deleteCell (tileX, tileY)
-        end
-    end
-end
-
-function map:getCellHealth (tileX, tileY)
-    if self:isTaken (tileX, tileY) == true then
-        return self.cellGrid[tileX][tileY].health
-    else
-        return 0
-    end
-end
-
-function map:getCellEnergy (tileX, tileY)
-    if self:isTaken (tileX, tileY) == true then
-        return self.cellGrid[tileX][tileY].energy
-    else
-        return 0
     end
 end
 
