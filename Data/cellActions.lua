@@ -365,12 +365,13 @@ local actionTypes = {
 for id, actionDef in pairs (cellActions) do
     -- Checks the required parameters
     for attribute, dataType in pairs (requiredAttributes) do
+        -- Raises an error if the attribute has the wrong type
         if type (actionDef[attribute]) ~= dataType then
             error (string.format ("Provided action attribute %s has the wrong type (currently %s, should be %s)", attribute, type (actionDef[attribute]), dataType))
         end
     end
 
-    -- Checks if the provided interDict is valid
+    -- Checks if the provided interpolation dictionary is valid
     actionDef.interDict = actionDef.interDict or {}
     for match in actionDef.funcString do
         local dictVal = actionDef.interDict[match]
@@ -378,6 +379,9 @@ for id, actionDef in pairs (cellActions) do
             error (string.format ("Found an interpolated function string value (%s) with an incorrect interpolation dictionary definition", match))
         end
     end
+
+    -- Adds the action's ID to its definition
+    actionDef.id = id
 end
 
 return cellActions

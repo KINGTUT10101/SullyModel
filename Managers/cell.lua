@@ -6,11 +6,19 @@ local copyTable = require ("Helpers.copyTable")
 local mapToScale = require ("Helpers.mapToScale")
 local cellActions = require ("Data.cellActions")
 
+-- Gathers all the cell actions into arrays based on their types
+-- This is used by major mutations to replace cell actions with another action of the same type
 local cellActionsByType = {}
-
 for id, actionDef in pairs (cellActions) do
-    actionDef.id = id
-    cellActionsByType[#cellActionsByType+1] = actionDef
+    local actionType = actionDef.type
+
+    -- Creates a new array if one hasn't been defined for the current type
+    if cellActionsByType[actionType] == nil then
+        cellActionsByType[actionType] = {}
+    end
+
+    -- Adds the action to the corresponding array
+    table.insert (cellActionsByType[actionType], actionDef)
 end
 
 -- Cell manager
