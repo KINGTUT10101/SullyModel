@@ -82,23 +82,23 @@ map:turnRight (tileX, tileY)
 -- end
 ]]
     },
---     applyDamage = {
---         desc = "Applies damage to the cell the current cell is facing",
---         type = "action",
---         params = 0,
---         hyperparams = {},
---         interOrder = {},
---         funcString = 
--- [[
--- enemyTileX, enemyTileY = map:getForwardPos (tileX, tileY, 1)
--- map:adjustCellEnergy (tileX, tileY, -4)
--- map:adjustCellHealth (enemyTileX, enemyTileY, -5)
--- if map:isTaken(tileX, tileY) == false then
---     print ("Cell death: Apply damage", tileX, tileY)
---     return
--- end
--- ]]
---     },
+    applyDamage = {
+        desc = "Applies damage to the cell the current cell is facing",
+        type = "action",
+        params = 0,
+        hyperparams = {},
+        interOrder = {},
+        funcString = 
+[[
+enemyTileX, enemyTileY = map:getForwardPos (tileX, tileY, 1)
+map:adjustCellEnergy (tileX, tileY, -4)
+map:adjustCellHealth (enemyTileX, enemyTileY, -5)
+if map:isTaken(tileX, tileY) == false then
+    print ("Cell death: Apply damage", tileX, tileY)
+    return
+end
+]]
+    },
     healSelf = {
         desc = "Uses energy to heal the cell",
         type = "action",
@@ -107,11 +107,9 @@ map:turnRight (tileX, tileY)
         interOrder = {},
         funcString = 
 [[
-map:adjustCellEnergy (tileX, tileY, -12)
-map:adjustCellHealth (tileX, tileY, 10)
-if map:isTaken(tileX, tileY) == false then
-    print ("Cell death: Heal self", tileX, tileY)
-    return
+if map:getCellTotalResources (tileX, tileY) - 12 > 0 then
+    map:adjustCellEnergy (tileX, tileY, -12)
+    map:adjustCellHealth (tileX, tileY, 10)
 end
 ]]
     },
@@ -159,38 +157,30 @@ if %s %s %s then
         interOrder = {"param"},
         funcString =
 [[
-for i = 1, %s do
+for i = 1, math.min (%s, 25) do
 ]]
     },
---     reproduce = {
---         desc = "Halves the cell's health and energy to split and create a new cell",
---         type = "action",
---         params = 0,
---         hyperparams = {},
---         interOrder = {},
---         funcString =
--- [[
--- babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
--- if map:isClear (babyTileX, babyTileY) == true then
---     parentHalfHealth = map:getCellHealth (tileX, tileY) / 2
---     parentHalfEnergy = map:getCellEnergy (tileX, tileY) / 2
---     map:adjustCellEnergy (tileX, tileY, -math.ceil (parentHalfEnergy) * 2)
+    reproduce = {
+        desc = "Halves the cell's energy to split and create a new cell",
+        type = "action",
+        params = 0,
+        hyperparams = {},
+        interOrder = {},
+        funcString =
+[[
+babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
+if map:isClear (babyTileX, babyTileY) == true then
+    local parentEnergy = map:getCellEnergy (tileX, tileY)
+    local parentHealth = map:getCellHealth (tileX, tileY)
     
---     if map:isTaken(tileX, tileY) == true then
---         map:adjustCellHealth (tileX, tileY, -math.ceil (parentHalfHealth) * 2)
-        
---         if map:isTaken(tileX, tileY) == true then
---             map:spawnCell (babyTileX, babyTileY, math.floor (parentHalfHealth), math.floor (parentHalfEnergy), cellObj)
---             print ("Cell spawned")
---         else
---             return
---         end
---     else
---         return
---     end
--- end
--- ]]
---     },
+    if parentEnergy + parentHealth > 500 then
+        map:adjustCellEnergy (tileX, tileY, -500)
+        map:spawnCell (babyTileX, babyTileY, 250, 250, cellObj)
+        print ("Cell spawned")
+    end
+end
+]]
+    },
     shareEnergy = {
         desc = "Shares some energy with the cell in front of the current cell",
         type = "action",
@@ -282,6 +272,28 @@ end
 %s = %s - %s
 ]]
     },
+    multVariables = {
+        desc = "Multiplies ones variable by another",
+        type = "assign",
+        params = 3,
+        hyperparams = {},
+        interOrder = {"param", "param", "param"},
+        funcString =
+[[
+%s = %s * %s
+]]
+    },
+    divVariables = {
+        desc = "Divides ones variable by another",
+        type = "assign",
+        params = 3,
+        hyperparams = {},
+        interOrder = {"param", "param", "param"},
+        funcString =
+[[
+%s = %s / %s
+]]
+    },
     zeroVariable = {
         desc = "Sets the value of a variable to zero",
         type = "assign",
@@ -313,6 +325,17 @@ end
         funcString =
 [[
 %s = cellObj.energy
+]]
+    },
+    getAge = {
+        desc = "Saves the cell's remaining ticks left to a variable",
+        type = "assign",
+        params = 1,
+        hyperparams = {},
+        interOrder = {"param"},
+        funcString =
+[[
+%s = cellObj.ticksLeft
 ]]
     },
     getOtherCellEnergy = {
@@ -381,7 +404,9 @@ function cell:new (health, energy)
             moderate = 0.1,
             minor = 0.1,
             meta = 0.1,
-        }
+        },
+        totalEnergy = 0,
+        ticksLeft = round (mapToScale (love.math.randomNormal ()/ 10, -3, 3, 2000, 3500)),
     }
 
     return newCell
@@ -390,13 +415,12 @@ end
 --- Updates a single cell during a game tick
 function cell:update (tileX, tileY, cellObj, map)
     -- Energy cost
-    cellObj.energy = cellObj.energy - 1
+    self.map:adjustCellEnergy (tileX, tileY, -1)
 
-    if cellObj.energy < 0 then
-        self.map:adjustCellHealth (tileX, tileY, cellObj.energy)
-    end
+    -- Age the cell by one tick
+    cellObj.ticksLeft = cellObj.ticksLeft - 1
 
-    if cellObj.health <= 0 or self.map:isTaken (tileX, tileY) == false then
+    if cellObj.health <= 0 or cellObj.ticksLeft <= 0 or self.map:isTaken (tileX, tileY) == false then
         -- Delete cell
         self.map:deleteCell (tileX, tileY)
     else
@@ -429,7 +453,7 @@ function cell:mutate (childCellObj, parentCellObj)
     -- Mutate color slightly
     local colorIndex = math.random (1, 3)
     local newColor = copyTable (parentCellObj.color)
-    newColor[colorIndex] = newColor[colorIndex] + math.random (-5, 5) / 100
+    newColor[colorIndex] = clamp (newColor[colorIndex] + math.random (-5, 5) / 100, 0.10, 0.85)
     childCellObj.color = newColor
 
     -- Copy script list and variables
@@ -554,7 +578,14 @@ function cell:mutate (childCellObj, parentCellObj)
         if math.random () < 0.05 then
             childVars[varIndex] = 0
         else
-            childVars[varIndex] = childVars[varIndex] + round (mapToScale (love.math.randomNormal () / 10, -3, 3, -100, 100))
+            -- Small chance to multiply a value
+            if math.random () < 0.10 then
+                local multSign = (math.random () < 0.50) and 1 or -1
+
+                childVars[varIndex] = childVars[varIndex] * (multSign * mapToScale (love.math.randomNormal (), -3, 6, -1, 6))
+            else
+                childVars[varIndex] = childVars[varIndex] + round (mapToScale (love.math.randomNormal () / 10, -3, 3, -100, 100))
+            end
         end
     end
 
@@ -562,7 +593,7 @@ function cell:mutate (childCellObj, parentCellObj)
     if math.random () < childMutRates.meta then
         local mutKey = randomchoice ({"major", "moderate", "minor", "meta"})
 
-        childMutRates[mutKey] = clamp (childMutRates[mutKey] + mapToScale (love.math.randomNormal () / 20, -3, 3, -1, 1), 0, 1)
+        childMutRates[mutKey] = clamp (childMutRates[mutKey] + mapToScale (love.math.randomNormal () / 20, -3, 3, -1, 1), 0.05, 1)
     end
 
     childCellObj.scriptList = childScriptList

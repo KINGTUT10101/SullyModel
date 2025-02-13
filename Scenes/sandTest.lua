@@ -6,7 +6,7 @@ local mapToScale = require ("Helpers.mapToScale")
 local round = require ("Libraries.lume").round
 local copyTable = require ("Helpers.copyTable")
 
-local mapSize = 100
+local mapSize = 50
 
 local camVelocity = 15
 local zoomVelocity = 25
@@ -24,110 +24,118 @@ local failsafeSpawns = 50
 local failsafeActivations = -1
 local lastCell = nil
 
-local baseX = 1000000 * love.math.random()
-local baseY = 1000000 * love.math.random()
+local renderMap = true
+
+local baseXInput = 1000000 * love.math.random()
+local baseYInput = 1000000 * love.math.random()
 local function mapInput (tileX, tileY)
-    return mapToScale (love.math.noise(baseX+.05*tileX, baseY+.07*tileY), 0, 1, 0, 500)
+    return mapToScale (love.math.noise(baseXInput+.05*tileX, baseYInput+.07*tileY), 0, 1, 0, 500)
+end
+
+local baseXBarriers = 1000 * love.math.random()
+local baseYBarriers = 1000 * love.math.random()
+local function mapBarriers (tileX, tileY)
+    return (love.math.noise(baseXBarriers+.03*tileX, baseYBarriers+.1*tileY) > 0.85) and true or false
 end
 
 function thisScene:load (...)
     cell:init (map)
-    map:init (cell, "Test Map", 0, 2500)
-    map:reset (mapSize, mapSize, mapInput)
+    map:init (cell, "Test Map", 0, math.huge, 0, 2500)
+    map:reset (mapSize, mapSize, mapInput, mapBarriers)
     map:setCamera (-110, -10, 5.8)
     map:setTickSpeed (1/8)
 
     captures[1] = cell:new (100, 100)
-    -- captures[1].scriptList = {
-    --     -- Set variables
-    --     {
-    --         id = "readInput",
-    --         args = {
-    --             "var2",
-    --         },
-    --         hyperargs = {},
-    --     },
-    --     {
-    --         id = "getHealth",
-    --         args = {
-    --             "var5",
-    --         },
-    --         hyperargs = {},
-    --     },
-    --     {
-    --         id = "getEnergy",
-    --         args = {
-    --             "var4",
-    --         },
-    --         hyperargs = {},
-    --     },
-    --     {
-    --         id = "addVariables",
-    --         args = {
-    --             "var5",
-    --             "var4",
-    --             "var5"
-    --         },
-    --         hyperargs = {},
-    --     },
+    captures[1].scriptList = {
+        -- Set variables
+        {
+            id = "readInput",
+            args = {
+                "var2",
+            },
+            hyperargs = {},
+        },
+        {
+            id = "getHealth",
+            args = {
+                "var5",
+            },
+            hyperargs = {},
+        },
+        {
+            id = "getEnergy",
+            args = {
+                "var4",
+            },
+            hyperargs = {},
+        },
+        {
+            id = "addVariables",
+            args = {
+                "var5",
+                "var4",
+                "var5"
+            },
+            hyperargs = {},
+        },
         
-    --     -- Consume input
-    --     {
-    --         id = "ifStruct",
-    --         args = {
-    --             "var1",
-    --             "var2",
-    --         },
-    --         hyperargs = {
-    --             "<"
-    --         },
-    --     },
-    --     {
-    --         id = "consumeInput",
-    --         args = {},
-    --         hyperargs = {},
-    --     },
-    --     {
-    --         id = "endStruct",
-    --         args = {},
-    --         hyperargs = {},
-    --     },
+        -- Consume input
+        {
+            id = "ifStruct",
+            args = {
+                "var1",
+                "var2",
+            },
+            hyperargs = {
+                "<"
+            },
+        },
+        {
+            id = "consumeInput",
+            args = {},
+            hyperargs = {},
+        },
+        {
+            id = "endStruct",
+            args = {},
+            hyperargs = {},
+        },
 
-    --     -- Check if there's enough energy to reproduce
-    --     {
-    --         id = "ifStruct",
-    --         args = {
-    --             "var3",
-    --             "var5",
-    --         },
-    --         hyperargs = {
-    --             "<"
-    --         },
-    --     },
-    --     {
-    --         id = "reproduce",
-    --         args = {},
-    --         hyperargs = {},
-    --     },
-    --     {
-    --         id = "endStruct",
-    --         args = {},
-    --         hyperargs = {},
-    --     },
+        -- Check if there's enough energy to reproduce
+        {
+            id = "ifStruct",
+            args = {
+                "var5",
+                "var3",
+            },
+            hyperargs = {
+                ">"
+            },
+        },
+        {
+            id = "reproduce",
+            args = {},
+            hyperargs = {},
+        },
+        {
+            id = "endStruct",
+            args = {},
+            hyperargs = {},
+        },
 
-    --     -- Move forward
-    --     {
-    --         id = "moveForward",
-    --         args = {},
-    --         hyperargs = {},
-    --     },
-    -- }
-    -- captures[1].vars[1] = 2 -- Minimum input value needed to consume
-    -- captures[1].vars[1] = 0 -- Stores the input value
-    -- captures[1].vars[3] = 250 -- Minimum total health/energy needed to reproduce
-    -- captures[1].vars[4] = 0 -- Temp variable
-    -- captures[1].vars[5] = 0 -- Holds the total health/energy
-    -- cell:compileScript (captures[1])
+        -- Move forward
+        {
+            id = "moveForward",
+            args = {},
+            hyperargs = {},
+        },
+    }
+    captures[1].vars[1] = 2 -- Minimum input value needed to consume
+    captures[1].vars[1] = 0 -- Stores the input value
+    captures[1].vars[3] = 550 -- Minimum total health/energy needed to reproduce
+    captures[1].vars[4] = 0 -- Temp variable
+    captures[1].vars[5] = 0 -- Holds the total health/energy
+    cell:compileScript (captures[1])
 end
 
 function thisScene:update (dt)
@@ -212,9 +220,11 @@ function thisScene:update (dt)
             table.remove (captures, maxCaptures + 1)
         end
 
-        baseX = 1000000 * love.math.random()
-        baseY = 1000000 * love.math.random()
-        map:reset (mapSize, mapSize, mapInput)
+        baseXInput = 1000000 * love.math.random()
+        baseYInput = 1000000 * love.math.random()
+        baseXBarriers = 1000000 * love.math.random()
+        baseYBarriers = 1000000 * love.math.random()
+        map:reset (mapSize, mapSize, mapInput, mapBarriers)
 
         local cellsSpawned = 0
 
@@ -223,11 +233,11 @@ function thisScene:update (dt)
                 local newCell = copyTable (captures[i])
 
                 -- Heavily mutate cell
-                for i = 1, round (mapToScale (love.math.randomNormal (), 0, 1, 0, 50)) do
-                    local mutCell = cell:new (100, 100)
-                    cell:mutate (mutCell, newCell)
-                    newCell = mutCell
-                end
+                -- for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, 80)) do
+                --     local mutCell = cell:new (100, 100)
+                --     cell:mutate (mutCell, newCell)
+                --     newCell = mutCell
+                -- end
 
                 cell:compileScript (newCell)
 
@@ -249,7 +259,10 @@ end
 
 function thisScene:draw ()
     love.graphics.setBackgroundColor (0, 0, 1, 1)
-    map:draw ()
+
+    if renderMap == true then
+        map:draw ()
+    end
 
     -- Super speed border
     local tickSpeed = map:getTickSpeed ()
@@ -362,6 +375,14 @@ function thisScene:keypressed (key, scancode, isrepeat)
                 end
             end
         end
+
+    -- Quick saves
+    elseif key == "g" then
+        map:quickSave ()
+
+    -- Toggle rendering
+    elseif key == "z" then
+        renderMap = not renderMap
     
     -- Toggles superspeed
     elseif key == "tab" then

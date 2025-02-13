@@ -1,10 +1,16 @@
+local bitser = require ("Libraries.bitser")
 local clamp = require ("Libraries.lume").clamp
 local cycleValue = require ("Helpers.cycleValue")
 local mapToScale = require ("Helpers.mapToScale")
 local copyTable  = require("Helpers.copyTable")
 
+bitser.register("function", function()
+    return nil
+end)
+
 local map = {
     inputGrid = {}, -- Tracks all the tiles in the map environment
+    barrierGrid = {}, -- Tracks all the barriers in the map environment
     cellGrid = {}, -- Sparse matrix that tracks all the cells in the map environment
     -- inputRender = nil, -- Contains a pre-rendered image of the background data
     width = 0, -- Width of the input grid
@@ -21,36 +27,77 @@ local map = {
         min = 0,
         max = 1,
     },
+    drawBounds = {
+        min = 0,
+        max = 1,
+    },
     title = "Untitled Map", -- The title of the map. Mostly used in menus
     cellManager = nil,
     stats = {
         cells = 0,
     },
+    ticksBetweenSaves = 500000,
+    lastSave = 0,
+    resets = 0,
 }
+
+function map:quickSave ()
+    local cellGridCopy = {}
+
+    for i = 1, self.width do
+        local cellRow = {}
+        cellGridCopy[i] = cellRow -- Add row to cell grid
+
+        for j = 1, self.height do
+            if self.cellGrid[i][j] ~= nil then
+                cellRow[j] = copyTable (self.cellGrid[i][j])
+                cellRow[j].scriptFunc = nil
+            end
+        end
+    end
+    
+    local fileName = "quickSave_" .. os.date("%Y-%m-%d_%H-%M-%S") .. ".slf"
+    bitser.dumpLoveFile (fileName, {
+        inputGrid = self.inputGrid,
+        barrierGrid = self.barrierGrid,
+        cellGrid = cellGridCopy,
+        stats = self.stats,
+        lastSave = self.lastSave,
+        resets = self.resets,
+        lastTick = self.lastTick,
+    })
+    print ("QUICK SAVE: " .. fileName)
+end
 
 --- Initializes the map manager and prepares it for processing.
 --- @param title string The name of the map.
-function map:init (cellManager, title, inputMin, inputMax)
+function map:init (cellManager, title, inputMin, inputMax, drawMin, drawMax)
     self.cellManager = cellManager
     self.title = title or "Untitled Map"
     self.inputBounds.min = inputMin or 0
     self.inputBounds.max = inputMax or 1
+    self.drawBounds.min = drawMin or self.inputBounds.min
+    self.drawBounds.max = drawMax or self.inputBounds.max
 end
 
 --- Resets the map with a new size and input data.
 --- @param width integer The width of the input data.
 --- @param height integer The height of the input data.
---- @param mapInput fun(param:integer, param:integer):number Used to map the value of each input tile
-function map:reset (width, height, mapInput)
+--- @param mapInput? fun(param:integer, param:integer):number Used to map the value of each input tile
+--- @param mapBarriers? fun(param:integer, param:integer):boolean Used to map the impassible barrier tiles
+function map:reset (width, height, mapInput, mapBarriers)
     self.width, self.height = width, height
 
     -- Generates the input grid and input render
     local inputGrid = {}
+    local barrierGrid = {}
     local cellGrid = {}
-    -- local inputRender = love.image.newImageData (self.width, self.height)
     for i = 1, self.width do
         local inputRow = {}
         inputGrid[i] = inputRow -- Add row to input grid
+
+        local barrierRow = {}
+        barrierGrid[i] = barrierRow -- Add row to barrier grid
 
         local cellRow = {}
         cellGrid[i] = cellRow -- Add row to cell grid
@@ -65,13 +112,24 @@ function map:reset (width, height, mapInput)
             end
 
             inputRow[j] = tile -- Add tile to grid
-            -- inputRender:setPixel (i - 1, j - 1, tile, tile, tile, 1) -- Render tile to image
+
+            local barrier = false
+
+            if mapBarriers ~= nil then
+                barrier = mapBarriers (i, j)
+            else
+                barrier = false
+            end
+
+            barrierRow[j] = barrier -- Add tile to grid
         end
     end
 
     self.inputGrid = inputGrid
+    self.barrierGrid = barrierGrid
     self.cellGrid = cellGrid
     self.stats.cells = 0
+    self.resets = self.resets + 1
     -- self.inputRender = love.graphics.newImage (inputRender)
     -- self.inputRender:setFilter ("nearest", "nearest")
 end
@@ -109,6 +167,14 @@ function map:update (dt)
         end
 
         self.lastTick = 0 -- Reset last tick
+        self.lastSave = self.lastSave - 1 -- Decrement ticks since last save
+
+        -- Save the map and cells if enough ticks have passed
+        if self.lastSave <= 0 then
+            self:quickSave ()
+
+            self.lastSave = self.ticksBetweenSaves
+        end
     end
 
     return capture
@@ -124,24 +190,32 @@ function map:draw ()
 
     -- Draw cells
     local inputGrid = self.inputGrid
+    local barrierGrid = self.barrierGrid
     local cellGrid = self.cellGrid
     for i = 1, self.width do
         local cellRow = cellGrid[i]
         local inputRow = inputGrid[i]
+        local barrierRow = barrierGrid[i]
 
         for j = 1, self.height do
             local cell = cellRow[j]
             local input = inputRow[j]
+            local barrier = barrierRow[j]
 
-            -- Check if cell exists at this position
+            -- Check what exists at the current position to determine what to render
             if cell ~= nil then
                 -- Render cell
                 love.graphics.setColor (cell.color)
                 love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
+                
+            elseif barrier == true then
+                -- Render barrier
+                love.graphics.setColor ({1, 0, 0, 1})
+                love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
 
             else
                 -- Render input tile
-                local scaledColor = mapToScale (input, self.inputBounds.min, self.inputBounds.max, 0, 1)
+                local scaledColor = mapToScale (input, self.drawBounds.min, self.drawBounds.max, 0, 1)
                 love.graphics.setColor (scaledColor, scaledColor, scaledColor, 1)
                 love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
             end
@@ -243,16 +317,16 @@ function map:adjustInputTile (tileX, tileY, value)
     end
 end
 
---- Checks if the provided position is clear of any cells.
+--- Checks if the provided position is clear of any cells or barriers.
 --- It also implicitly checks if the provided position is within bounds.
 --- @param tileX integer The horizontal map position.
 --- @param tileY integer The vertical map position.
 --- @return boolean isClear True if the provided position does not have a cell.
 function map:isClear (tileX, tileY)
-    return self:inBounds (tileX, tileY) and self.cellGrid[tileX][tileY] == nil
+    return self:inBounds (tileX, tileY) == true and self.barrierGrid[tileX][tileY] == false and self.cellGrid[tileX][tileY] == nil
 end
 
---- Checks if the provided position is taken by a cells.
+--- Checks if the provided position is taken by a cell.
 --- It also implicitly checks if the provided position is within bounds.
 --- @param tileX integer The horizontal map position.
 --- @param tileY integer The vertical map position.
@@ -264,15 +338,20 @@ end
 function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
     if self:isClear (tileX, tileY) == true then
         local newCellObj = self.cellManager:new (health, energy) -- Create default cell
+        print ("Create cell")
 
         -- Mutate cell if a parent is given
         if parentCellObj ~= nil then
             local mutSuccess, mutErr = pcall (self.cellManager.mutate, self.cellManager.mutate, newCellObj, parentCellObj)
+            print ("Mutations applied")
             local compSuccess, compErr = pcall (self.cellManager.compileScript, self.cellManager.compileScript, newCellObj)
+            print ("Script compiled")
 
             assert (mutSuccess == true, "ERROR: Problem with mutation:" .. tostring (mutErr))
             assert (compSuccess == true, "ERROR: Problem with script compilation:" .. tostring (compErr))
             -- self.cellManager:printCellInfo (parentCellObj)
+        else
+            print ("No changes applied")
         end
 
         self.cellGrid[tileX][tileY] = newCellObj
@@ -289,16 +368,16 @@ function map:deleteCell (tileX, tileY)
         local cellObj = self.cellGrid[tileX][tileY]
 
         -- Add cell's remaining energy and health to the ground
-        map:adjustInputTile (tileX, tileY, 1 * (cellObj.health + math.max (500 * 0.1, cellObj.energy)))
+        map:adjustInputTile (tileX, tileY, cellObj.totalEnergy)
 
         self.cellGrid[tileX][tileY] = nil
         self.stats.cells = self.stats.cells - 1
     end
 end
 
-function map:swapCells (tileX1, tileY1, tileX2, tileY2)
+function map:moveTo (tileX1, tileY1, tileX2, tileY2)
     if self:isTaken (tileX1, tileY1) == true and self:isClear (tileX2, tileY2) == true then
-        self.cellGrid[tileX1][tileY1], self.cellGrid[tileX2][tileY2] = self.cellGrid[tileX2][tileY2], self.cellGrid[tileX1][tileY1]
+        self.cellGrid[tileX1][tileY1], self.cellGrid[tileX2][tileY2] = nil, self.cellGrid[tileX1][tileY1]
 
         return tileX2, tileY2
     else
@@ -330,7 +409,7 @@ function map:moveForward (tileX, tileY)
         local cellDirection = self.cellGrid[tileX][tileY].direction
         local vect = directionVects[cellDirection]
 
-        return self:swapCells (tileX, tileY, tileX + vect[1], tileY + vect[2])
+        return self:moveTo (tileX, tileY, tileX + vect[1], tileY + vect[2])
     else
         return tileX, tileY
     end
@@ -360,13 +439,16 @@ function map:transferInputToCell (tileX, tileY, amount)
 
         if inputVal <= amount then
             cellObj.energy = cellObj.energy + inputVal
+            cellObj.totalEnergy = cellObj.totalEnergy + inputVal
             inputVal = 0
         else
             cellObj.energy = cellObj.energy + amount
+            cellObj.totalEnergy = cellObj.totalEnergy + amount
             inputVal = inputVal - amount
         end
         
         if cellObj.energy > 500 then -- Cell energy max
+            cellObj.totalEnergy = cellObj.totalEnergy - (cellObj.energy - 500)
             inputVal = inputVal + cellObj.energy - 500
             cellObj.energy = 500
         end
@@ -409,6 +491,7 @@ function map:adjustCellEnergy (tileX, tileY, amount)
 
         if cell.energy < 0 then
             map:adjustCellHealth (tileX, tileY, cell.energy)
+            cell.energy = 0
         end
     end
 end
@@ -435,6 +518,15 @@ end
 function map:getCellEnergy (tileX, tileY)
     if self:isTaken (tileX, tileY) == true then
         return self.cellGrid[tileX][tileY].energy
+    else
+        return 0
+    end
+end
+
+function map:getCellTotalResources (tileX, tileY)
+    if self:isTaken (tileX, tileY) == true then
+        local cellObj = self.cellGrid[tileX][tileY]
+        return cellObj.energy + cellObj.health
     else
         return 0
     end
