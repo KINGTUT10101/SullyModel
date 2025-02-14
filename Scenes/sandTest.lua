@@ -45,97 +45,116 @@ function thisScene:load (...)
     map:setCamera (-110, -10, 5.8)
     map:setTickSpeed (1/8)
 
-    captures[1] = cell:new (100, 100)
-    captures[1].scriptList = {
-        -- Set variables
-        {
-            id = "readInput",
-            args = {
-                "var2",
-            },
-            hyperargs = {},
-        },
-        {
-            id = "getHealth",
-            args = {
-                "var5",
-            },
-            hyperargs = {},
-        },
-        {
-            id = "getEnergy",
-            args = {
-                "var4",
-            },
-            hyperargs = {},
-        },
-        {
-            id = "addVariables",
-            args = {
-                "var5",
-                "var4",
-                "var5"
-            },
-            hyperargs = {},
-        },
+    -- Adds a few heavily mutated cells to the initial captures list
+    for i = 1, maxCaptures do
+        local newCellObj = cell:new (250, 250)
+
+        -- Heavily mutate cell
+        for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, 200)) do
+            local mutCell = cell:new (100, 100)
+            cell:mutate (mutCell, newCellObj)
+            newCellObj = mutCell
+        end
+
+        cell:compileScript (newCellObj)
+
+        captures[i] = newCellObj
+    end
+
+    captures[1].mutationRates.major = 0.35
+    captures[1].mutationRates.moderate = 0.25
+    captures[1].mutationRates.minor = 0.20
+    captures[1].mutationRates.meta = 0.15
+    -- captures[1].scriptList = {
+    --     -- Set variables
+    --     {
+    --         id = "readInput",
+    --         args = {
+    --             "var2",
+    --         },
+    --         hyperargs = {},
+    --     },
+    --     {
+    --         id = "getHealth",
+    --         args = {
+    --             "var5",
+    --         },
+    --         hyperargs = {},
+    --     },
+    --     {
+    --         id = "getEnergy",
+    --         args = {
+    --             "var4",
+    --         },
+    --         hyperargs = {},
+    --     },
+    --     {
+    --         id = "addVariables",
+    --         args = {
+    --             "var5",
+    --             "var4",
+    --             "var5"
+    --         },
+    --         hyperargs = {},
+    --     },
         
-        -- Consume input
-        {
-            id = "ifStruct",
-            args = {
-                "var1",
-                "var2",
-            },
-            hyperargs = {
-                "<"
-            },
-        },
-        {
-            id = "consumeInput",
-            args = {},
-            hyperargs = {},
-        },
-        {
-            id = "endStruct",
-            args = {},
-            hyperargs = {},
-        },
+    --     -- Consume input
+    --     {
+    --         id = "ifStruct",
+    --         args = {
+    --             "var1",
+    --             "var2",
+    --         },
+    --         hyperargs = {
+    --             "<"
+    --         },
+    --     },
+    --     {
+    --         id = "consumeInput",
+    --         args = {},
+    --         hyperargs = {},
+    --     },
+    --     {
+    --         id = "endStruct",
+    --         args = {},
+    --         hyperargs = {},
+    --     },
 
-        -- Check if there's enough energy to reproduce
-        {
-            id = "ifStruct",
-            args = {
-                "var5",
-                "var3",
-            },
-            hyperargs = {
-                ">"
-            },
-        },
-        {
-            id = "reproduce",
-            args = {},
-            hyperargs = {},
-        },
-        {
-            id = "endStruct",
-            args = {},
-            hyperargs = {},
-        },
+    --     -- Check if there's enough energy to reproduce
+    --     {
+    --         id = "ifStruct",
+    --         args = {
+    --             "var5",
+    --             "var3",
+    --         },
+    --         hyperargs = {
+    --             ">"
+    --         },
+    --     },
+    --     {
+    --         id = "reproduce",
+    --         args = {},
+    --         hyperargs = {},
+    --     },
+    --     {
+    --         id = "endStruct",
+    --         args = {},
+    --         hyperargs = {},
+    --     },
 
-        -- Move forward
-        {
-            id = "moveForward",
-            args = {},
-            hyperargs = {},
-        },
-    }
-    captures[1].vars[1] = 2 -- Minimum input value needed to consume
-    captures[1].vars[1] = 0 -- Stores the input value
-    captures[1].vars[3] = 550 -- Minimum total health/energy needed to reproduce
-    captures[1].vars[4] = 0 -- Temp variable
-    captures[1].vars[5] = 0 -- Holds the total health/energy
-    cell:compileScript (captures[1])
+    --     -- Move forward
+    --     {
+    --         id = "moveForward",
+    --         args = {},
+    --         hyperargs = {},
+    --     },
+    -- }
+    -- captures[1].vars[1] = 2 -- Minimum input value needed to consume
+    -- captures[1].vars[1] = 0 -- Stores the input value
+    -- captures[1].vars[3] = 550 -- Minimum total health/energy needed to reproduce
+    -- captures[1].vars[4] = 0 -- Temp variable
+    -- captures[1].vars[5] = 0 -- Holds the total health/energy
+    -- cell:compileScript (captures[1])
 end
 
 function thisScene:update (dt)
@@ -233,11 +252,11 @@ function thisScene:update (dt)
                 local newCell = copyTable (captures[i])
 
                 -- Heavily mutate cell
-                -- for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, 80)) do
-                --     local mutCell = cell:new (100, 100)
-                --     cell:mutate (mutCell, newCell)
-                --     newCell = mutCell
-                -- end
+                for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, 80)) do
+                    local mutCell = cell:new (100, 100)
+                    cell:mutate (mutCell, newCell)
+                    newCell = mutCell
+                end
 
                 cell:compileScript (newCell)
 
@@ -246,7 +265,7 @@ function thisScene:update (dt)
                 -- cell:printCellScriptList (newCell)
 
                 -- Attempt to spawn the cell
-                if map:spawnCell (math.random (1, map.width), math.random (1, map.height), 500, 500, newCell) == true then
+                if map:spawnCell (math.random (1, map.width), math.random (1, map.height), 300, 300, newCell) == true then
                     cellsSpawned = cellsSpawned + 1
                 end
             end
