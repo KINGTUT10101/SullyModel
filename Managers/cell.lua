@@ -169,7 +169,7 @@ for i = 1, math.min (%s, 25) do
         funcString =
 [[
 babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
-if map:isClear (babyTileX, babyTileY) == true then
+if map.stats.cells < 250 and map:isClear (babyTileX, babyTileY) == true then
     local parentEnergy = map:getCellEnergy (tileX, tileY)
     local parentHealth = map:getCellHealth (tileX, tileY)
     
@@ -395,8 +395,8 @@ function cell:new (health, energy)
         scriptList = {},
         scriptFunc = function () end,
         vars = {0,0,0,0,0},
-        health = clamp (health or 500, 0, 500),
-        energy = clamp (energy or 500, 0, 500),
+        health = clamp ((health ~= nil) and health or 500, 0, 500),
+        energy = clamp ((energy ~= nil) and energy or 500, 0, 500),
         direction = 1,
         lastUpdate  = 0,
         mutationRates = {
@@ -450,11 +450,19 @@ local function randomAction (childVars)
 end
 
 function cell:mutate (childCellObj, parentCellObj)
-    -- Mutate color slightly
-    local colorIndex = math.random (1, 3)
-    local newColor = copyTable (parentCellObj.color)
-    newColor[colorIndex] = clamp (newColor[colorIndex] + math.random (-5, 5) / 100, 0.10, 0.85)
-    childCellObj.color = newColor
+    local mutRateSum = 0
+
+    for k, v in pairs (parentCellObj.mutationRates) do
+        mutRateSum = mutRateSum + v
+    end
+
+    if math.random () < mutRateSum / 4 then
+        -- Mutate color slightly
+        local colorIndex = math.random (1, 3)
+        local newColor = copyTable (parentCellObj.color)
+        newColor[colorIndex] = clamp (newColor[colorIndex] + math.random (-5, 5) / 100, 0.10, 0.85)
+        childCellObj.color = newColor
+    end
 
     -- Copy script list and variables
     local childScriptList = copyTable (parentCellObj.scriptList)
