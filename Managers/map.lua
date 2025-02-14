@@ -207,7 +207,7 @@ function map:draw ()
                 -- Render cell
                 love.graphics.setColor (cell.color)
                 love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
-                
+
             elseif barrier == true then
                 -- Render barrier
                 love.graphics.setColor ({1, 0, 0, 1})
@@ -338,20 +338,15 @@ end
 function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
     if self:isClear (tileX, tileY) == true then
         local newCellObj = self.cellManager:new (health, energy) -- Create default cell
-        print ("Create cell")
 
         -- Mutate cell if a parent is given
         if parentCellObj ~= nil then
             local mutSuccess, mutErr = pcall (self.cellManager.mutate, self.cellManager.mutate, newCellObj, parentCellObj)
-            print ("Mutations applied")
             local compSuccess, compErr = pcall (self.cellManager.compileScript, self.cellManager.compileScript, newCellObj)
-            print ("Script compiled")
 
             assert (mutSuccess == true, "ERROR: Problem with mutation:" .. tostring (mutErr))
             assert (compSuccess == true, "ERROR: Problem with script compilation:" .. tostring (compErr))
             -- self.cellManager:printCellInfo (parentCellObj)
-        else
-            print ("No changes applied")
         end
 
         self.cellGrid[tileX][tileY] = newCellObj
