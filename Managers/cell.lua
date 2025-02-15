@@ -9,6 +9,8 @@ local cell = {
     map = nil,
 }
 
+local scriptListLimit = 750
+
 local actionDict = {
     readInput = {
         desc = "Reads the value from the input tile below the cell",
@@ -169,7 +171,7 @@ for i = 1, math.min (%s, 25) do
         funcString =
 [[
 babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
-if map.stats.cells < 250 and map:isClear (babyTileX, babyTileY) == true then
+if map.stats.cells < 20 and map:isClear (babyTileX, babyTileY) == true then
     local parentEnergy = map:getCellEnergy (tileX, tileY)
     local parentHealth = map:getCellHealth (tileX, tileY)
     
@@ -481,7 +483,14 @@ function cell:mutate (childCellObj, parentCellObj)
 
     -- Major mutations
     if math.random () < childMutRates.major then
-        local changeType = weightedchoice ({add = 65, delete = 20, replace = 10, swap = 5})
+        local weightedChoices = {add = 65, delete = 20, replace = 10, swap = 5}
+
+        -- Remove the ability to add to the script list if the script list is too long
+        if #childScriptList > scriptListLimit then
+            weightedChoices.add = nil
+        end
+
+        local changeType = weightedchoice (weightedChoices)
         local actionIndex = math.random (1, #childScriptList)
 
         if changeType == "add" or #childScriptList <= 0 then
