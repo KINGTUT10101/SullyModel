@@ -394,7 +394,7 @@ function cell:new (health, energy)
         color = {0.5, 0.5, 0.5, 1},
         scriptList = {},
         scriptFunc = function () end,
-        vars = {0,0,0,0,0},
+        vars = {0,0,0,0,0, 0},
         health = clamp ((health ~= nil) and health or 500, 0, 500),
         energy = clamp ((energy ~= nil) and energy or 500, 0, 500),
         direction = 1,
@@ -633,6 +633,9 @@ function cell:compileScript (cellObj)
     end
     scriptLines[#scriptLines+1] = "\n"
 
+    -- Set the value of persistent variable in the cell's script memory (currently variable #6)
+    scriptLines[#scriptLines+1] = "var6 = cellObj.vars[6]\n\n"
+
     -- Add the body of the script
     for i = 1, #scriptList do
         local action = scriptList[i]
@@ -672,6 +675,9 @@ function cell:compileScript (cellObj)
             end
         end
     end
+
+    -- Set the value of persistent variable in the vars list (currently variable #6)
+    scriptLines[#scriptLines+1] = "cellObj.vars[6] = var6\n"
 
     -- Assemble full script string
     local scriptStr = table.concat (scriptLines, "")
