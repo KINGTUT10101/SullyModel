@@ -305,6 +305,22 @@ end
 %s = 0
 ]]
     },
+    randomNumber = {
+        desc = "Assigns a random value to a variable that is between two provided variables",
+        type = "assign",
+        params = 3,
+        hyperparams = {},
+        interOrder = {"param", "param", "param"},
+        funcString =
+[[
+bound1, bound2 = %s, %s
+
+if bound1 > bound2 then
+    bound1, bound2 = bound2, bound1
+end
+%s = math.random (math.floor (bound1), math.floor (bound2))
+]]
+    },
     getHealth = {
         desc = "Saves the cell's health to a variable",
         type = "assign",
@@ -618,6 +634,7 @@ function cell:compileScript (cellObj)
         "local allSimilar = false\n",
         "local currCellColor, otherCellColor = {1, 1, 1, 1}, {1, 1, 1, 1}\n",
         "local parentHalfHealth, parentHalfEnergy = 0, 0\n",
+        "local bound1, bound2 = 0, 0\n",
         "\n",
     }
     
