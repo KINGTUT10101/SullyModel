@@ -36,7 +36,7 @@ local map = {
     stats = {
         cells = 0,
     },
-    ticksBetweenSaves = 500000,
+    ticksBetweenSaves = 100000,
     lastSave = 0,
     resets = 0,
 }
