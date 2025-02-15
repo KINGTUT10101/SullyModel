@@ -49,6 +49,11 @@ function thisScene:load (...)
     for i = 1, maxCaptures do
         local newCellObj = cell:new (250, 250)
 
+        newCellObj.mutationRates.major = 0.35
+        newCellObj.mutationRates.moderate = 0.30
+        newCellObj.mutationRates.minor = 0.20
+        newCellObj.mutationRates.meta = 0.15
+
         -- Heavily mutate cell
         for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, 200)) do
             local mutCell = cell:new (100, 100)
