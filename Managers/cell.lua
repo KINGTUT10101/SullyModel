@@ -424,7 +424,7 @@ function cell:new (health, energy)
             meta = 0.1,
         },
         totalEnergy = 0,
-        ticksLeft = round (mapToScale (love.math.randomNormal ()/ 10, -3, 3, 2000, 3500)),
+        ticksLeft = round (mapToScale (love.math.randomNormal ()/ 10, -3, 3, 12000, 16000)),
     }
 
     return newCell
@@ -649,7 +649,7 @@ function cell:compileScript (cellObj)
     
     -- Add cell variables to script
     for i = 1, #cellVars do
-        scriptLines[#scriptLines+1] = string.format ("local var%s = %s\n", i, cellVars[i])
+        scriptLines[#scriptLines+1] = string.format ("local var%s = %s\n", i, tostring(cellVars[i]))
     end
     scriptLines[#scriptLines+1] = "\n"
 
@@ -697,7 +697,7 @@ function cell:compileScript (cellObj)
     end
 
     -- Set the value of persistent variable in the vars list (currently variable #6)
-    scriptLines[#scriptLines+1] = "cellObj.vars[6] = var6\n"
+    scriptLines[#scriptLines+1] = "cellObj.vars[6] = (var6 == math.huge) and 0 or var6\n"
 
     -- Assemble full script string
     local scriptStr = table.concat (scriptLines, "")
