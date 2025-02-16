@@ -9,7 +9,7 @@ local cell = {
     map = nil,
 }
 
-local scriptListLimit = 750
+local scriptListLimit = 350
 
 local actionDict = {
     readInput = {
@@ -171,7 +171,7 @@ for i = 1, math.min (%s, 25) do
         funcString =
 [[
 babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
-if map.stats.cells < 20 and map:isClear (babyTileX, babyTileY) == true then
+if map.stats.cells < 200 and map:isClear (babyTileX, babyTileY) == true then
     local parentEnergy = map:getCellEnergy (tileX, tileY)
     local parentHealth = map:getCellHealth (tileX, tileY)
     
@@ -424,7 +424,7 @@ function cell:new (health, energy)
             meta = 0.1,
         },
         totalEnergy = 0,
-        ticksLeft = round (mapToScale (love.math.randomNormal ()/ 10, -3, 3, 12000, 16000)),
+        ticksLeft = round (mapToScale (love.math.randomNormal ()/ 10, -3, 3, 3000, 6500)),
     }
 
     return newCell
@@ -644,6 +644,7 @@ function cell:compileScript (cellObj)
         "local currCellColor, otherCellColor = {1, 1, 1, 1}, {1, 1, 1, 1}\n",
         "local parentHalfHealth, parentHalfEnergy = 0, 0\n",
         "local bound1, bound2 = 0, 0\n",
+        "local inf = math.huge\n",
         "\n",
     }
     
