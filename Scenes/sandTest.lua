@@ -14,7 +14,7 @@ local zoomVelocity = 25
 local testCell = cell:new (100, 100)
 
 local maxCaptures = 25
-local maxCaptureCycles = 500
+local maxCaptureCycles = 10000
 local captureTimer = maxCaptureCycles
 local captures = {} -- Holds the last 10 captures
 
@@ -29,7 +29,11 @@ local renderMap = true
 local baseXInput = 1000000 * love.math.random()
 local baseYInput = 1000000 * love.math.random()
 local function mapInput (tileX, tileY)
-    return mapToScale (love.math.noise(baseXInput+.05*tileX, baseYInput+.07*tileY), 0, 1, 0, 500)
+    if math.random () < 0.002 then
+        return math.huge
+    else
+        return mapToScale (love.math.noise(baseXInput+.05*tileX, baseYInput+.07*tileY), 0, 1, 0, 500)
+    end
 end
 
 local baseXBarriers = 1000 * love.math.random()
