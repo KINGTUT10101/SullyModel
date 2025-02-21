@@ -23,27 +23,88 @@ end
 
 -- Cell manager
 local cell = {
-    map = nil,
+    map = nil, -- A reference to the map manager
+    saveScriptStr = false,
+    maxHealth = 0, -- The maximum health of a cell object
+    maxEnergy = 0, -- The maximum energy of a cell object
+    energyPerTick = 0,
+    maxCells = 0,
+    maxActions = 0,
+    mutsPerChild = {
+        min = 0,
+        max = 0,
+        mean = 0,
+    },
+    cellAge = {
+        min = 0,
+        max = 0,
+        mean = 0,
+    },
+    memoryVars = {
+        min = 0,
+        max = 0,
+        mean = 0,
+    }, -- The number of global variables per cell object
+    initialMutRates = {
+        major = 0.35,
+        moderate = 0.25,
+        minor = 0.15,
+        meta = 0.25,
+    }
 }
 
 --- Initializes the cell manager. Must be called before using any other methods.
---- @param map table The map manager.
-function cell:init (map)
+--- @param map table A reference to the map manager
+function cell:init (map, options)
     self.map = map
+
+    self.maxHealth = options.maxHealth or 500
+    self.maxEnergy = options.maxEnergy or 500
+    self.energyPerTick = options.energyPerTick or 1
+    self.maxCells = options.maxCells or math.huge
+    self.maxActions = options.maxActions or 1000
+
+    options.mutsPerChild = options.mutsPerChild or {}
+    self.mutsPerChild.min = options.mutsPerChild.min or 0
+    self.mutsPerChild.max = options.mutsPerChild.max or 10
+    self.mutsPerChild.mean = options.mutsPerChild.mean or 5
+
+    options.cellAge = options.cellAge or {}
+    self.cellAge.min = options.cellAge.min or 500
+    self.cellAge.max = options.cellAge.max or 500
+    self.cellAge.mean = options.cellAge.mean or 500
+
+    options.memoryVars = options.memoryVars or {}
+    self.memoryVars.min = options.memoryVars.min or 0
+    self.memoryVars.max = options.memoryVars.max or 5
+    self.memoryVars.mean = options.memoryVars.mean or 3
+
+    options.initialMutRates = options.initialMutRates or {}
+    self.initialMutRates.major = clamp (options.initialMutRates.major or 0, 0, 1)
+    self.initialMutRates.moderate = clamp (options.initialMutRates.moderate or 5, 0, 1)
+    self.initialMutRates.minor = clamp (options.initialMutRates.minor or 3, 0, 1)
+    self.initialMutRates.meta = clamp (options.initialMutRates.meta or 3, 0, 1)
+end
+
+function cell:toggleSaveScriptStr (value)
+    assert (type (value) == "boolean", "Provided value is not Boolean")
+
+    self.saveScriptStr = value
 end
 
 --- Generates a default cell with no actions
 --- @return table cellObj The new default cell object
 function cell:new (health, energy)
     local newCell = {
+        age = 
+        health = clamp (health or self.maxHealth, 0, self.maxHealth),
+        energy = clamp (energy or self.maxEnergy, 0, self.maxEnergy),
         color = {0.5, 0.5, 0.5, 1},
         scriptList = {},
         scriptFunc = function () end,
-        vars = {0,0,0,0,0},
-        health = clamp (health or 500, 0, 500),
-        energy = clamp (energy or 500, 0, 500),
+        scriptStr = nil,
+        memoryVars = {},
         direction = 1,
-        lastUpdate  = 0,
         mutationRates = {
             major = 0.1,
             moderate = 0.1,
@@ -58,7 +119,7 @@ end
 --- Updates a single cell during a game tick
 function cell:update (tileX, tileY, cellObj, map)
     -- Energy cost
-    cellObj.energy = cellObj.energy - 1
+    cellObj.energy = cellObj.energy - self.energyPerTick
 
     if cellObj.energy < 0 then
         self.map:adjustCellHealth (tileX, tileY, cellObj.energy)
@@ -312,6 +373,9 @@ function cell:compileScript (cellObj)
     local scriptFunc, err = load (scriptStr)
     assert (err == nil, err)
 
+    if cell.saveScriptStr == true then
+        cellObj.scriptStr = scriptStr
+    end
     cellObj.scriptFunc = scriptFunc
 end
 
