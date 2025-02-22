@@ -4,13 +4,13 @@ local mapToScale = require ("Helpers.mapToScale")
 local copyTable  = require("Helpers.copyTable")
 
 local map = {
-    inputGrid = {}, -- Tracks all the tiles in the map environment
-    cellGrid = {}, -- Sparse matrix that tracks all the cells in the map environment
-    startCell = nil, -- The first cell object in the linked list used for updating the cells
+    envGrid = {},
+    cellGrid = {},
+    version = "mk-2",
     width = 0, -- Width of the input grid
     height = 0, --- Height of the input grid
     lastTick = 0, --- Time since the last tick, in seconds
-    tickSpeed = 1/32, -- Time between ticks
+    tickSpeed = 0, -- Time between ticks
     camera = {
         x = 0,
         y = 0,
@@ -18,22 +18,37 @@ local map = {
     }, -- Contains camera position information
     inputBounds = {
         min = 0,
-        max = 1,
+        max = 0,
+    },
+    drawBounds = {
+        min = 0,
+        max = 0,
     },
     title = "Untitled Map", -- The title of the map. Mostly used in menus
     cellManager = nil,
     stats = {
         cells = 0,
+        resets = 0,
     },
+    ticksBetweenSaves = 0,
+    lastSave = 0,
 }
 
 --- Initializes the map manager and prepares it for processing.
---- @param title string The name of the map.
-function map:init (cellManager, title, inputMin, inputMax)
+function map:init (cellManager, options)
+    options = options or {}
+    assert (type (options) == "table", "Provided options argument is not a table")
+
     self.cellManager = cellManager
-    self.title = title or "Untitled Map"
-    self.inputBounds.min = inputMin or 0
-    self.inputBounds.max = inputMax or 1
+    self.title = options.title or "Untitled Map"
+    self.inputBounds.min = options.inputMin or 0
+    self.inputBounds.max = options.inputMax or 500
+    self.drawBounds.min = options.drawMin or self.inputBounds.min
+    self.drawBounds.max = options.drawMax or self.inputBounds.max
+    self.stats.resets = 0
+    self.ticksBetweenSaves = options.ticksBetweenSaves or 100000
+
+    self.tickSpeed = math.huge
 end
 
 --- Resets the map with a new size and input data.
@@ -43,32 +58,34 @@ end
 function map:reset (width, height, mapInput)
     self.width, self.height = width, height
 
-    -- Generates the input grid and input render
-    local inputGrid = {}
+    -- Generates the grids
+    local envGrid = {}
     local cellGrid = {}
     for i = 1, self.width do
-        local inputRow = {}
-        inputGrid[i] = inputRow -- Add row to input grid
+        local envRow = {}
+        envGrid[i] = envRow -- Add row to input grid
 
         local cellRow = {}
-        cellGrid[i] = cellRow -- Add row to cell grid
+        cellGrid[i] = cellRow
 
         for j = 1, self.height do
-            local tile = 0
+            local envTile = {
+                input = 0,
+                type = "blank",
+            }
 
             if mapInput ~= nil then
-                tile = mapInput (i, j)
-            else
-                tile = 0
+                envTile.input = mapInput (i, j)
             end
 
-            inputRow[j] = tile -- Add tile to grid
+            envRow[j] = envTile -- Add tile to grid
         end
     end
 
-    self.inputGrid = inputGrid
+    self.envGrid = envGrid
     self.cellGrid = cellGrid
     self.stats.cells = 0
+    self.stats.resets = self.stats.resets + 1
     self.lastTick = 0
     self.startCell = nil
 end
@@ -81,16 +98,34 @@ function map:update (dt)
     -- Check if enough time has passed since the last tick
     local cellGrid = self.cellGrid
     if self.lastTick >= self.tickSpeed then
-        local currCell = self.startCell
+        local updateStartTime = love.timer.getTime()
 
-        -- Iterate over the cell object's linked list until no more cells are found
-        while currCell ~= nil do
-            -- Call cell object's update script
+        -- Iterate over active grid and update cells
+        -- TODO: Optimize this system so it doesn't have to iterate over the entire grid
+        for i = 1, self.width do
+            local cellRow = cellGrid[i]
 
-            currCell = currCell.nextCell
+            for j = 1, self.height do
+                local cellObj = cellRow[j]
+
+                -- Skip tiles without cells and cells that have already been updated this tick
+                if cellObj ~= nil and cellObj.lastUpdate < updateStartTime then
+                    cellObj.lastUpdate = updateStartTime
+
+                    self.cellManager:update (i, j, cellObj, self) -- Call cell update function
+                end
+            end
         end
 
         self.lastTick = 0 -- Reset last tick
+        self.lastSave = self.lastSave - 1 -- Decrement ticks since last save
+
+        -- Save the map and cells if enough ticks have passed
+        if self.lastSave <= 0 then
+            -- self:quickSave ()
+
+            self.lastSave = self.ticksBetweenSaves
+        end
     end
 end
 
@@ -101,11 +136,11 @@ function map:draw ()
     love.graphics.scale (self.camera.zoom)
 
     -- Draw tiles
-    local inputGrid = self.inputGrid
+    local envGrid = self.envGrid
     local cellGrid = self.cellGrid
     for i = 1, self.width do
         local cellRow = cellGrid[i]
-        local inputRow = inputGrid[i]
+        local envRow = envGrid[i]
 
         for j = 1, self.height do
             local cellObj = cellRow[j]
@@ -118,8 +153,7 @@ function map:draw ()
 
             else
                 -- Render input tile
-                local input = inputRow[j]
-                local scaledColor = mapToScale (input, self.inputBounds.min, self.inputBounds.max, 0, 1)
+                local scaledColor = mapToScale (envRow[j].input, self.drawBounds.min, self.drawBounds.max, 0, 1)
                 love.graphics.setColor (scaledColor, scaledColor, scaledColor, 1)
                 love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
             end
@@ -180,21 +214,13 @@ function map:screenToMap (screenX, screenY)
     return math.ceil (mapX), math.ceil (mapY)
 end
 
---- Checks if the provided position is within the bounds of the map
---- @param tileX integer The horizontal map position
---- @param tileY integer The vertical map position
---- @return boolean inBounds True if the provided position is within bounds
-function map:inBounds (tileX, tileY)
-    return tileX >= 1 and tileX <= self.width and tileY >= 1 and tileY <= self.height
-end
-
 --- Gets the value of the input tile at the provided position
 --- @param tileX integer The horizontal map position
 --- @param tileY integer The vertical map position
 --- @return number | nil inputValue The value of the input tile or nil if the provided position was out of bounds
 function map:getInputTile (tileX, tileY)
     if self:inBounds (tileX, tileY) == true then
-        return self.inputGrid[tileX][tileY]
+        return self.envGrid[tileX][tileY].input
 
     else
         return nil
@@ -209,7 +235,7 @@ function map:setInputTile (tileX, tileY, value)
     assert (type (value) == "number", "Provided value is not a number")
 
     if self:inBounds (tileX, tileY) == true then
-        self.inputGrid[tileX][tileY] = clamp (value, self.inputBounds.min, self.inputBounds.max)
+        self.envGrid[tileX][tileY].input = clamp (value, self.inputBounds.min, self.inputBounds.max)
     end
 end
 
@@ -221,8 +247,16 @@ function map:adjustInputTile (tileX, tileY, value)
     assert (type (value) == "number", "Provided value is not a number")
 
     if self:inBounds (tileX, tileY) == true then
-        self.inputGrid[tileX][tileY] = clamp (self.inputGrid[tileX][tileY] + value, self.inputBounds.min, self.inputBounds.max)
+        self.envGrid[tileX][tileY].input = clamp (self.envGrid[tileX][tileY].input + value, self.inputBounds.min, self.inputBounds.max)
     end
+end
+
+--- Checks if the provided position is within the bounds of the map
+--- @param tileX integer The horizontal map position
+--- @param tileY integer The vertical map position
+--- @return boolean inBounds True if the provided position is within bounds
+function map:inBounds (tileX, tileY)
+    return tileX >= 1 and tileX <= self.width and tileY >= 1 and tileY <= self.height
 end
 
 --- Checks if the provided position is clear of any cells.
@@ -243,6 +277,16 @@ function map:isTaken (tileX, tileY)
     return self:inBounds (tileX, tileY) and self.cellGrid[tileX][tileY] ~= nil
 end
 
+--- Gets a copy of the cell object at the specified map position.
+--- @param tileX integer The horizontal map position.
+--- @param tileY integer The vertical map position.
+--- @return table|nil cellObj The cell object at the given position or nil if a cell object doesn't exist there.
+function map:getCell (tileX, tileY)
+    if self:isTaken (tileX, tileY) == true then
+        return copyTable (self.cellGrid[tileX][tileY])
+    end
+end
+
 --- Spawns a new cell object into the map.
 --- The new cell object will have n rounds of mutations applied to it if a parent is provided, depending on the value of map.cellManager.meanMut.
 --- @param tileX integer The horizontal map position.
@@ -256,14 +300,13 @@ function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
         local newCellObj = self.cellManager:new (health, energy) -- Create default cell object
 
         -- Mutate cell object if a parent is given
-        if parentCellObj ~= nil then
-            local mutSuccess, mutErr = pcall (self.cellManager.mutate, self.cellManager.mutate, newCellObj, parentCellObj)
-            local compSuccess, compErr = pcall (self.cellManager.compileScript, self.cellManager.compileScript, newCellObj)
+        -- if parentCellObj ~= nil then
+        --     local mutSuccess, mutErr = pcall (self.cellManager.mutate, self.cellManager.mutate, newCellObj, parentCellObj)
+        --     local compSuccess, compErr = pcall (self.cellManager.compileScript, self.cellManager.compileScript, newCellObj)
 
-            assert (mutSuccess == true, "ERROR: Problem with mutation:" .. tostring (mutErr))
-            assert (compSuccess == true, "ERROR: Problem with script compilation:" .. tostring (compErr))
-            -- self.cellManager:printCellInfo (parentCellObj)
-        end
+        --     assert (mutSuccess == true, "ERROR: Problem with mutation: " .. tostring (mutErr))
+        --     assert (compSuccess == true, "ERROR: Problem with script compilation: " .. tostring (compErr))
+        -- end
 
         self.cellGrid[tileX][tileY] = newCellObj
         self.stats.cells = self.stats.cells + 1
@@ -306,13 +349,110 @@ function map:swapCells (tileX1, tileY1, tileX2, tileY2)
     end
 end
 
---- Gets a copy of the cell object at the specified map position.
---- @param tileX integer The horizontal map position.
---- @param tileY integer The vertical map position.
---- @return table|nil cellObj The cell object at the given position or nil if a cell object doesn't exist there.
-function map:getCell (tileX, tileY)
+function map:transferInputToCell (tileX, tileY, amount)
     if self:isTaken (tileX, tileY) == true then
-        return copyTable (self.cellGrid[tileX][tileY])
+        local cellObj = self.cellGrid[tileX][tileY]
+        local inputVal = self:getInputTile (tileX, tileY)
+
+        -- Energy cost of consuming a tile
+        cellObj.energy = cellObj.energy - 2
+
+        if inputVal <= amount then
+            cellObj.energy = cellObj.energy + inputVal
+            cellObj.totalEnergy = cellObj.totalEnergy + inputVal
+            inputVal = 0
+        else
+            cellObj.energy = cellObj.energy + amount
+            cellObj.totalEnergy = cellObj.totalEnergy + amount
+            inputVal = inputVal - amount
+        end
+        
+        if cellObj.energy > 500 then -- Cell energy max
+            cellObj.totalEnergy = cellObj.totalEnergy - (cellObj.energy - 500)
+            inputVal = inputVal + cellObj.energy - 500
+            cellObj.energy = 500
+        end
+
+        self:setInputTile (tileX, tileY, inputVal)
+    end
+end
+
+function map:shareInputToCell (tileX1, tileY1, tileX2, tileY2, amount)
+    if self:isTaken (tileX1, tileY1) == true and self:isTaken (tileX2, tileY2) == true then
+        local currCellObj = self.cellGrid[tileX1][tileY1]
+        local otherCellObj = self.cellGrid[tileX2][tileY2]
+
+        -- Energy cost of sharing energy
+        currCellObj.energy = currCellObj.energy - 3
+
+        if currCellObj.energy <= amount then
+            otherCellObj.energy = otherCellObj.energy + currCellObj.energy
+            currCellObj.energy = 0
+        else
+            otherCellObj.energy = otherCellObj.energy + amount
+            currCellObj.energy = currCellObj.energy - amount
+        end
+        
+        if otherCellObj.energy > 500 then -- Cell energy max
+            currCellObj.energy = currCellObj.energy + otherCellObj.energy - 500
+            otherCellObj.energy = 500
+        end
+
+        if currCellObj.energy <= 0 then
+            self:deleteCell (tileX1, tileY1)
+        end
+    end
+end
+
+function map:dropEnergy ()
+
+end
+
+function map:adjustCellEnergy (tileX, tileY, amount)
+    if self:isTaken (tileX, tileY) == true then
+        local cell = self.cellGrid[tileX][tileY]
+        cell.energy = math.min (500, cell.energy + amount)
+
+        if cell.energy < 0 then
+            map:adjustCellHealth (tileX, tileY, cell.energy)
+            cell.energy = 0
+        end
+    end
+end
+
+function map:adjustCellHealth (tileX, tileY, amount)
+    if self:isTaken (tileX, tileY) == true then
+        local cell = self.cellGrid[tileX][tileY]
+        cell.health = math.min (500, cell.health + amount)
+
+        if cell.health <= 0 then
+            self:deleteCell (tileX, tileY)
+        end
+    end
+end
+
+function map:getCellHealth (tileX, tileY)
+    if self:isTaken (tileX, tileY) == true then
+        return self.cellGrid[tileX][tileY].health
+    else
+        return 0
+    end
+end
+
+function map:getCellEnergy (tileX, tileY)
+    if self:isTaken (tileX, tileY) == true then
+        return self.cellGrid[tileX][tileY].energy
+    else
+        return 0
+    end
+end
+
+function map:getCellTotalResources (tileX, tileY)
+    if self:isTaken (tileX, tileY) == true then
+        local cellObj = self.cellGrid[tileX][tileY]
+        return cellObj.energy + cellObj.health
+    else
+        return 0
     end
 end
 

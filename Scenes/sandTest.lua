@@ -1,5 +1,6 @@
 local thisScene = {}
 local sceneMan = require ("Libraries.sceneMan")
+local tux = require ("Libraries.tux")
 local map = require ("Managers.map")
 local cell = require ("Managers.cell")
 local mapToScale = require ("Helpers.mapToScale")
@@ -24,6 +25,8 @@ local failsafeSpawns = 50
 local failsafeActivations = -1
 local lastCell = nil
 
+local renderMap = true
+
 local baseX = 1000000 * love.math.random()
 local baseY = 1000000 * love.math.random()
 local function mapInput (tileX, tileY)
@@ -32,102 +35,12 @@ end
 
 function thisScene:load (...)
     cell:init (map)
-    map:init (cell, "Test Map", 0, 2500)
+    map:init (cell)
     map:reset (mapSize, mapSize, mapInput)
     map:setCamera (-110, -10, 5.8)
     map:setTickSpeed (1/8)
 
     captures[1] = cell:new (100, 100)
-    -- captures[1].scriptList = {
-    --     -- Set variables
-    --     {
-    --         id = "readInput",
-    --         args = {
-    --             "var2",
-    --         },
-    --         hyperargs = {},
-    --     },
-    --     {
-    --         id = "getHealth",
-    --         args = {
-    --             "var5",
-    --         },
-    --         hyperargs = {},
-    --     },
-    --     {
-    --         id = "getEnergy",
-    --         args = {
-    --             "var4",
-    --         },
-    --         hyperargs = {},
-    --     },
-    --     {
-    --         id = "addVariables",
-    --         args = {
-    --             "var5",
-    --             "var4",
-    --             "var5"
-    --         },
-    --         hyperargs = {},
-    --     },
-        
-    --     -- Consume input
-    --     {
-    --         id = "ifStruct",
-    --         args = {
-    --             "var1",
-    --             "var2",
-    --         },
-    --         hyperargs = {
-    --             "<"
-    --         },
-    --     },
-    --     {
-    --         id = "consumeInput",
-    --         args = {},
-    --         hyperargs = {},
-    --     },
-    --     {
-    --         id = "endStruct",
-    --         args = {},
-    --         hyperargs = {},
-    --     },
-
-    --     -- Check if there's enough energy to reproduce
-    --     {
-    --         id = "ifStruct",
-    --         args = {
-    --             "var3",
-    --             "var5",
-    --         },
-    --         hyperargs = {
-    --             "<"
-    --         },
-    --     },
-    --     {
-    --         id = "reproduce",
-    --         args = {},
-    --         hyperargs = {},
-    --     },
-    --     {
-    --         id = "endStruct",
-    --         args = {},
-    --         hyperargs = {},
-    --     },
-
-    --     -- Move forward
-    --     {
-    --         id = "moveForward",
-    --         args = {},
-    --         hyperargs = {},
-    --     },
-    -- }
-    -- captures[1].vars[1] = 2 -- Minimum input value needed to consume
-    -- captures[1].vars[1] = 0 -- Stores the input value
-    -- captures[1].vars[3] = 250 -- Minimum total health/energy needed to reproduce
-    -- captures[1].vars[4] = 0 -- Temp variable
-    -- captures[1].vars[5] = 0 -- Holds the total health/energy
-    -- cell:compileScript (captures[1])
 end
 
 function thisScene:update (dt)
@@ -249,7 +162,12 @@ end
 
 function thisScene:draw ()
     love.graphics.setBackgroundColor (0, 0, 1, 1)
-    map:draw ()
+
+    if renderMap == true then
+        map:draw ()
+    else
+        -- Print message in the middle of the screen
+    end
 
     -- Super speed border
     local tickSpeed = map:getTickSpeed ()
@@ -293,57 +211,9 @@ function thisScene:draw ()
 end
 
 function thisScene:keypressed (key, scancode, isrepeat)
-    -- Mutate test cell
-    if key == "m" then
-        local newCell = cell:new (100, 100)
-        cell:mutate (newCell, testCell)
-        cell:compileScript (newCell)
-        testCell = newCell
-
-        for k, v in pairs (testCell) do
-            print (k, v)
-            if type (v) == "table" then
-                for k, v in pairs (v) do
-                    print ("    ", k, v)
-                end
-            end
-        end
-        print ()
-
-    -- Rapidly mutate the cell
-    elseif key == "n" then
-        for i = 1, 25 do
-            local newCell = cell:new (100, 100)
-            cell:mutate (newCell, testCell)
-            cell:compileScript (newCell)
-            testCell = newCell
-        end
-
-        for k, v in pairs (testCell) do
-            print (k, v)
-            if type (v) == "table" then
-                for k, v in pairs (v) do
-                    print ("    ", k, v)
-                end
-            end
-        end
-        print ()
-
-    -- Reset test cell
-    elseif key == "l" then
-        testCell = cell:new (100, 100)
-
-    -- Spawn test cell in the map
-    elseif key == "p" then
-        local tileX, tileY = map:screenToMap (love.mouse.getPosition ())
-
-        map:spawnCell (tileX, tileY, 500, 500, testCell)
-        print ("Cell spawned at :", tileX, tileY)
-    
-    -- Kills  a cell in the map
-    elseif key == "k" then
-        local tileX, tileY = map:screenToMap (love.mouse.getPosition ())
-        map:deleteCell (tileX, tileY)
+    -- Toggles map rendering
+    if key == "p" then
+        renderMap = not renderMap
 
     -- Prints an input tile's value
     elseif key == "i" then

@@ -1,73 +1,25 @@
--- Behavior script for the cell
-local cellScriptRecursive = {
+-- An example of a scriptList attribute of a cell object
+local exScriptList = {
     {
         id = "readInput",
-        args = {
-            2,
+        interDict = {
+            saveTo = "var1"
         },
-    },
-    {
-        id = "ifStruct",
-        args = {
-            1,
-            3,
-        },
-        hyperargs = {
-            2,
-        },
-        scope = {
-            {
-                id = "reproduce",
-            }
-        },
-    },
-}
-
-local cellScriptLinear = {
-    {
-        id = "readInput",
-        args = {
-            "var2",
-        },
-        hyperargs = {},
-    },
-    {
-        id = "ifStruct",
-        args = {
-            "var1",
-            "var3",
-        },
-        hyperargs = {
-            ">"
-        },
-    },
-    {
-        id = "moveForward",
-        args = {},
-        hyperargs = {},
     },
     {
         id = "addVariables",
-        args = {
-            "var3",
-            "var3",
-            "var4",
+        interDict = {
+            saveTo = "var0_1",
+            term1 = "var0_1",
+            term2 = "var1_4"
         },
-        hyperargs = {},
     },
     {
-        id = "endStruct",
-        args = {},
-        hyperargs = {},
-    }
+        id = "ifStruct",
+        interDict = {
+            compTo = "var1"
+        },
+    },
 }
 
--- Starting values for the variables
-local variables = {
-    4,
-    62,
-    0,
-    1,
-}
-
-return cellScriptRecursive, cellScriptLinear, variables
+return exScriptList

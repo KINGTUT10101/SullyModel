@@ -282,6 +282,23 @@ end
 %s = 0
 ]]
     },
+    getConstantNum = {
+        desc = "Sets the value of a variable to one of several predefined numbers",
+        type = "assign",
+        params = 1,
+        hyperparams = {
+            {
+                math.huge,
+                math.pi,
+                math.exp(1),
+            },
+        },
+        interOrder = {"param"},
+        funcString =
+[[
+%s = %s
+]]
+    },
     getHealth = {
         desc = "Saves the cell's health to a variable",
         type = "assign",
@@ -331,9 +348,10 @@ end
     },
 }
 
--- "($param1 + $param2) * $rate"
-
--- {
+-- TODO: Change actions to use this definition scheme for variables
+-- (In an action definition)
+-- funcString = "($param1 + $param2) * $rate",
+-- params = {
 --     param1 = true,
 --     param2 = true,
 --     rate = {
@@ -343,7 +361,8 @@ end
 --     },
 -- }
 
--- {
+-- (In a spawned cell)
+-- args = {
 --     param1 = "var3_1",
 --     param2 = "var1_5",
 --     rate = "0.05",
@@ -372,13 +391,14 @@ for id, actionDef in pairs (cellActions) do
     end
 
     -- Checks if the provided interpolation dictionary is valid
-    actionDef.interDict = actionDef.interDict or {}
-    for match in actionDef.funcString do
-        local dictVal = actionDef.interDict[match]
-        if type (dictVal) ~= "table" or type (dictVal) ~= "boolean" then
-            error (string.format ("Found an interpolated function string value (%s) with an incorrect interpolation dictionary definition", match))
-        end
-    end
+    -- TODO: Add code to find matches
+    -- actionDef.interDict = actionDef.interDict or {}
+    -- for match in actionDef.funcString do
+    --     local dictVal = actionDef.interDict[match]
+    --     if type (dictVal) ~= "table" or type (dictVal) ~= "boolean" then
+    --         error (string.format ("Found an interpolated function string value (%s) with an incorrect interpolation dictionary definition", match))
+    --     end
+    -- end
 
     -- Adds the action's ID to its definition
     actionDef.id = id

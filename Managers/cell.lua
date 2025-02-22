@@ -27,7 +27,10 @@ local cell = {
     saveScriptStr = false,
     maxHealth = 0, -- The maximum health of a cell object
     maxEnergy = 0, -- The maximum energy of a cell object
-    energyPerTick = 0,
+    tickCost = 0,
+    shareCost = 0,
+    consumeCost = 0,
+    reproCost = 0,
     maxCells = 0,
     maxActions = 0,
     mutsPerChild = {
@@ -56,11 +59,18 @@ local cell = {
 --- Initializes the cell manager. Must be called before using any other methods.
 --- @param map table A reference to the map manager
 function cell:init (map, options)
+    options = options or {}
+    assert (type (options) == "table", "Provided options argument is not a table")
+
     self.map = map
 
+    self.saveScriptStr = options.saveScriptStr or false
     self.maxHealth = options.maxHealth or 500
     self.maxEnergy = options.maxEnergy or 500
-    self.energyPerTick = options.energyPerTick or 1
+    self.tickCost = options.tickCost or 1
+    self.shareCost = options.shareCost or 3
+    self.consumeCost = options.consumeCost or 2
+    self.reproCost = options.reproCost or (self.maxHealth + self.maxEnergy) / 2
     self.maxCells = options.maxCells or math.huge
     self.maxActions = options.maxActions or 1000
 
@@ -96,7 +106,8 @@ end
 --- @return table cellObj The new default cell object
 function cell:new (health, energy)
     local newCell = {
-        age = 
+        lastUpdate = 0,
+        ticksLeft = math.random (self.cellAge.min, self.cellAge.max),
         health = clamp (health or self.maxHealth, 0, self.maxHealth),
         energy = clamp (energy or self.maxEnergy, 0, self.maxEnergy),
         color = {0.5, 0.5, 0.5, 1},
@@ -104,13 +115,16 @@ function cell:new (health, energy)
         scriptFunc = function () end,
         scriptStr = nil,
         memoryVars = {},
-        direction = 1,
+        moveDir = 1,
+        viewDir = 1,
+        relViewX = 0,
+        relViewY = 0,
         mutationRates = {
             major = 0.1,
             moderate = 0.1,
             minor = 0.1,
             meta = 0.1,
-        }
+        },
     }
 
     return newCell
@@ -119,18 +133,17 @@ end
 --- Updates a single cell during a game tick
 function cell:update (tileX, tileY, cellObj, map)
     -- Energy cost
-    cellObj.energy = cellObj.energy - self.energyPerTick
+    self.map:adjustCellEnergy (tileX, tileY, -self.tickCost)
 
-    if cellObj.energy < 0 then
-        self.map:adjustCellHealth (tileX, tileY, cellObj.energy)
-    end
+    -- Age the cell by one tick
+    cellObj.ticksLeft = cellObj.ticksLeft - 1
 
-    if cellObj.health <= 0 or self.map:isTaken (tileX, tileY) == false then
+    if cellObj.health <= 0 or cellObj.ticksLeft <= 0 then
         -- Delete cell
         self.map:deleteCell (tileX, tileY)
     else
         -- Run cell script
-        cellObj.scriptFunc (tileX, tileY, cellObj, map)
+        -- cellObj.scriptFunc (tileX, tileY, cellObj, map)
     end
 end
 
@@ -155,6 +168,10 @@ local function randomAction (childVars)
 end
 
 function cell:mutate (childCellObj, parentCellObj)
+    childCellObj = copyTable (parentCellObj)
+
+    if true then return end
+
     -- Mutate color slightly
     local colorIndex = math.random (1, 3)
     local newColor = copyTable (parentCellObj.color)
@@ -300,6 +317,10 @@ function cell:mutate (childCellObj, parentCellObj)
 end
 
 function cell:compileScript (cellObj)
+    cellObj.scriptFunc = function () end
+
+    if true then return end
+
     local scriptList = cellObj.scriptList
     local cellVars = cellObj.vars
 
@@ -382,10 +403,12 @@ end
 function cell:printCellInfo (cellObj)
     print ("==========" .. "Cell Info - " .. tostring (cellObj) .. "==========")
     for k, v in pairs (cellObj) do
-        print (tostring(k) .. ": " .. tostring(v))
-        if type (v) == "table" then
-            for k, v in pairs (v) do
-                print ("  " .. tostring(k) .. ": " .. tostring(v))
+        if k ~= "scriptStr" then
+            print (tostring(k) .. ": " .. tostring(v))
+            if type (v) == "table" then
+                for k, v in pairs (v) do
+                    print ("  " .. tostring(k) .. ": " .. tostring(v))
+                end
             end
         end
     end

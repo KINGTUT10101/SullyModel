@@ -1,9 +1,12 @@
+-- require ("rngTesting") -- Testing
+
 math.randomseed (os.time ())
 
 -- Loads the libraries
 local sceneMan = require("Libraries.sceneMan")
 local lovelyToasts = require("Libraries.lovelyToasts")
 local tux = require("Libraries.tux")
+
 
 -- Declares / initializes the local variables
 
