@@ -158,7 +158,12 @@ function map:update (dt)
                     if cell.lastUpdate < updateStartTime then
                         cell.lastUpdate = updateStartTime
 
-                        self.cellManager:update (i, j, cell, self) -- Call cell update function
+                        local result, errorStr = pcall (self.cellManager.update, self.cellManager, i, j, cell, self) -- Call cell update function
+                    
+                        if result == false then
+                            self.cellManager:printCellInfo (cell)
+                            error (errorStr)
+                        end
                     end
 
                     capture = cell
@@ -285,6 +290,7 @@ end
 --- @param tileY integer The vertical map position
 --- @return number | nil inputValue The value of the input tile or nil if the provided position was out of bounds
 function map:getInputTile (tileX, tileY)
+    assert (tileX == tileX and tileY == tileY, "Bad coords found " .. tileX .. " " .. tileY)
     if self:inBounds (tileX, tileY) == true then
         return self.inputGrid[tileX][tileY]
 
@@ -341,8 +347,8 @@ function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
 
         -- Mutate cell if a parent is given
         if parentCellObj ~= nil then
-            local mutSuccess, mutErr = pcall (self.cellManager.mutate, self.cellManager.mutate, newCellObj, parentCellObj)
-            local compSuccess, compErr = pcall (self.cellManager.compileScript, self.cellManager.compileScript, newCellObj)
+            local mutSuccess, mutErr = pcall (self.cellManager.mutate, self.cellManager, newCellObj, parentCellObj)
+            local compSuccess, compErr = pcall (self.cellManager.compileScript, self.cellManager, newCellObj)
 
             assert (mutSuccess == true, "ERROR: Problem with mutation:" .. tostring (mutErr))
             assert (compSuccess == true, "ERROR: Problem with script compilation:" .. tostring (compErr))

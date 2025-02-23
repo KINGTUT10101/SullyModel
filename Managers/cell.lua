@@ -7,6 +7,8 @@ local mapToScale = require ("Helpers.mapToScale")
 
 local cell = {
     map = nil,
+    scriptVars = 0,
+    memVars = 0,
 }
 
 local scriptListLimit = 350
@@ -260,7 +262,8 @@ end
         interOrder = {"param", "param", "param"},
         funcString =
 [[
-%s = %s + %s
+result = %s + %s
+%s = (result == result) and result or 0
 ]]
     },
     subVariables = {
@@ -271,7 +274,8 @@ end
         interOrder = {"param", "param", "param"},
         funcString =
 [[
-%s = %s - %s
+result = %s - %s
+%s = (result == result) and result or 0
 ]]
     },
     multVariables = {
@@ -282,7 +286,8 @@ end
         interOrder = {"param", "param", "param"},
         funcString =
 [[
-%s = %s * %s
+result = %s * %s
+%s = (result == result) and result or 0
 ]]
     },
     divVariables = {
@@ -293,7 +298,8 @@ end
         interOrder = {"param", "param", "param"},
         funcString =
 [[
-%s = %s / %s
+result = %s / %s
+%s = (result == result) and result or 0
 ]]
     },
     zeroVariable = {
@@ -307,20 +313,31 @@ end
 %s = 0
 ]]
     },
+--     randomNumber = {
+--         desc = "Assigns a random value to a variable that is between two provided variables",
+--         type = "assign",
+--         params = 3,
+--         hyperparams = {},
+--         interOrder = {"param", "param", "param"},
+--         funcString =
+-- [[
+-- bound1, bound2 = %s, %s
+
+-- if bound1 > bound2 then
+--     bound1, bound2 = bound2, bound1
+-- end
+-- %s = math.random (math.floor (bound1), math.floor (bound2))
+-- ]]
+--     },
     randomNumber = {
         desc = "Assigns a random value to a variable that is between two provided variables",
         type = "assign",
-        params = 3,
+        params = 1,
         hyperparams = {},
-        interOrder = {"param", "param", "param"},
+        interOrder = {"param"},
         funcString =
 [[
-bound1, bound2 = %s, %s
-
-if bound1 > bound2 then
-    bound1, bound2 = bound2, bound1
-end
-%s = math.random (math.floor (bound1), math.floor (bound2))
+%s = math.random (-1000, 1000)
 ]]
     },
     getHealth = {
@@ -401,8 +418,10 @@ for id, actionDef in pairs (actionDict) do
     end
 end
 
-function cell:init (map)
+function cell:init (map, scriptVars, memVars)
     self.map = map
+    self.scriptVars = scriptVars or 5
+    self.memVars = memVars or 1
 end
 
 --- Generates a default cell with no actions
@@ -412,7 +431,7 @@ function cell:new (health, energy)
         color = {0.5, 0.5, 0.5, 1},
         scriptList = {},
         scriptFunc = function () end,
-        vars = {0,0,0,0,0, 0},
+        vars = {},
         health = clamp ((health ~= nil) and health or 500, 0, 500),
         energy = clamp ((energy ~= nil) and energy or 500, 0, 500),
         direction = 1,
@@ -426,6 +445,10 @@ function cell:new (health, energy)
         totalEnergy = 0,
         ticksLeft = round (mapToScale (love.math.randomNormal ()/ 10, -3, 3, 3000, 6500)),
     }
+
+    for i = 1, self.scriptVars + self.memVars do
+        newCell.vars[i] = 0
+    end
 
     return newCell
 end
@@ -645,17 +668,21 @@ function cell:compileScript (cellObj)
         "local parentHalfHealth, parentHalfEnergy = 0, 0\n",
         "local bound1, bound2 = 0, 0\n",
         "local inf = math.huge\n",
+        "local result = 0\n",
         "\n",
     }
     
     -- Add cell variables to script
-    for i = 1, #cellVars do
+    for i = 1, self.scriptVars do
         scriptLines[#scriptLines+1] = string.format ("local var%s = %s\n", i, tostring(cellVars[i]))
     end
     scriptLines[#scriptLines+1] = "\n"
 
-    -- Set the value of persistent variable in the cell's script memory (currently variable #6)
-    scriptLines[#scriptLines+1] = "var6 = cellObj.vars[6]\n\n"
+    for i = self.scriptVars + 1, self.scriptVars + self.memVars do
+        scriptLines[#scriptLines+1] = string.format ("local var%s = cellObj.vars[%s]\n", i, i)
+    end
+    scriptLines[#scriptLines+1] = "\n"
+
 
     -- Add the body of the script
     for i = 1, #scriptList do
@@ -697,8 +724,10 @@ function cell:compileScript (cellObj)
         end
     end
 
-    -- Set the value of persistent variable in the vars list (currently variable #6)
-    scriptLines[#scriptLines+1] = "cellObj.vars[6] = (var6 == math.huge) and 0 or var6\n"
+    -- Set the value of persistent variable in the vars list
+    for i = self.scriptVars + 1, self.scriptVars + self.memVars do
+        scriptLines[#scriptLines+1] = string.format ("cellObj.vars[%s] = (var%s == math.huge) and 0 or var%s\n", i, i, i)
+    end
 
     -- Assemble full script string
     local scriptStr = table.concat (scriptLines, "")
@@ -706,6 +735,8 @@ function cell:compileScript (cellObj)
     -- print ("======================")
     -- print(scriptStr)
     -- print ()
+
+    cellObj.scriptStr = scriptStr
 
     local scriptFunc, err = load (scriptStr)
     assert (err == nil, err)

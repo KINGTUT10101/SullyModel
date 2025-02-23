@@ -43,7 +43,7 @@ local function mapBarriers (tileX, tileY)
 end
 
 function thisScene:load (...)
-    cell:init (map)
+    cell:init (map, 5, 3)
     map:init (cell, "Test Map", 0, math.huge, 0, 2500)
     map:reset (mapSize, mapSize, mapInput, mapBarriers)
     map:setCamera (-110, -10, 5.8)
