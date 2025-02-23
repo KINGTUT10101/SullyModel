@@ -1,40 +1,76 @@
+local cellActionVars = {
+    "local origInputVal = 0",
+    "local enemyTileX, enemyTileY = 1, 1",
+    "local babyTileX, babyTileY = 1, 1",
+    "local otherTileX, otherTileY = 1, 1",
+    "local allSimilar = false",
+    "local currCellColor, otherCellColor = {1, 1, 1, 1}, {1, 1, 1, 1}",
+    "local parentHalfHealth, parentHalfEnergy = 0, 0",
+}
+
 local cellActions = {
     readInput = {
         desc = "Reads the value from the input tile below the cell",
         type = "assign",
-        params = 1,
+        params = {
+            assignTo = true,
+        },
         hyperparams = {},
-        interOrder = {"param",},
         funcString = 
 [[
-%s = map:getInputTile (tileX, tileY)
+$assignTo = map:getInputTile (tileX, tileY)
 ]]
     },
     consumeInput = {
         desc = "Takes some of the input value to increase the energy level of the cell",
         type = "action",
-        params = 0,
-        hyperparams = {},
-        interOrder = {},
+        params = {},
+        hyperparams = {
+            energyFromTile = 25,
+            energyCost = 2,
+        },
         funcString = 
 [[
-map:transferInputToCell (tileX, tileY, 25)
+-- Energy cost of consuming a tile
+map:adjustCellEnergy (tileX, tileY, -$energyCost)
+
 if map:isTaken(tileX, tileY) == false then
     print ("Cell death: Consume input", tileX, tileY)
     return
+else
+    local inputVal = map:getInputTile (tileX, tileY)
+
+    if inputVal <= $energyFromTile then
+        cellObj.energy = cellObj.energy + inputVal
+        cellObj.totalEnergy = cellObj.totalEnergy + inputVal
+        inputVal = 0
+    else
+        cellObj.energy = cellObj.energy + $energyFromTile
+        cellObj.totalEnergy = cellObj.totalEnergy + $energyFromTile
+        inputVal = inputVal - $energyFromTile
+    end
+
+    if cellObj.energy > map.cellManager.maxEnergy then -- Cell energy max
+        cellObj.totalEnergy = cellObj.totalEnergy - (cellObj.energy - map.cellManager.maxEnergy)
+        inputVal = inputVal + cellObj.energy - map.cellManager.maxEnergy
+        cellObj.energy = map.cellManager.maxEnergy
+    end
+
+    map:setInputTile (tileX, tileY, inputVal)
 end
 ]]
     },
     moveForward = {
         desc = "Moves the cell in the direction it's facing",
         type = "action",
-        params = 0,
-        hyperparams = {},
-        interOrder = {},
+        params = {},
+        hyperparams = {
+            energyCost = 3,
+        },
         funcString = 
 [[
 tileX, tileY = map:moveForward (tileX, tileY)
-map:adjustCellEnergy (tileX, tileY, -3)
+map:adjustCellEnergy (tileX, tileY, -$energyCost)
 if map:isTaken(tileX, tileY) == false then
     print ("Cell death: Move forward", tileX, tileY)
     return
@@ -44,60 +80,54 @@ end
     turnLeft = {
         desc = "Turns the cell left",
         type = "action",
-        params = 0,
+        params = {},
         hyperparams = {},
-        interOrder = {},
         funcString = 
 [[
 map:turnLeft (tileX, tileY)
--- map:adjustCellEnergy (tileX, tileY, -1)
--- if map:isTaken(tileX, tileY) == false then
---     return
--- end
 ]]
     },
     turnRight = {
         desc = "Turns the cell right",
         type = "action",
-        params = 0,
+        params = {},
         hyperparams = {},
-        interOrder = {},
         funcString = 
 [[
 map:turnRight (tileX, tileY)
--- map:adjustCellEnergy (tileX, tileY, -1)
--- if map:isTaken(tileX, tileY) == false then
---     return
--- end
 ]]
     },
---     applyDamage = {
---         desc = "Applies damage to the cell the current cell is facing",
---         type = "action",
---         params = 0,
---         hyperparams = {},
---         interOrder = {},
---         funcString = 
--- [[
--- enemyTileX, enemyTileY = map:getForwardPos (tileX, tileY, 1)
--- map:adjustCellEnergy (tileX, tileY, -4)
--- map:adjustCellHealth (enemyTileX, enemyTileY, -5)
--- if map:isTaken(tileX, tileY) == false then
---     print ("Cell death: Apply damage", tileX, tileY)
---     return
--- end
--- ]]
---     },
+    applyDamage = {
+        desc = "Applies damage to the cell the current cell is facing",
+        type = "action",
+        params = {},
+        hyperparams = {
+            damage = 5,
+            energyCost = 4,
+        },
+        funcString = 
+[[
+enemyTileX, enemyTileY = map:getForwardPos (tileX, tileY, 1)
+map:adjustCellEnergy (tileX, tileY, -$energyCost)
+map:adjustCellHealth (enemyTileX, enemyTileY, -$damage)
+if map:isTaken(tileX, tileY) == false then
+    print ("Cell death: Apply damage", tileX, tileY)
+    return
+end
+]]
+    },
     healSelf = {
         desc = "Uses energy to heal the cell",
         type = "action",
-        params = 0,
-        hyperparams = {},
-        interOrder = {},
+        params = {},
+        hyperparams = {
+            healing = 10,
+            energyCost = 12,
+        },
         funcString = 
 [[
-map:adjustCellEnergy (tileX, tileY, -12)
-map:adjustCellHealth (tileX, tileY, 10)
+map:adjustCellEnergy (tileX, tileY, -$energyCost)
+map:adjustCellHealth (tileX, tileY, $healing)
 if map:isTaken(tileX, tileY) == false then
     print ("Cell death: Heal self", tileX, tileY)
     return
@@ -107,16 +137,17 @@ end
     energizeSelf = {
         desc = "Uses health to energize the cell",
         type = "action",
-        params = 0,
-        hyperparams = {},
-        interOrder = {},
+        params = {},
+        hyperparams = {
+            energyTransferred = 12,
+            healthCost = 12,
+        },
         funcString = 
 [[
-map:adjustCellHealth (tileX, tileY, -12)
+map:adjustCellHealth (tileX, tileY, -$healthCost)
 if map:isTaken (tileX, tileY) == true then
-    map:adjustCellEnergy (tileX, tileY, -12)
-end
-if map:isTaken(tileX, tileY) == false then
+    map:adjustCellEnergy (tileX, tileY, $energyTransferred)
+else
     print ("Cell death: Energize self", tileX, tileY)
     return
 end
@@ -125,67 +156,60 @@ end
     ifStruct = {
         desc = "An if statement that compares two variables",
         type = "control",
-        params = 2,
-        hyperparams = {
-            {
+        params = {
+            term1 = true,
+            term2 = true,
+            op = {
                 "==",
                 "~=",
                 ">",
                 "<",
             },
         },
-        interOrder = {"param", "hyper", "param"},
         funcString =
 [[
-if %s %s %s then
+if $term1 $op $term2 then
 ]]
     },
     forStruct = {
         desc = "A for loop that iterates from 1 until it reaches the value of the provided variable",
         type = "control",
-        params = 1,
-        hyperparams = {},
-        interOrder = {"param"},
+        params = {
+            loopTo = true,
+        },
         funcString =
 [[
-for i = 1, %s do
+for i = 1, $loopTo do
 ]]
     },
---     reproduce = {
---         desc = "Halves the cell's health and energy to split and create a new cell",
---         type = "action",
---         params = 0,
---         hyperparams = {},
---         interOrder = {},
---         funcString =
--- [[
--- babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
--- if map:isClear (babyTileX, babyTileY) == true then
---     parentHalfHealth = map:getCellHealth (tileX, tileY) / 2
---     parentHalfEnergy = map:getCellEnergy (tileX, tileY) / 2
---     map:adjustCellEnergy (tileX, tileY, -math.ceil (parentHalfEnergy) * 2)
-    
---     if map:isTaken(tileX, tileY) == true then
---         map:adjustCellHealth (tileX, tileY, -math.ceil (parentHalfHealth) * 2)
-        
---         if map:isTaken(tileX, tileY) == true then
---             map:spawnCell (babyTileX, babyTileY, math.floor (parentHalfHealth), math.floor (parentHalfEnergy), cellObj)
---             print ("Cell spawned")
---         else
---             return
---         end
---     else
---         return
---     end
--- end
--- ]]
---     },
+    reproduce = {
+        desc = "Halves the cell's energy to split and create a new cell",
+        type = "action",
+        params = {},
+        hyperparams = {
+            energyCost = 500,
+        },
+        funcString =
+[[
+babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
+if map:isClear (babyTileX, babyTileY) == true then
+    if map:getCellTotalResources (tileX, tileY) > $energyCost then
+        if map:spawnCell (babyTileX, babyTileY, $energyCost / 2, $energyCost / 2, cellObj) == true then
+            map:adjustCellEnergy (tileX, tileY, -$energyCost)
+        end
+        print ("Cell spawned")
+    end
+end
+]]
+    },
     shareEnergy = {
         desc = "Shares some energy with the cell in front of the current cell",
         type = "action",
-        params = 0,
-        hyperparams = {},
-        interOrder = {},
+        params = {},
+        hyperparams = {
+            sharedEnergy = 25,
+            energyCost = 3,
+        },
         funcString =
 [[
 otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
@@ -199,27 +223,28 @@ end
     isTaken = {
         desc = "Determines if the position in front of the current cell contains another cell",
         type = "assign",
-        params = 1,
+        params = {
+            assignTo = true,
+        },
         hyperparams = {},
-        interOrder = {"param"},
         funcString =
 [[
-%s = (map:isTaken (map:getForwardPos (tileX, tileY, 1))) and 1 or 0
+$assignTo = (map:isTaken (map:getForwardPos (tileX, tileY, 1))) and 1 or 0
 ]]
     },
     isSimilar = {
         desc = "Determines if the position in front of the current cell contains another cell with a similar color",
         type = "assign",
-        params = 1,
-        hyperparams = {
-            {
+        params = {
+            assignTo = true,
+            similarRating = {
                 0.01,
                 0.05,
                 0.15,
                 0.25,
             }
         },
-        interOrder = {"hyper", "param"},
+        hyperparams = {},
         funcString =
 [[
 otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
@@ -230,107 +255,137 @@ if map:isTaken (otherTileX, otherTileY) == true then
 
     allSimilar = true
     for i = 1, 3 do
-        if math.abs (currCellColor[i] - otherCellColor[i]) > %s then
+        if math.abs (currCellColor[i] - otherCellColor[i]) > $similarRating then
             allSimilar = false
         end
     end
 end
-%s = (allSimilar == true) and 1 or 0
+$assignTo = (allSimilar == true) and 1 or 0
 ]]
     },
     copyVariable = {
         desc = "Copies the value of a variable",
         type = "assign",
-        params = 2,
+        params = {
+            assignTo = true,
+            copyFrom = true,
+        },
         hyperparams = {},
-        interOrder = {"param", "param"},
         funcString =
 [[
-%s = %s
+$assignTo = $copyFrom
 ]]
     },
     addVariables = {
         desc = "Adds two variables together",
         type = "assign",
-        params = 3,
+        params = {
+            assignTo = true,
+            term1 = true,
+            term2 = true,
+        },
         hyperparams = {},
-        interOrder = {"param", "param", "param"},
         funcString =
 [[
-%s = %s + %s
+$assignTo = $term1 + $term2
 ]]
     },
     subVariables = {
         desc = "Subtracts ones variable from another",
         type = "assign",
-        params = 3,
+        params = {
+            assignTo = true,
+            term1 = true,
+            term2 = true,
+        },
         hyperparams = {},
-        interOrder = {"param", "param", "param"},
         funcString =
 [[
-%s = %s - %s
+$assignTo = $term1 - $term2
 ]]
     },
     zeroVariable = {
         desc = "Sets the value of a variable to zero",
         type = "assign",
-        params = 1,
+        params = {
+            assignTo = true,
+        },
         hyperparams = {},
-        interOrder = {"param"},
         funcString =
 [[
-%s = 0
+$assignTo = 0
 ]]
     },
     getConstantNum = {
         desc = "Sets the value of a variable to one of several predefined numbers",
         type = "assign",
-        params = 1,
-        hyperparams = {
-            {
+        params = {
+            assignTo = true,
+            constNum = {
                 math.huge,
                 math.pi,
                 math.exp(1),
             },
         },
-        interOrder = {"param"},
+        hyperparams = {},
         funcString =
 [[
-%s = %s
+$assignTo = $constNum
+]]
+    },
+    getRandomNum = {
+        desc = "Sets the value of a variable to a random number between two variables",
+        type = "assign",
+        params = {
+            assignTo = true,
+            bound1 = true,
+            bound2 = true,
+        },
+        hyperparams = {},
+        funcString =
+[[
+if $bound1 < $bound2 then
+    $assignTo = math.random ($bound1, $bound2)
+else
+    $assignTo = math.random ($bound2, $bound1)
+end
 ]]
     },
     getHealth = {
         desc = "Saves the cell's health to a variable",
         type = "assign",
-        params = 1,
+        params = {
+            assignTo = true,
+        },
         hyperparams = {},
-        interOrder = {"param"},
         funcString =
 [[
-%s = cellObj.health
+$assignTo = cellObj.health
 ]]
     },
     getEnergy = {
         desc = "Saves the cell's energy to a variable",
         type = "assign",
-        params = 1,
+        params = {
+            assignTo = true,
+        },
         hyperparams = {},
-        interOrder = {"param"},
         funcString =
 [[
-%s = cellObj.energy
+$assignTo = cellObj.energy
 ]]
     },
     getOtherCellEnergy = {
         desc = "Saves the energy of the cell in front of the current cell to a variable",
         type = "assign",
-        params = 1,
+        params = {
+            assignTo = true,
+        },
         hyperparams = {},
-        interOrder = {"param"},
         funcString =
 [[
 otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
-%s = map:getCellEnergy (otherTileX, otherTileY)
+$assignTo = map:getCellEnergy (otherTileX, otherTileY)
 ]]
     },
     earlyStop = {
@@ -368,40 +423,7 @@ end
 --     rate = "0.05",
 -- }
 
-
-local requiredAttributes = {
-    desc = "string",
-    type = "string",
-    funcString = "string",
+return {
+    actions = cellActions,
+    actionVars = cellActionVars,
 }
-local actionTypes = {
-    action = true, -- Performs an operation that doesn't save data to cell object's variables.
-    assign = true, -- Performs an operation that modifies at least one of the cell object's variable.
-    control = true, -- A programming control structure that starts a new scope in the cell object's script.
-}
-
--- Flags actions that're missing required attributes and sets default values where sensible
-for id, actionDef in pairs (cellActions) do
-    -- Checks the required parameters
-    for attribute, dataType in pairs (requiredAttributes) do
-        -- Raises an error if the attribute has the wrong type
-        if type (actionDef[attribute]) ~= dataType then
-            error (string.format ("Provided action attribute %s has the wrong type (currently %s, should be %s)", attribute, type (actionDef[attribute]), dataType))
-        end
-    end
-
-    -- Checks if the provided interpolation dictionary is valid
-    -- TODO: Add code to find matches
-    -- actionDef.interDict = actionDef.interDict or {}
-    -- for match in actionDef.funcString do
-    --     local dictVal = actionDef.interDict[match]
-    --     if type (dictVal) ~= "table" or type (dictVal) ~= "boolean" then
-    --         error (string.format ("Found an interpolated function string value (%s) with an incorrect interpolation dictionary definition", match))
-    --     end
-    -- end
-
-    -- Adds the action's ID to its definition
-    actionDef.id = id
-end
-
-return cellActions
