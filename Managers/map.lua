@@ -296,7 +296,7 @@ end
 --- @param parentCellObj? table The parent cell object object.
 --- @return boolean success True if a cell object was spawned successfully.
 function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
-    if self:isClear (tileX, tileY) == true then
+    if self.stats.cells < self.cellManager.maxCells and self:isClear (tileX, tileY) == true then
         local newCellObj = self.cellManager:new (health, energy) -- Create default cell object
 
         -- Mutate cell object if a parent is given
@@ -324,8 +324,8 @@ function map:deleteCell (tileX, tileY)
     if self:isTaken (tileX, tileY) == true then
         local cellObj = self.cellGrid[tileX][tileY]
 
-        -- Add cell object's remaining energy and health to the ground
-        map:adjustInputTile (tileX, tileY, 1 * (cellObj.health + math.max (500 * 0.1, cellObj.energy)))
+        -- Add cell's remaining energy and health to the ground
+        map:adjustInputTile (tileX, tileY, cellObj.totalEnergy)
 
         self.cellGrid[tileX][tileY] = nil
         self.stats.cells = self.stats.cells - 1
@@ -346,34 +346,6 @@ function map:swapCells (tileX1, tileY1, tileX2, tileY2)
         return tileX2, tileY2
     else
         return tileX1, tileY1
-    end
-end
-
-function map:transferInputToCell (tileX, tileY, amount)
-    if self:isTaken (tileX, tileY) == true then
-        local cellObj = self.cellGrid[tileX][tileY]
-        local inputVal = self:getInputTile (tileX, tileY)
-
-        -- Energy cost of consuming a tile
-        cellObj.energy = cellObj.energy - 2
-
-        if inputVal <= amount then
-            cellObj.energy = cellObj.energy + inputVal
-            cellObj.totalEnergy = cellObj.totalEnergy + inputVal
-            inputVal = 0
-        else
-            cellObj.energy = cellObj.energy + amount
-            cellObj.totalEnergy = cellObj.totalEnergy + amount
-            inputVal = inputVal - amount
-        end
-        
-        if cellObj.energy > 500 then -- Cell energy max
-            cellObj.totalEnergy = cellObj.totalEnergy - (cellObj.energy - 500)
-            inputVal = inputVal + cellObj.energy - 500
-            cellObj.energy = 500
-        end
-
-        self:setInputTile (tileX, tileY, inputVal)
     end
 end
 
