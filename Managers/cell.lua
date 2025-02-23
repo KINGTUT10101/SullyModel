@@ -747,10 +747,12 @@ end
 function cell:printCellInfo (cellObj)
     print ("==========" .. "Cell Info - " .. tostring (cellObj) .. "==========")
     for k, v in pairs (cellObj) do
-        print (tostring(k) .. ": " .. tostring(v))
-        if type (v) == "table" then
-            for k, v in pairs (v) do
-                print ("  " .. tostring(k) .. ": " .. tostring(v))
+        if k ~= "scriptStr" then
+            print (tostring(k) .. ": " .. tostring(v))
+            if type (v) == "table" then
+                for k, v in pairs (v) do
+                    print ("  " .. tostring(k) .. ": " .. tostring(v))
+                end
             end
         end
     end

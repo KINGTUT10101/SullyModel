@@ -239,55 +239,8 @@ function thisScene:draw ()
 end
 
 function thisScene:keypressed (key, scancode, isrepeat)
-    -- Mutate test cell
-    if key == "m" then
-        local newCell = cell:new (100, 100)
-        cell:mutate (newCell, testCell)
-        cell:compileScript (newCell)
-        testCell = newCell
-
-        for k, v in pairs (testCell) do
-            print (k, v)
-            if type (v) == "table" then
-                for k, v in pairs (v) do
-                    print ("    ", k, v)
-                end
-            end
-        end
-        print ()
-
-    -- Rapidly mutate the cell
-    elseif key == "n" then
-        for i = 1, 25 do
-            local newCell = cell:new (100, 100)
-            cell:mutate (newCell, testCell)
-            cell:compileScript (newCell)
-            testCell = newCell
-        end
-
-        for k, v in pairs (testCell) do
-            print (k, v)
-            if type (v) == "table" then
-                for k, v in pairs (v) do
-                    print ("    ", k, v)
-                end
-            end
-        end
-        print ()
-
-    -- Reset test cell
-    elseif key == "l" then
-        testCell = cell:new (100, 100)
-
-    -- Spawn test cell in the map
-    elseif key == "p" then
-        local tileX, tileY = map:screenToMap (love.mouse.getPosition ())
-
-        map:spawnCell (tileX, tileY, 500, 500, testCell)
-        print ("Cell spawned at :", tileX, tileY)
-    
     -- Kills  a cell in the map
-    elseif key == "k" then
+    if key == "k" then
         local tileX, tileY = map:screenToMap (love.mouse.getPosition ())
         map:deleteCell (tileX, tileY)
 
@@ -306,6 +259,21 @@ function thisScene:keypressed (key, scancode, isrepeat)
                 else
                     cell:printCellInfo (map:getCell (tileX, tileY))
                 end
+            end
+        end
+
+    -- Copies a cell's script to your keyboard
+    elseif key == "o" then
+        local cellObj = map:getCell (map:screenToMap (love.mouse.getPosition ()))
+        
+        if cellObj ~= nil then
+            if love.keyboard.isDown ("lshift") then
+                print ("=====Cell Script=====")
+                print (cellObj.scriptStr)
+                print ()
+            else
+                love.system.setClipboardText (cellObj.scriptStr)
+                print ("Script copied to clipboard!")
             end
         end
 
