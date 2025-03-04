@@ -288,6 +288,7 @@ $assignTo = $copyFrom
         funcString =
 [[
 $assignTo = $term1 + $term2
+if $assignTo ~= $assignTo then $assignTo = 0 end
 ]]
     },
     subVariables = {
@@ -302,6 +303,37 @@ $assignTo = $term1 + $term2
         funcString =
 [[
 $assignTo = $term1 - $term2
+if $assignTo ~= $assignTo then $assignTo = 0 end
+]]
+    },
+    multVariables = {
+        desc = "Multiplies ones variable by another",
+        type = "assign",
+        params = {
+            assignTo = true,
+            term1 = true,
+            term2 = true,
+        },
+        hyperparams = {},
+        funcString =
+[[
+$assignTo = $term1 * $term2
+if $assignTo ~= $assignTo then $assignTo = 0 end
+]]
+    },
+    divVariables = {
+        desc = "Divides ones variable from another",
+        type = "assign",
+        params = {
+            assignTo = true,
+            term1 = true,
+            term2 = true,
+        },
+        hyperparams = {},
+        funcString =
+[[
+$assignTo = $term1 / $term2
+if $assignTo ~= $assignTo then $assignTo = 0 end
 ]]
     },
     zeroVariable = {
@@ -338,17 +370,17 @@ $assignTo = $constNum
         type = "assign",
         params = {
             assignTo = true,
-            bound1 = true,
-            bound2 = true,
+            bounds = {
+                "-1000, 1000",
+                "-1, 1",
+                "",
+                "0, 1",
+            }
         },
         hyperparams = {},
         funcString =
 [[
-if $bound1 < $bound2 then
-    $assignTo = math.random ($bound1, $bound2)
-else
-    $assignTo = math.random ($bound2, $bound1)
-end
+$assignTo = math.random ($bounds)
 ]]
     },
     getHealth = {
