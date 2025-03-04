@@ -2,104 +2,182 @@ local clamp = require ("Libraries.lume").clamp
 local round = require ("Libraries.lume").round
 local randomchoice = require ("Libraries.lume").randomchoice
 local weightedchoice = require ("Libraries.lume").weightedchoice
+local memoize = require ("Libraries.lume").memoize
 local copyTable = require ("Helpers.copyTable")
 local mapToScale = require ("Helpers.mapToScale")
-local cellActions = require ("Data.cellActions")
 
--- Gathers all the cell actions into arrays based on their types
--- This is used by major mutations to replace cell actions with another action of the same type
-local cellActionsByType = {}
-for id, actionDef in pairs (cellActions) do
-    local actionType = actionDef.type
-
-    -- Creates a new array if one hasn't been defined for the current type
-    if cellActionsByType[actionType] == nil then
-        cellActionsByType[actionType] = {}
-    end
-
-    -- Adds the action to the corresponding array
-    table.insert (cellActionsByType[actionType], actionDef)
-end
+local requiredAttributes = {
+    desc = "string",
+    type = "string",
+    funcString = "string",
+}
+local actionTypes = {
+    action = true, -- Performs an operation that doesn't save data to cell object's variables.
+    assign = true, -- Performs an operation that modifies at least one of the cell object's variable.
+    control = true, -- A programming control structure that starts a new scope in the cell object's script.
+}
 
 -- Cell manager
 local cell = {
     map = nil, -- A reference to the map manager
-    saveScriptStr = false,
+    actionsByKey = nil,
+    actionsByIndex = nil,
+    actionsByType = nil,
+    actionVars = nil,
+    minScriptVars = 0,
+    -- varsPerLevel = 0,
+    scriptVars = 0,
+    memVars = 0,
     maxHealth = 0, -- The maximum health of a cell object
     maxEnergy = 0, -- The maximum energy of a cell object
     tickCost = 0,
-    shareCost = 0,
-    consumeCost = 0,
-    reproCost = 0,
     maxCells = 0,
     maxActions = 0,
+    minMutRate = 0,
     mutsPerChild = {
         min = 0,
         max = 0,
         mean = 0,
+    },
+    initialMutRates = {
+        major = 0,
+        moderate = 0,
+        minor = 0,
+        meta = 0,
     },
     cellAge = {
         min = 0,
         max = 0,
         mean = 0,
     },
-    memoryVars = {
-        min = 0,
-        max = 0,
-        mean = 0,
-    }, -- The number of global variables per cell object
-    initialMutRates = {
-        major = 0.35,
-        moderate = 0.25,
-        minor = 0.15,
-        meta = 0.25,
-    }
 }
 
 --- Initializes the cell manager. Must be called before using any other methods.
 --- @param map table A reference to the map manager
-function cell:init (map, options)
+function cell:init (map, actions, actionVars, options)
     options = options or {}
     assert (type (options) == "table", "Provided options argument is not a table")
 
     self.map = map
 
-    self.saveScriptStr = options.saveScriptStr or false
+    self.minScriptVars = self:validateCompileActions (actions, options.hyperargs)
+    self.actionsByKey = actions
+    self.actionsByIndex = {}
+    self.actionVars = actionVars
+
+    self.scriptVars = options.scriptVars or 5
+    self.memVars = options.scriptVars or 2
+    assert (self.scriptVars + self.memVars >= self.minScriptVars, "More variables are needed to meet the minimum required arguments for the provided action set")
+
+    -- Gathers all the cell actions into arrays based on their types and place them into the actionsByIndex array
+    -- This is used by major mutations to replace cell actions with another action of the same type
+    self.actionsByType = {}
+    for id, actionDef in pairs (actions) do
+        local actionType = actionDef.type
+
+        -- Creates a new array if one hasn't been defined for the current type
+        if self.actionsByType[actionType] == nil then
+            self.actionsByType[actionType] = {}
+        end
+
+        -- Adds the action to the corresponding array
+        table.insert (self.actionsByType[actionType], actionDef)
+        table.insert (self.actionsByIndex, actionDef)
+    end
+
     self.maxHealth = options.maxHealth or 500
     self.maxEnergy = options.maxEnergy or 500
     self.tickCost = options.tickCost or 1
-    self.shareCost = options.shareCost or 3
-    self.consumeCost = options.consumeCost or 2
-    self.reproCost = options.reproCost or (self.maxHealth + self.maxEnergy) / 2
     self.maxCells = options.maxCells or math.huge
     self.maxActions = options.maxActions or 1000
+    self.minMutRate = options.minMutRate or 0.10
+    self.varsPerLevel = options.varsPerLevel or 2
 
     options.mutsPerChild = options.mutsPerChild or {}
     self.mutsPerChild.min = options.mutsPerChild.min or 0
     self.mutsPerChild.max = options.mutsPerChild.max or 10
     self.mutsPerChild.mean = options.mutsPerChild.mean or 5
 
+    options.initialMutRates = options.initialMutRates or {}
+    self.initialMutRates.major = clamp (options.initialMutRates.major or 0.35, self.minMutRate, 1)
+    self.initialMutRates.moderate = clamp (options.initialMutRates.moderate or 0.25, self.minMutRate, 1)
+    self.initialMutRates.minor = clamp (options.initialMutRates.minor or 0.15, self.minMutRate, 1)
+    self.initialMutRates.meta = clamp (options.initialMutRates.meta or 0.25, self.minMutRate, 1)
+
     options.cellAge = options.cellAge or {}
     self.cellAge.min = options.cellAge.min or 500
     self.cellAge.max = options.cellAge.max or 500
     self.cellAge.mean = options.cellAge.mean or 500
-
-    options.memoryVars = options.memoryVars or {}
-    self.memoryVars.min = options.memoryVars.min or 0
-    self.memoryVars.max = options.memoryVars.max or 5
-    self.memoryVars.mean = options.memoryVars.mean or 3
-
-    options.initialMutRates = options.initialMutRates or {}
-    self.initialMutRates.major = clamp (options.initialMutRates.major or 0, 0, 1)
-    self.initialMutRates.moderate = clamp (options.initialMutRates.moderate or 5, 0, 1)
-    self.initialMutRates.minor = clamp (options.initialMutRates.minor or 3, 0, 1)
-    self.initialMutRates.meta = clamp (options.initialMutRates.meta or 3, 0, 1)
 end
 
-function cell:toggleSaveScriptStr (value)
-    assert (type (value) == "boolean", "Provided value is not Boolean")
+function cell:validateCompileActions (cellActions, actionHyperargs)
+    cellActions = cellActions or {}
+    actionHyperargs = actionHyperargs or {}
 
-    self.saveScriptStr = value
+    local highestMinVars = 0
+
+    -- Flags actions that're missing required attributes and sets default values where sensible
+    for id, actionDef in pairs (cellActions) do
+        -- Sets some default values for the action definition
+        actionDef.params = (type(actionDef.params) == "table") and actionDef.params or {}
+        actionDef.hyperparams = (type(actionDef.hyperparams) == "table") and actionDef.hyperparams or {}
+
+        -- Checks if the action type is valid
+        if actionTypes[actionDef.type] ~= true then
+            error (string.format ("Provided action type is %s, which is invalid", actionDef.type))
+        end
+    
+        -- Checks the required parameters
+        for attribute, dataType in pairs (requiredAttributes) do
+            -- Raises an error if the attribute has the wrong type
+            if type (actionDef[attribute]) ~= dataType then
+                error (string.format ("Provided action attribute %s has the wrong type (currently %s, should be %s)", attribute, type (actionDef[attribute]), dataType))
+            end
+        end
+
+        -- Inserts values into the hyperparams of the provided action
+        actionHyperargs[id] = actionHyperargs[id] or {}
+        actionDef.funcString = actionDef.funcString:gsub("%$([%w_]+)", function(key)
+            if actionHyperargs[id][key] ~= nil then
+                return actionHyperargs[id][key] -- Replace value with provided hyperargument
+
+            elseif actionDef.hyperparams[key] ~= nil then
+                return actionDef.hyperparams[key] -- Replace value with default hyperargument
+
+            else
+                return "$" .. key -- Assume the value is a parameter and keep it the same
+            end
+        end)
+    
+        -- Checks if the params used in the function string are defined properly in the params table
+        for match in actionDef.funcString:gmatch("%$([%w_]+)") do
+            local paramVal = actionDef.params[match]
+            
+            if type (paramVal) ~= "table" and paramVal ~= true then
+                error (string.format ("Found an interpolated function string value (%s) in action function string %s with no compatible parameters", match, id))
+            end
+        end
+            
+        -- Find the number of variable parameters needed for this action and determine if it's more than the current max
+        local numVarParams = 0 -- The number of variable parameters needed for this action
+        for key, value in pairs (actionDef.params) do
+            if value == true then
+                numVarParams = numVarParams + 1
+            end
+        end
+        highestMinVars = (highestMinVars < numVarParams) and numVarParams or highestMinVars
+
+        -- Adds the parameter keys to a list inside the action
+        actionDef.paramKeys = {}
+        for key, value in pairs (actionDef.params) do
+            table.insert (actionDef.paramKeys, key)
+        end
+    
+        -- Adds the action's ID to its definition
+        actionDef.id = id      
+    end
+
+    return highestMinVars
 end
 
 --- Generates a default cell with no actions
@@ -110,11 +188,11 @@ function cell:new (health, energy)
         ticksLeft = math.random (self.cellAge.min, self.cellAge.max),
         health = clamp (health or self.maxHealth, 0, self.maxHealth),
         energy = clamp (energy or self.maxEnergy, 0, self.maxEnergy),
+        totalEnergy = 0,
         color = {0.5, 0.5, 0.5, 1},
         scriptList = {},
         scriptFunc = function () end,
-        scriptStr = nil,
-        memoryVars = {},
+        vars = {},
         moveDir = 1,
         viewDir = 1,
         relViewX = 0,
@@ -126,6 +204,10 @@ function cell:new (health, energy)
             meta = 0.1,
         },
     }
+
+    for i = 1, self.scriptVars + self.memVars do
+        newCell.vars[i] = 0
+    end
 
     return newCell
 end
@@ -148,35 +230,63 @@ function cell:update (tileX, tileY, cellObj, map)
 end
 
 local function randomAction (childVars)
-    local newActionDef = actionList[math.random (1, #actionList)]
+    local newActionDef = cell.actionsByIndex[math.random (1, #cell.actionsByIndex)]
     local newAction = {}
     newAction.id = newActionDef.id
 
     -- Add random arguments
     newAction.args = {}
-    for i = 1, newActionDef.params do
-        newAction.args[#newAction.args+1] = "var" .. math.random (1, #childVars)
-    end
-
-    -- Add random hyperarguments
-    newAction.hyperargs = {}
-    for index, hyperparamSet in ipairs (newActionDef.hyperparams) do
-        newAction.hyperargs[#newAction.hyperargs+1] = hyperparamSet[math.random (1, #hyperparamSet)]
+    for key, value in pairs (newActionDef.params) do
+        if value == true then
+            -- Variable parameter
+            newAction.args[key] = "var" .. math.random (1, #childVars)
+        else
+            -- Option parameter
+            newAction.args[key] = value[math.random (1, #value)]
+        end
     end
 
     return newAction, newActionDef
 end
 
+-- local function getRandomAction (actionList)
+--     local scopeAction = actionList[1] -- Get the top-level action, which is a startScript action
+
+--     while true do
+--         local action = scopeAction.scope[math.random (1, #scopeAction.scope)]
+
+--         -- Check if the action creates scope, if it has any actions inside its scope, and if it passes the RNG check
+--         if action.scope ~= nil and #action.scope > 0 and math.random () < 0.85 then
+--             scopeAction = action
+--         else
+--             return scopeAction, action
+--         end
+--     end
+-- end
+
+-- -- TODO: memoize these functions
+-- local function getTotalVarsForLevel (level)
+--     return (level - 1) * cell.varsPerLevel + cell.minScriptVars
+-- end
+
+-- local function selectRandomVarForLevel (level)
+--     local index = math.random  (1, getTotalVarsForLevel (level))
+
+--     if index <= cell.minScriptVars then
+--         return 1
+--     else
+--         return 
+--     end
+-- end
+
 function cell:mutate (childCellObj, parentCellObj)
-    childCellObj = copyTable (parentCellObj)
-
-    if true then return end
-
-    -- Mutate color slightly
-    local colorIndex = math.random (1, 3)
-    local newColor = copyTable (parentCellObj.color)
-    newColor[colorIndex] = newColor[colorIndex] + math.random (-5, 5) / 100
-    childCellObj.color = newColor
+    if math.random () < 0.95 then
+        -- Mutate color slightly
+        local colorIndex = math.random (1, 3)
+        local newColor = copyTable (parentCellObj.color)
+        newColor[colorIndex] = clamp (newColor[colorIndex] + math.random (-5, 5) / 100, 0.10, 0.85)
+        childCellObj.color = newColor
+    end
 
     -- Copy script list and variables
     local childScriptList = copyTable (parentCellObj.scriptList)
@@ -185,7 +295,14 @@ function cell:mutate (childCellObj, parentCellObj)
 
     -- Major mutations
     if math.random () < childMutRates.major then
-        local changeType = weightedchoice ({add = 65, delete = 20, replace = 10, swap = 5})
+        local weightedChoices = {add = 65, delete = 20, replace = 10, swap = 5}
+
+        -- Remove the ability to add to the script list if the script list is too long
+        if #childScriptList > self.maxActions then
+            weightedChoices.add = nil
+        end
+
+        local changeType = weightedchoice (weightedChoices)
         local actionIndex = math.random (1, #childScriptList)
 
         if changeType == "add" or #childScriptList <= 0 then
@@ -198,16 +315,15 @@ function cell:mutate (childCellObj, parentCellObj)
                 table.insert (childScriptList, actionIndex + 1, {
                     id = "endStruct",
                     args = {},
-                    hyperargs = {},
                 })
             end
             
         elseif changeType == "delete" or changeType == "replace" then
             local actionToDelete = childScriptList[actionIndex]
-            local actionDef = actionDict[actionToDelete.id]
+            local actionDef = self.actionsByKey[actionToDelete.id]
 
             if actionToDelete.id == "endStruct" then
-                local aboveActionDef = actionDict[childScriptList[actionIndex - 1].id]
+                local aboveActionDef = self.actionsByKey[childScriptList[actionIndex - 1].id]
 
                 -- Delete two lines if above line is a control type
                 if aboveActionDef ~= nil and aboveActionDef.type == "control" then
@@ -243,7 +359,6 @@ function cell:mutate (childCellObj, parentCellObj)
                     table.insert (childScriptList, actionIndex + 1, {
                         id = "endStruct",
                         args = {},
-                        hyperargs = {},
                     })
                 end
             end
@@ -254,7 +369,7 @@ function cell:mutate (childCellObj, parentCellObj)
                 end
 
                 local actionToSwap = childScriptList[actionIndex]
-                local actionDef = actionDict[actionToSwap.id]
+                local actionDef = self.actionsByKey[actionToSwap.id]
 
                 if actionToSwap.id ~= "endStruct" and actionDef.type ~= "control" then
                     childScriptList[actionIndex], childScriptList[actionIndex + 1] = childScriptList[actionIndex + 1], childScriptList[actionIndex]
@@ -270,23 +385,19 @@ function cell:mutate (childCellObj, parentCellObj)
                 break
             end
 
-            local action = childScriptList[math.random (1, #childScriptList)]
-            local actionDef = actionDict[action.id]
-            local numArgs, numHyperargs = #action.args, #action.hyperargs
+            local action = childScriptList[math.random (1, #childScriptList)] -- Choose a random action from the cell's list
+            local actionDef = self.actionsByKey[action.id] -- Get the action def from the action set
+            
+            if action.id ~= "endStruct" and #actionDef.paramKeys > 0 then
+                local argKey = actionDef.paramKeys[math.random (1, #actionDef.paramKeys)]
 
-            if numArgs > 0 and numHyperargs > 0 then
-                if math.random () < 0.5 then
-                    action.args[math.random (1, numArgs)] = "var" .. math.random (1, #childVars)
+                if actionDef.params[argKey] == true then
+                    -- Assign a random variable key
+                    action.args[argKey] = "var" .. math.random (1, #childVars)
                 else
-                    local hyperargIndex = math.random (1, numHyperargs)
-                    action.hyperargs[hyperargIndex] = 
-                    actionDef.hyperparams[hyperargIndex][math.random (1, #actionDef.hyperparams[hyperargIndex])]
+                    -- Assign a random option key
+                    action.args[argKey] = actionDef.params[argKey][math.random (1, #actionDef.params[argKey])]
                 end
-            elseif numArgs > 0 then
-                action.args[math.random (1, numArgs)] = "var" .. math.random (1, #childVars)
-            elseif numHyperargs > 0 then
-                local hyperargIndex = math.random (1, numHyperargs)
-                action.hyperargs[hyperargIndex] = actionDef.hyperargs[hyperargIndex][math.random (1, #actionDef.hyperargs[hyperargIndex])]
             end
         end
     end
@@ -316,10 +427,8 @@ function cell:mutate (childCellObj, parentCellObj)
     childCellObj.mutationRates = childMutRates
 end
 
-function cell:compileScript (cellObj)
-    cellObj.scriptFunc = function () end
-
-    if true then return end
+function cell:compileScript (cellObj, stringOnly)
+    stringOnly = stringOnly or false
 
     local scriptList = cellObj.scriptList
     local cellVars = cellObj.vars
@@ -328,19 +437,24 @@ function cell:compileScript (cellObj)
     -- Add arguments to script
     local scriptLines = {
         "local tileX, tileY, cellObj, map = ...\n\n",
-        "local origInputVal = 0\n",
-        "local enemyTileX, enemyTileY = 1, 1\n",
-        "local babyTileX, babyTileY = 1, 1\n",
-        "local otherTileX, otherTileY = 1, 1\n",
-        "local allSimilar = false\n",
-        "local currCellColor, otherCellColor = {1, 1, 1, 1}, {1, 1, 1, 1}\n",
-        "local parentHalfHealth, parentHalfEnergy = 0, 0\n",
-        "\n",
+        "local inf = math.huge\n", -- Bandaid fix to prevent crashes when a variable equals infinity
     }
+
+    -- Add the lines from the action variables
+    for i = 1, #self.actionVars do
+        scriptLines[#scriptLines+1] = self.actionVars[i] .. "\n"
+    end
+    scriptLines[#scriptLines+1] = "\n"
     
     -- Add cell variables to script
+    -- Script variables
     for i = 1, #cellVars do
         scriptLines[#scriptLines+1] = string.format ("local var%s = %s\n", i, cellVars[i])
+    end
+    scriptLines[#scriptLines+1] = "\n"
+    -- Memory variables
+    for i = self.scriptVars + 1, self.scriptVars + self.memVars do
+        scriptLines[#scriptLines+1] = string.format ("local var%s = cellObj.vars[%s]\n", i, i)
     end
     scriptLines[#scriptLines+1] = "\n"
 
@@ -353,24 +467,14 @@ function cell:compileScript (cellObj)
 
             scriptLines[#scriptLines+1] = string.rep ("    ", scope) .. "end\n"
         else
-            local actionDef = actionDict[action.id]
-
+            local actionDef = self.actionsByKey[action.id]
             local filledFuncString = nil
-            if #actionDef.interOrder > 0 then
-                -- Get a list of arguments and hyperarguments
-                local args = {}
-                local argIndex, hyperargIndex = 1, 1
-                for i = 1, #actionDef.interOrder do
-                    if actionDef.interOrder[i] == "hyper" then
-                        args[i] = action.hyperargs[hyperargIndex]
-                        hyperargIndex = hyperargIndex + 1
-                    else
-                        args[i] = action.args[argIndex]
-                        argIndex = argIndex + 1
-                    end
-                end
-
-                filledFuncString = string.format (actionDef.funcString, unpack (args))
+            if #actionDef.paramKeys > 0 then
+                -- Fill the function string with the interpolated parameters
+                filledFuncString = actionDef.funcString:gsub("%$([%w_]+)", function(key)
+                    -- Return the replacement value if it exists in lookup_table; otherwise, keep the original substring.
+                    return action.args[key] or error ()
+                end)
             else
                 filledFuncString = actionDef.funcString
             end
@@ -384,31 +488,31 @@ function cell:compileScript (cellObj)
         end
     end
 
+    -- Set the value of persistent variables in the vars list
+    for i = self.scriptVars + 1, self.scriptVars + self.memVars do
+        scriptLines[#scriptLines+1] = string.format ("cellObj.vars[%s] = (var%s == math.huge) and 0 or var%s\n", i, i, i)
+    end
+
     -- Assemble full script string
     local scriptStr = table.concat (scriptLines, "")
-
-    -- print ("======================")
-    -- print(scriptStr)
-    -- print ()
 
     local scriptFunc, err = load (scriptStr)
     assert (err == nil, err)
 
-    if cell.saveScriptStr == true then
-        cellObj.scriptStr = scriptStr
-    end
-    cellObj.scriptFunc = scriptFunc
+    if stringOnly == true then
+        return scriptStr
+    else
+        cellObj.scriptFunc = scriptFunc
+    end 
 end
 
 function cell:printCellInfo (cellObj)
     print ("==========" .. "Cell Info - " .. tostring (cellObj) .. "==========")
     for k, v in pairs (cellObj) do
-        if k ~= "scriptStr" then
-            print (tostring(k) .. ": " .. tostring(v))
-            if type (v) == "table" then
-                for k, v in pairs (v) do
-                    print ("  " .. tostring(k) .. ": " .. tostring(v))
-                end
+        print (tostring(k) .. ": " .. tostring(v))
+        if type (v) == "table" then
+            for k, v in pairs (v) do
+                print ("  " .. tostring(k) .. ": " .. tostring(v))
             end
         end
     end
@@ -440,6 +544,13 @@ function cell:printCellScriptList (cellObj)
             print ("    No hyperarguments used")
         end
     end
+    print ()
+end
+
+function cell:printCellScriptString (cellObj)
+    print ("==========" .. "Cell Script List - " .. tostring (cellObj) .. "==========")
+    print (self:compileScript (cellObj, true))
+    print ()
 end
 
 return cell
