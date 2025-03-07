@@ -5,6 +5,7 @@ local cell = require ("Managers.cell")
 local mapToScale = require ("Helpers.mapToScale")
 local round = require ("Libraries.lume").round
 local copyTable = require ("Helpers.copyTable")
+local cellActions = require ("Data.cellActions")
 
 local mapSize = 50
 
@@ -43,7 +44,9 @@ local function mapBarriers (tileX, tileY)
 end
 
 function thisScene:load (...)
-    cell:init (map, 5, 3)
+    cell:init (map, cellActions.actionDefs, cellActions.scriptPrefixes, {
+        
+    })
     map:init (cell, "Test Map", 0, math.huge, 0, 2500)
     map:reset (mapSize, mapSize, mapInput, mapBarriers)
     map:setCamera (-110, -10, 5.8)

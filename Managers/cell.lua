@@ -6,422 +6,183 @@ local copyTable = require ("Helpers.copyTable")
 local mapToScale = require ("Helpers.mapToScale")
 
 local cell = {
-    map = nil,
+    map = nil, -- A reference to the map manager
+    actionsByKey = nil,
+    actionsByIndex = nil,
+    actionsByType = nil,
+    actionVars = nil,
+    minScriptVars = 0,
     scriptVars = 0,
     memVars = 0,
-}
-
-local scriptListLimit = 350
-
-local actionDict = {
-    readInput = {
-        desc = "Reads the value from the input tile below the cell",
-        type = "assign",
-        params = 1,
-        hyperparams = {},
-        interOrder = {"param",},
-        funcString = 
-[[
-%s = map:getInputTile (tileX, tileY)
-]]
+    maxHealth = 0, -- The maximum health of a cell object
+    maxEnergy = 0, -- The maximum energy of a cell object
+    tickCost = 0,
+    maxCells = 0,
+    maxActions = 0,
+    minMutRate = 0,
+    mutsPerChild = {
+        min = 0,
+        max = 0,
+        mean = 0,
     },
-    consumeInput = {
-        desc = "Takes some of the input value to increase the energy level of the cell",
-        type = "action",
-        params = 0,
-        hyperparams = {},
-        interOrder = {},
-        funcString = 
-[[
-map:transferInputToCell (tileX, tileY, 25)
-if map:isTaken(tileX, tileY) == false then
-    print ("Cell death: Consume input", tileX, tileY)
-    return
-end
-]]
+    initialMutRates = {
+        major = 0,
+        moderate = 0,
+        minor = 0,
+        meta = 0,
     },
-    moveForward = {
-        desc = "Moves the cell in the direction it's facing",
-        type = "action",
-        params = 0,
-        hyperparams = {},
-        interOrder = {},
-        funcString = 
-[[
-tileX, tileY = map:moveForward (tileX, tileY)
-map:adjustCellEnergy (tileX, tileY, -3)
-if map:isTaken(tileX, tileY) == false then
-    print ("Cell death: Move forward", tileX, tileY)
-    return
-end
-]]
-    },
-    turnLeft = {
-        desc = "Turns the cell left",
-        type = "action",
-        params = 0,
-        hyperparams = {},
-        interOrder = {},
-        funcString = 
-[[
-map:turnLeft (tileX, tileY)
--- map:adjustCellEnergy (tileX, tileY, -1)
--- if map:isTaken(tileX, tileY) == false then
---     return
--- end
-]]
-    },
-    turnRight = {
-        desc = "Turns the cell right",
-        type = "action",
-        params = 0,
-        hyperparams = {},
-        interOrder = {},
-        funcString = 
-[[
-map:turnRight (tileX, tileY)
--- map:adjustCellEnergy (tileX, tileY, -1)
--- if map:isTaken(tileX, tileY) == false then
---     return
--- end
-]]
-    },
-    applyDamage = {
-        desc = "Applies damage to the cell the current cell is facing",
-        type = "action",
-        params = 0,
-        hyperparams = {},
-        interOrder = {},
-        funcString = 
-[[
-enemyTileX, enemyTileY = map:getForwardPos (tileX, tileY, 1)
-map:adjustCellEnergy (tileX, tileY, -4)
-map:adjustCellHealth (enemyTileX, enemyTileY, -5)
-if map:isTaken(tileX, tileY) == false then
-    print ("Cell death: Apply damage", tileX, tileY)
-    return
-end
-]]
-    },
-    healSelf = {
-        desc = "Uses energy to heal the cell",
-        type = "action",
-        params = 0,
-        hyperparams = {},
-        interOrder = {},
-        funcString = 
-[[
-if map:getCellTotalResources (tileX, tileY) - 12 > 0 then
-    map:adjustCellEnergy (tileX, tileY, -12)
-    map:adjustCellHealth (tileX, tileY, 10)
-end
-]]
-    },
-    energizeSelf = {
-        desc = "Uses health to energize the cell",
-        type = "action",
-        params = 0,
-        hyperparams = {},
-        interOrder = {},
-        funcString = 
-[[
-map:adjustCellHealth (tileX, tileY, -12)
-if map:isTaken (tileX, tileY) == true then
-    map:adjustCellEnergy (tileX, tileY, -12)
-end
-if map:isTaken(tileX, tileY) == false then
-    print ("Cell death: Energize self", tileX, tileY)
-    return
-end
-    ]]
-    },
-    ifStruct = {
-        desc = "An if statement that compares two variables",
-        type = "control",
-        params = 2,
-        hyperparams = {
-            {
-                "==",
-                "~=",
-                ">",
-                "<",
-            },
-        },
-        interOrder = {"param", "hyper", "param"},
-        funcString =
-[[
-if %s %s %s then
-]]
-    },
-    forStruct = {
-        desc = "A for loop that iterates from 1 until it reaches the value of the provided variable",
-        type = "control",
-        params = 1,
-        hyperparams = {},
-        interOrder = {"param"},
-        funcString =
-[[
-for i = 1, math.min (%s, 25) do
-]]
-    },
-    reproduce = {
-        desc = "Halves the cell's energy to split and create a new cell",
-        type = "action",
-        params = 0,
-        hyperparams = {},
-        interOrder = {},
-        funcString =
-[[
-babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
-if map.stats.cells < 200 and map:isClear (babyTileX, babyTileY) == true then
-    local parentEnergy = map:getCellEnergy (tileX, tileY)
-    local parentHealth = map:getCellHealth (tileX, tileY)
-    
-    if parentEnergy + parentHealth > 500 then
-        map:adjustCellEnergy (tileX, tileY, -500)
-        map:spawnCell (babyTileX, babyTileY, 250, 250, cellObj)
-        print ("Cell spawned")
-    end
-end
-]]
-    },
-    shareEnergy = {
-        desc = "Shares some energy with the cell in front of the current cell",
-        type = "action",
-        params = 0,
-        hyperparams = {},
-        interOrder = {},
-        funcString =
-[[
-otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
-map:shareInputToCell (tileX, tileY, otherTileX, otherTileY, 25)
-if map:isTaken(tileX, tileY) == false then
-    print ("Cell death: Share energy", tileX, tileY)
-    return
-end
-]]
-    },
-    isTaken = {
-        desc = "Determines if the position in front of the current cell contains another cell",
-        type = "assign",
-        params = 1,
-        hyperparams = {},
-        interOrder = {"param"},
-        funcString =
-[[
-%s = (map:isTaken (map:getForwardPos (tileX, tileY, 1))) and 1 or 0
-]]
-    },
-    isSimilar = {
-        desc = "Determines if the position in front of the current cell contains another cell with a similar color",
-        type = "assign",
-        params = 1,
-        hyperparams = {
-            {
-                0.01,
-                0.05,
-                0.15,
-                0.25,
-            }
-        },
-        interOrder = {"hyper", "param"},
-        funcString =
-[[
-otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
-allSimilar = false
-if map:isTaken (otherTileX, otherTileY) == true then
-    currCellColor = cellObj.color
-    otherCellColor = map.cellGrid[otherTileX][otherTileY].color
-
-    allSimilar = true
-    for i = 1, 3 do
-        if math.abs (currCellColor[i] - otherCellColor[i]) > %s then
-            allSimilar = false
-        end
-    end
-end
-%s = (allSimilar == true) and 1 or 0
-]]
-    },
-    copyVariable = {
-        desc = "Copies the value of a variable",
-        type = "assign",
-        params = 2,
-        hyperparams = {},
-        interOrder = {"param", "param"},
-        funcString =
-[[
-%s = %s
-]]
-    },
-    addVariables = {
-        desc = "Adds two variables together",
-        type = "assign",
-        params = 3,
-        hyperparams = {},
-        interOrder = {"param", "param", "param"},
-        funcString =
-[[
-result = %s + %s
-%s = (result == result) and result or 0
-]]
-    },
-    subVariables = {
-        desc = "Subtracts ones variable from another",
-        type = "assign",
-        params = 3,
-        hyperparams = {},
-        interOrder = {"param", "param", "param"},
-        funcString =
-[[
-result = %s - %s
-%s = (result == result) and result or 0
-]]
-    },
-    multVariables = {
-        desc = "Multiplies ones variable by another",
-        type = "assign",
-        params = 3,
-        hyperparams = {},
-        interOrder = {"param", "param", "param"},
-        funcString =
-[[
-result = %s * %s
-%s = (result == result) and result or 0
-]]
-    },
-    divVariables = {
-        desc = "Divides ones variable by another",
-        type = "assign",
-        params = 3,
-        hyperparams = {},
-        interOrder = {"param", "param", "param"},
-        funcString =
-[[
-result = %s / %s
-%s = (result == result) and result or 0
-]]
-    },
-    zeroVariable = {
-        desc = "Sets the value of a variable to zero",
-        type = "assign",
-        params = 1,
-        hyperparams = {},
-        interOrder = {"param"},
-        funcString =
-[[
-%s = 0
-]]
-    },
---     randomNumber = {
---         desc = "Assigns a random value to a variable that is between two provided variables",
---         type = "assign",
---         params = 3,
---         hyperparams = {},
---         interOrder = {"param", "param", "param"},
---         funcString =
--- [[
--- bound1, bound2 = %s, %s
-
--- if bound1 > bound2 then
---     bound1, bound2 = bound2, bound1
--- end
--- %s = math.random (math.floor (bound1), math.floor (bound2))
--- ]]
---     },
-    randomNumber = {
-        desc = "Assigns a random value to a variable that is between two provided variables",
-        type = "assign",
-        params = 1,
-        hyperparams = {},
-        interOrder = {"param"},
-        funcString =
-[[
-%s = math.random (-1000, 1000)
-]]
-    },
-    getHealth = {
-        desc = "Saves the cell's health to a variable",
-        type = "assign",
-        params = 1,
-        hyperparams = {},
-        interOrder = {"param"},
-        funcString =
-[[
-%s = cellObj.health
-]]
-    },
-    getEnergy = {
-        desc = "Saves the cell's energy to a variable",
-        type = "assign",
-        params = 1,
-        hyperparams = {},
-        interOrder = {"param"},
-        funcString =
-[[
-%s = cellObj.energy
-]]
-    },
-    getAge = {
-        desc = "Saves the cell's remaining ticks left to a variable",
-        type = "assign",
-        params = 1,
-        hyperparams = {},
-        interOrder = {"param"},
-        funcString =
-[[
-%s = cellObj.ticksLeft
-]]
-    },
-    getOtherCellEnergy = {
-        desc = "Saves the energy of the cell in front of the current cell to a variable",
-        type = "assign",
-        params = 1,
-        hyperparams = {},
-        interOrder = {"param"},
-        funcString =
-[[
-otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
-%s = map:getCellEnergy (otherTileX, otherTileY)
-]]
-    },
-    earlyStop = {
-        desc = "Stops the cell's script early",
-        type = "action",
-        params = 0,
-        hyperparams = {},
-        interOrder = {},
-        funcString =
-[[
-if true then
-    return
-end
-]]
+    cellAge = {
+        min = 0,
+        max = 0,
+        mean = 0,
     },
 }
+
+local actionDict
 local actionList = {}
 
-for id, actionDef in pairs (actionDict) do
-    actionDef.id = id
-    actionList[#actionList+1] = actionDef
-end
+function cell:init (map, cellActions, scriptPrefixes, options)
+    options = options or {}
+    assert (type (options) == "table", "Provided options argument is not a table")
 
--- Bandaid fix to ensure all action defs have a interpolation order
-for id, actionDef in pairs (actionDict) do
-    if actionDef.interOrder == nil then
-        assert (actionDef.hyperparams == nil, "Action defined with hyperparameters but without an interpolation order")
+    self.map = map
 
-        actionDef.interOrder = {}
-        for i = 1, actionDef.params do
-            actionDef.interOrder[i] = "param"
+    -- TEMP
+    actionDict = cellActions
+    actionList = {}
+    for id, actionDef in pairs (actionDict) do
+        actionDef.id = id
+        actionList[#actionList+1] = actionDef
+    end
+    -- Bandaid fix to ensure all action defs have a interpolation order
+    for id, actionDef in pairs (actionDict) do
+        if actionDef.interOrder == nil then
+            assert (actionDef.hyperparams == nil, "Action defined with hyperparameters but without an interpolation order")
+    
+            actionDef.interOrder = {}
+            for i = 1, actionDef.params do
+                actionDef.interOrder[i] = "param"
+            end
         end
     end
+
+    -- self.minScriptVars = self:validateCompileActions (actions, options.hyperargs)
+    -- self.actionsByKey = actions
+    -- self.actionsByIndex = {}
+    -- self.actionVars = actionVars
+
+    self.scriptVars = options.scriptVars or 5
+    self.memVars = options.memVars or 2
+    -- assert (self.scriptVars + self.memVars >= self.minScriptVars, "More variables are needed to meet the minimum required arguments for the provided action set")
+
+    -- Gathers all the cell actions into arrays based on their types and place them into the actionsByIndex array
+    -- This is used by major mutations to replace cell actions with another action of the same type
+    -- self.actionsByType = {}
+    -- for id, actionDef in pairs (actions) do
+    --     local actionType = actionDef.type
+
+    --     -- Creates a new array if one hasn't been defined for the current type
+    --     if self.actionsByType[actionType] == nil then
+    --         self.actionsByType[actionType] = {}
+    --     end
+
+    --     -- Adds the action to the corresponding array
+    --     table.insert (self.actionsByType[actionType], actionDef)
+    --     table.insert (self.actionsByIndex, actionDef)
+    -- end
+
+    self.maxHealth = options.maxHealth or 500
+    self.maxEnergy = options.maxEnergy or 500
+    self.tickCost = options.tickCost or 1
+    self.maxCells = options.maxCells or math.huge
+    self.maxActions = options.maxActions or 1000
+    self.minMutRate = options.minMutRate or 0.10
+
+    options.mutsPerChild = options.mutsPerChild or {}
+    self.mutsPerChild.min = options.mutsPerChild.min or 0
+    self.mutsPerChild.max = options.mutsPerChild.max or 10
+    self.mutsPerChild.mean = options.mutsPerChild.mean or 5
+
+    options.initialMutRates = options.initialMutRates or {}
+    self.initialMutRates.major = clamp (options.initialMutRates.major or 0.35, self.minMutRate, 1)
+    self.initialMutRates.moderate = clamp (options.initialMutRates.moderate or 0.25, self.minMutRate, 1)
+    self.initialMutRates.minor = clamp (options.initialMutRates.minor or 0.15, self.minMutRate, 1)
+    self.initialMutRates.meta = clamp (options.initialMutRates.meta or 0.25, self.minMutRate, 1)
+
+    options.cellAge = options.cellAge or {}
+    self.cellAge.min = options.cellAge.min or 500
+    self.cellAge.max = options.cellAge.max or 500
+    self.cellAge.mean = options.cellAge.mean or 500
 end
 
-function cell:init (map, scriptVars, memVars)
-    self.map = map
-    self.scriptVars = scriptVars or 5
-    self.memVars = memVars or 1
+function cell:validateCompileActions (cellActions, actionHyperargs)
+    cellActions = cellActions or {}
+    actionHyperargs = actionHyperargs or {}
+
+    local highestMinVars = 0
+
+    -- Flags actions that're missing required attributes and sets default values where sensible
+    for id, actionDef in pairs (cellActions) do
+        -- Sets some default values for the action definition
+        actionDef.params = (type(actionDef.params) == "table") and actionDef.params or {}
+        actionDef.hyperparams = (type(actionDef.hyperparams) == "table") and actionDef.hyperparams or {}
+
+        -- Checks if the action type is valid
+        if actionTypes[actionDef.type] ~= true then
+            error (string.format ("Provided action type is %s, which is invalid", actionDef.type))
+        end
+    
+        -- Checks the required parameters
+        for attribute, dataType in pairs (requiredAttributes) do
+            -- Raises an error if the attribute has the wrong type
+            if type (actionDef[attribute]) ~= dataType then
+                error (string.format ("Provided action attribute %s has the wrong type (currently %s, should be %s)", attribute, type (actionDef[attribute]), dataType))
+            end
+        end
+
+        -- Inserts values into the hyperparams of the provided action
+        actionHyperargs[id] = actionHyperargs[id] or {}
+        actionDef.funcString = actionDef.funcString:gsub("%$([%w_]+)", function(key)
+            if actionHyperargs[id][key] ~= nil then
+                return actionHyperargs[id][key] -- Replace value with provided hyperargument
+
+            elseif actionDef.hyperparams[key] ~= nil then
+                return actionDef.hyperparams[key] -- Replace value with default hyperargument
+
+            else
+                return "$" .. key -- Assume the value is a parameter and keep it the same
+            end
+        end)
+    
+        -- Checks if the params used in the function string are defined properly in the params table
+        for match in actionDef.funcString:gmatch("%$([%w_]+)") do
+            local paramVal = actionDef.params[match]
+            
+            if type (paramVal) ~= "table" and paramVal ~= true then
+                error (string.format ("Found an interpolated function string value (%s) in action function string %s with no compatible parameters", match, id))
+            end
+        end
+            
+        -- Find the number of variable parameters needed for this action and determine if it's more than the current max
+        local numVarParams = 0 -- The number of variable parameters needed for this action
+        for key, value in pairs (actionDef.params) do
+            if value == true then
+                numVarParams = numVarParams + 1
+            end
+        end
+        highestMinVars = (highestMinVars < numVarParams) and numVarParams or highestMinVars
+
+        -- Adds the parameter keys to a list inside the action
+        actionDef.paramKeys = {}
+        for key, value in pairs (actionDef.params) do
+            table.insert (actionDef.paramKeys, key)
+        end
+    
+        -- Adds the action's ID to its definition
+        actionDef.id = id      
+    end
+
+    return highestMinVars
 end
 
 --- Generates a default cell with no actions
@@ -456,7 +217,7 @@ end
 --- Updates a single cell during a game tick
 function cell:update (tileX, tileY, cellObj, map)
     -- Energy cost
-    self.map:adjustCellEnergy (tileX, tileY, -1)
+    self.map:adjustCellEnergy (tileX, tileY, -self.tickCost)
 
     -- Age the cell by one tick
     cellObj.ticksLeft = cellObj.ticksLeft - 1
@@ -509,7 +270,7 @@ function cell:mutate (childCellObj, parentCellObj)
         local weightedChoices = {add = 65, delete = 20, replace = 10, swap = 5}
 
         -- Remove the ability to add to the script list if the script list is too long
-        if #childScriptList > scriptListLimit then
+        if #childScriptList > self.maxActions then
             weightedChoices.add = nil
         end
 
