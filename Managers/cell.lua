@@ -101,7 +101,6 @@ function cell:init (map, cellActions, scriptPrefixes, options)
     options.mutsPerChild = options.mutsPerChild or {}
     self.mutsPerChild.min = options.mutsPerChild.min or 0
     self.mutsPerChild.max = options.mutsPerChild.max or 10
-    self.mutsPerChild.mean = options.mutsPerChild.mean or 5
 
     options.initialMutRates = options.initialMutRates or {}
     self.initialMutRates.major = clamp (options.initialMutRates.major or 0.35, self.minMutRate, 1)
@@ -110,9 +109,8 @@ function cell:init (map, cellActions, scriptPrefixes, options)
     self.initialMutRates.meta = clamp (options.initialMutRates.meta or 0.25, self.minMutRate, 1)
 
     options.cellAge = options.cellAge or {}
-    self.cellAge.min = options.cellAge.min or 500
-    self.cellAge.max = options.cellAge.max or 500
-    self.cellAge.mean = options.cellAge.mean or 500
+    self.cellAge.min = options.cellAge.min or 3000
+    self.cellAge.max = options.cellAge.max or 6500
 end
 
 function cell:validateCompileActions (cellActions, actionHyperargs)
@@ -193,15 +191,15 @@ function cell:new (health, energy)
         scriptList = {},
         scriptFunc = function () end,
         vars = {},
-        health = clamp ((health ~= nil) and health or 500, 0, 500),
-        energy = clamp ((energy ~= nil) and energy or 500, 0, 500),
+        health = clamp (health or self.maxHealth, 0, self.maxHealth),
+        energy = clamp (energy or self.maxEnergy, 0, self.maxEnergy),
         direction = 1,
         lastUpdate  = 0,
         mutationRates = {
-            major = 0.1,
-            moderate = 0.1,
-            minor = 0.1,
-            meta = 0.1,
+            major = self.initialMutRates.major,
+            moderate = self.initialMutRates.moderate,
+            minor = self.initialMutRates.minor,
+            meta = self.initialMutRates.meta,
         },
         totalEnergy = 0,
         ticksLeft = round (mapToScale (love.math.randomNormal ()/ 10, -3, 3, 3000, 6500)),
@@ -222,7 +220,7 @@ function cell:update (tileX, tileY, cellObj, map)
     -- Age the cell by one tick
     cellObj.ticksLeft = cellObj.ticksLeft - 1
 
-    if cellObj.health <= 0 or cellObj.ticksLeft <= 0 or self.map:isTaken (tileX, tileY) == false then
+    if cellObj.health <= 0 or cellObj.ticksLeft <= 0 then
         -- Delete cell
         self.map:deleteCell (tileX, tileY)
     else
