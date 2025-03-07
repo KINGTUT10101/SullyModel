@@ -9,10 +9,8 @@ bitser.register("function", function()
 end)
 
 local map = {
-    inputGrid = {}, -- Tracks all the tiles in the map environment
-    barrierGrid = {}, -- Tracks all the barriers in the map environment
-    cellGrid = {}, -- Sparse matrix that tracks all the cells in the map environment
-    -- inputRender = nil, -- Contains a pre-rendered image of the background data
+    cellGrid = {},
+    envGrid = {},
     width = 0, -- Width of the input grid
     height = 0, --- Height of the input grid
     lastTick = 0, --- Time since the last tick, in seconds
@@ -59,8 +57,7 @@ function map:quickSave ()
     
     local fileName = "quickSave_" .. os.date("%Y-%m-%d_%H-%M-%S") .. ".slf"
     bitser.dumpLoveFile (fileName, {
-        inputGrid = self.inputGrid,
-        barrierGrid = self.barrierGrid,
+        envGrid = self.envGrid,
         cellGrid = cellGridCopy,
         stats = self.stats,
         lastSave = self.lastSave,
@@ -71,20 +68,23 @@ function map:quickSave ()
 end
 
 --- Initializes the map manager and prepares it for processing.
---- @param title string The name of the map.
 function map:init (cellManager, options)
     options = options or {}
     assert (type (options) == "table", "Provided options argument is not a table")
 
     self.cellManager = cellManager
     self.title = options.title or "Untitled Map"
-    self.inputBounds.min = options.inputMin or 0
-    self.inputBounds.max = options.inputMax or 500
-    self.drawBounds.min = options.drawMin or self.inputBounds.min
-    self.drawBounds.max = options.drawMax or self.inputBounds.max
     self.stats.resets = 0
     self.ticksBetweenSaves = options.ticksBetweenSaves or 100000
     self.maxMutsOnSpawn = options.maxMutsOnSpawn or 5 -- TODO: Add this
+
+    options.inputBounds = options.inputBounds or {}
+    self.inputBounds.min = options.inputBounds.min or 0
+    self.inputBounds.max = options.inputBounds.max or 500
+
+    options.drawBounds = options.drawBounds or {}
+    self.drawBounds.min = options.drawBounds.min or self.inputBounds.min
+    self.drawBounds.max = options.drawBounds.max or self.inputBounds.max
 
     self.tickSpeed = math.huge
 end
@@ -92,50 +92,40 @@ end
 --- Resets the map with a new size and input data.
 --- @param width integer The width of the input data.
 --- @param height integer The height of the input data.
---- @param mapInput? fun(param:integer, param:integer):number Used to map the value of each input tile
---- @param mapBarriers? fun(param:integer, param:integer):boolean Used to map the impassible barrier tiles
-function map:reset (width, height, mapInput, mapBarriers)
+--- @param mapEnvInputs? fun(param:integer, param:integer):number Used to map the value of each input tile
+--- @param mapEnvTypes? fun(param:integer, param:integer):boolean Used to map the impassible barrier tiles
+function map:reset (width, height, mapEnvInputs, mapEnvTypes)
     self.width, self.height = width, height
 
     -- Generates the input grid and input render
-    local inputGrid = {}
-    local barrierGrid = {}
+    local envGrid = {}
     local cellGrid = {}
     for i = 1, self.width do
-        local inputRow = {}
-        inputGrid[i] = inputRow -- Add row to input grid
-
-        local barrierRow = {}
-        barrierGrid[i] = barrierRow -- Add row to barrier grid
+        local envRow = {}
+        envGrid[i] = envRow -- Add row to input grid
 
         local cellRow = {}
         cellGrid[i] = cellRow -- Add row to cell grid
 
         for j = 1, self.height do
-            local tile = 0
+            local envTile = {
+                input = 0,
+                type = "blank",
+            }
 
-            if mapInput ~= nil then
-                tile = mapInput (i, j)
-            else
-                tile = 0
+            if mapEnvInputs ~= nil then
+                envTile.input = mapEnvInputs (i, j)
             end
 
-            inputRow[j] = tile -- Add tile to grid
-
-            local barrier = false
-
-            if mapBarriers ~= nil then
-                barrier = mapBarriers (i, j)
-            else
-                barrier = false
+            if mapEnvTypes ~= nil then
+                envTile.type = mapEnvTypes (i, j)
             end
 
-            barrierRow[j] = barrier -- Add tile to grid
+            envRow[j] = envTile
         end
     end
 
-    self.inputGrid = inputGrid
-    self.barrierGrid = barrierGrid
+    self.envGrid = envGrid
     self.cellGrid = cellGrid
     self.stats.cells = 0
     self.resets = self.resets + 1
@@ -207,18 +197,15 @@ function map:draw ()
     -- love.graphics.draw (self.inputRender, 0, 0)
 
     -- Draw cells
-    local inputGrid = self.inputGrid
-    local barrierGrid = self.barrierGrid
+    local envGrid = self.envGrid
     local cellGrid = self.cellGrid
     for i = 1, self.width do
         local cellRow = cellGrid[i]
-        local inputRow = inputGrid[i]
-        local barrierRow = barrierGrid[i]
+        local envRow = envGrid[i]
 
         for j = 1, self.height do
             local cell = cellRow[j]
-            local input = inputRow[j]
-            local barrier = barrierRow[j]
+            local envTile = envRow[j]
 
             -- Check what exists at the current position to determine what to render
             if cell ~= nil then
@@ -226,14 +213,14 @@ function map:draw ()
                 love.graphics.setColor (cell.color)
                 love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
 
-            elseif barrier == true then
-                -- Render barrier
+            elseif envTile.type ~= "blank" then
+                -- Render barrier (assume this is the only other tile type right now)
                 love.graphics.setColor ({1, 0, 0, 1})
                 love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
 
             else
                 -- Render input tile
-                local scaledColor = mapToScale (input, self.drawBounds.min, self.drawBounds.max, 0, 1)
+                local scaledColor = mapToScale (envTile.input, self.drawBounds.min, self.drawBounds.max, 0, 1)
                 love.graphics.setColor (scaledColor, scaledColor, scaledColor, 1)
                 love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
             end
@@ -309,7 +296,7 @@ end
 function map:getInputTile (tileX, tileY)
     assert (tileX == tileX and tileY == tileY, "Bad coords found " .. tileX .. " " .. tileY)
     if self:inBounds (tileX, tileY) == true then
-        return self.inputGrid[tileX][tileY]
+        return self.envGrid[tileX][tileY].input
 
     else
         return nil
@@ -324,7 +311,7 @@ function map:setInputTile (tileX, tileY, value)
     assert (type (value) == "number", "Provided value is not a number")
 
     if self:inBounds (tileX, tileY) == true then
-        self.inputGrid[tileX][tileY] = clamp (value, self.inputBounds.min, self.inputBounds.max)
+        self.envGrid[tileX][tileY].input = clamp (value, self.inputBounds.min, self.inputBounds.max)
     end
 end
 
@@ -336,7 +323,7 @@ function map:adjustInputTile (tileX, tileY, value)
     assert (type (value) == "number", "Provided value is not a number")
 
     if self:inBounds (tileX, tileY) == true then
-        self.inputGrid[tileX][tileY] = clamp (self.inputGrid[tileX][tileY] + value, self.inputBounds.min, self.inputBounds.max)
+        self.envGrid[tileX][tileY].input = clamp (self.envGrid[tileX][tileY].input + value, self.inputBounds.min, self.inputBounds.max)
     end
 end
 
@@ -346,7 +333,7 @@ end
 --- @param tileY integer The vertical map position.
 --- @return boolean isClear True if the provided position does not have a cell.
 function map:isClear (tileX, tileY)
-    return self:inBounds (tileX, tileY) == true and self.barrierGrid[tileX][tileY] == false and self.cellGrid[tileX][tileY] == nil
+    return self:inBounds (tileX, tileY) == true and self.cellGrid[tileX][tileY] == nil and self.envGrid[tileX][tileY].type == "blank"
 end
 
 --- Checks if the provided position is taken by a cell.

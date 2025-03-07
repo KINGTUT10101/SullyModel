@@ -40,7 +40,7 @@ end
 local baseXBarriers = 1000 * love.math.random()
 local baseYBarriers = 1000 * love.math.random()
 local function mapBarriers (tileX, tileY)
-    return (love.math.noise(baseXBarriers+.03*tileX, baseYBarriers+.1*tileY) > 0.85) and true or false
+    return (love.math.noise(baseXBarriers+.03*tileX, baseYBarriers+.1*tileY) > 0.85) and "barrier" or "blank"
 end
 
 function thisScene:load (...)
@@ -48,7 +48,16 @@ function thisScene:load (...)
         maxCells = 250,
         maxActions = 200,
     })
-    map:init (cell, "Test Map", 0, math.huge, 0, 2500)
+    map:init (cell, {
+        inputBounds = {
+            min = 0,
+            max = math.huge,
+        },
+        drawBounds = {
+            min = 0,
+            max = 2500,
+        }
+    })
     map:reset (mapSize, mapSize, mapInput, mapBarriers)
     map:setCamera (-110, -10, 5.8)
     map:setTickSpeed (1/8)
