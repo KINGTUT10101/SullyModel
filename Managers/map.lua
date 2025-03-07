@@ -434,6 +434,7 @@ function map:transferInputToCell (tileX, tileY, amount)
     if self:isTaken (tileX, tileY) == true then
         local cellObj = self.cellGrid[tileX][tileY]
         local inputVal = self:getInputTile (tileX, tileY)
+        local maxEnergy = self.cellManager.maxEnergy
 
         -- Energy cost of consuming a tile
         cellObj.energy = cellObj.energy - 2
@@ -448,10 +449,10 @@ function map:transferInputToCell (tileX, tileY, amount)
             inputVal = inputVal - amount
         end
         
-        if cellObj.energy > 500 then -- Cell energy max
-            cellObj.totalEnergy = cellObj.totalEnergy - (cellObj.energy - 500)
-            inputVal = inputVal + cellObj.energy - 500
-            cellObj.energy = 500
+        if cellObj.energy > maxEnergy then -- Cell energy max
+            cellObj.totalEnergy = cellObj.totalEnergy - (cellObj.energy - maxEnergy)
+            inputVal = inputVal + cellObj.energy - maxEnergy
+            cellObj.energy = maxEnergy
         end
 
         self:setInputTile (tileX, tileY, inputVal)
@@ -462,6 +463,7 @@ function map:shareInputToCell (tileX1, tileY1, tileX2, tileY2, amount)
     if self:isTaken (tileX1, tileY1) == true and self:isTaken (tileX2, tileY2) == true then
         local currCellObj = self.cellGrid[tileX1][tileY1]
         local otherCellObj = self.cellGrid[tileX2][tileY2]
+        local maxEnergy = self.cellManager.maxEnergy
 
         -- Energy cost of sharing energy
         currCellObj.energy = currCellObj.energy - 3
@@ -474,9 +476,9 @@ function map:shareInputToCell (tileX1, tileY1, tileX2, tileY2, amount)
             currCellObj.energy = currCellObj.energy - amount
         end
         
-        if otherCellObj.energy > 500 then -- Cell energy max
-            currCellObj.energy = currCellObj.energy + otherCellObj.energy - 500
-            otherCellObj.energy = 500
+        if otherCellObj.energy > maxEnergy then -- Cell energy max
+            currCellObj.energy = currCellObj.energy + otherCellObj.energy - maxEnergy
+            otherCellObj.energy = maxEnergy
         end
 
         if currCellObj.energy <= 0 then
@@ -488,7 +490,7 @@ end
 function map:adjustCellEnergy (tileX, tileY, amount)
     if self:isTaken (tileX, tileY) == true then
         local cell = self.cellGrid[tileX][tileY]
-        cell.energy = math.min (500, cell.energy + amount)
+        cell.energy = math.min (self.cellManager.maxEnergy, cell.energy + amount)
 
         if cell.energy < 0 then
             map:adjustCellHealth (tileX, tileY, cell.energy)
@@ -500,7 +502,7 @@ end
 function map:adjustCellHealth (tileX, tileY, amount)
     if self:isTaken (tileX, tileY) == true then
         local cell = self.cellGrid[tileX][tileY]
-        cell.health = math.min (500, cell.health + amount)
+        cell.health = math.min (self.cellManager.maxHealth, cell.health + amount)
 
         if cell.health <= 0 then
             self:deleteCell (tileX, tileY)
