@@ -10,7 +10,7 @@ local cellActionVars = {
 
 local cellActions = {
     readInput = {
-        desc = "Reads the value from the input tile below the cell",
+        desc = "Reads the value from the input tile in the cell's view",
         type = "assign",
         params = {
             assignTo = true,
@@ -18,7 +18,7 @@ local cellActions = {
         hyperparams = {},
         funcString = 
 [[
-$assignTo = map:getInputTile (tileX, tileY)
+$assignTo = map:getInputTile (cellObj.relViewX, cellObj.relViewY) or 0
 ]]
     },
     consumeInput = {
@@ -60,7 +60,7 @@ else
 end
 ]]
     },
-    moveForward = {
+    moveCellForward = {
         desc = "Moves the cell in the direction it's facing",
         type = "action",
         params = {},
@@ -69,7 +69,7 @@ end
         },
         funcString = 
 [[
-tileX, tileY = map:moveForward (tileX, tileY)
+tileX, tileY = map:moveCellForward (tileX, tileY)
 map:adjustCellEnergy (tileX, tileY, -$energyCost)
 if map:isTaken(tileX, tileY) == false then
     print ("Cell death: Move forward", tileX, tileY)
@@ -77,24 +77,87 @@ if map:isTaken(tileX, tileY) == false then
 end
 ]]
     },
-    turnLeft = {
+    turnCellLeft = {
         desc = "Turns the cell left",
         type = "action",
         params = {},
         hyperparams = {},
         funcString = 
 [[
-map:turnLeft (tileX, tileY)
+map:turnCellLeft (tileX, tileY)
 ]]
     },
-    turnRight = {
+    turnCellRight = {
         desc = "Turns the cell right",
         type = "action",
         params = {},
         hyperparams = {},
         funcString = 
 [[
-map:turnRight (tileX, tileY)
+map:turnCellRight (tileX, tileY)
+]]
+    },
+    moveViewForward = {
+        desc = "Moves the cell's view in the direction it's facing",
+        type = "action",
+        params = {},
+        hyperparams = {
+            energyCost = 0,
+        },
+        funcString = 
+[[
+map:moveViewForward (tileX, tileY)
+map:adjustCellEnergy (tileX, tileY, -$energyCost)
+if map:isTaken(tileX, tileY) == false then
+    print ("Cell death: Move forward", tileX, tileY)
+    return
+end
+]]
+    },
+    turnViewLeft = {
+        desc = "Turns the cell's view left",
+        type = "action",
+        params = {},
+        hyperparams = {},
+        funcString = 
+[[
+map:turnViewLeft (tileX, tileY)
+]]
+    },
+    turnViewRight = {
+        desc = "Turns the cell's view right",
+        type = "action",
+        params = {},
+        hyperparams = {},
+        funcString = 
+[[
+map:turnViewRight (tileX, tileY)
+]]
+    },
+    zeroView = {
+        desc = "Zeros the cell's view",
+        type = "action",
+        params = {},
+        hyperparams = {},
+        funcString = 
+[[
+cellObj.relViewX, cellObj.relViewY = 0, 0
+]]
+    },
+    getDirection = {
+        desc = "Returns the cell's direction for either its view or movement",
+        type = "action",
+        params = {
+            assignTo = true,
+            dirType = {
+                "moveDir",
+                "viewDir",
+            },
+        },
+        hyperparams = {},
+        funcString = 
+[[
+$assignTo = cellObj.$dirType
 ]]
     },
     applyDamage = {
@@ -108,11 +171,15 @@ map:turnRight (tileX, tileY)
         funcString = 
 [[
 enemyTileX, enemyTileY = map:getForwardPos (tileX, tileY, 1)
-map:adjustCellEnergy (tileX, tileY, -$energyCost)
-map:adjustCellHealth (enemyTileX, enemyTileY, -$damage)
-if map:isTaken(tileX, tileY) == false then
-    print ("Cell death: Apply damage", tileX, tileY)
-    return
+if map:isTaken (enemyTileX, enemyTileY) == true then
+    map:adjustCellEnergy (tileX, tileY, -$energyCost)
+    
+    if map:isTaken(tileX, tileY) == false then
+        print ("Cell death: Apply damage", tileX, tileY)
+        return
+    else
+        map:adjustCellHealth (enemyTileX, enemyTileY, -$damage)
+    end
 end
 ]]
     },
@@ -127,10 +194,11 @@ end
         funcString = 
 [[
 map:adjustCellEnergy (tileX, tileY, -$energyCost)
-map:adjustCellHealth (tileX, tileY, $healing)
 if map:isTaken(tileX, tileY) == false then
     print ("Cell death: Heal self", tileX, tileY)
     return
+else
+    map:adjustCellHealth (tileX, tileY, $healing)
 end
 ]]
     },
@@ -177,9 +245,12 @@ if $term1 $op $term2 then
         params = {
             loopTo = true,
         },
+        hyperparams = {
+            maxLoops = 10,
+        },
         funcString =
 [[
-for i = 1, $loopTo do
+for i = 1, math.min ($maxLoops, $loopTo) do
 ]]
     },
     reproduce = {
@@ -213,10 +284,18 @@ end
         funcString =
 [[
 otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
-map:shareInputToCell (tileX, tileY, otherTileX, otherTileY, 25)
-if map:isTaken(tileX, tileY) == false then
-    print ("Cell death: Share energy", tileX, tileY)
-    return
+
+if map:isTaken (otherTileX, otherTileY) == true then
+    if map:getCellTotalResources (tileX, tileY) > ($sharedEnergy + $energyCost) then
+        map:adjustCellEnergy (tileX, tileY, -($sharedEnergy + $energyCost))
+        map:adjustCellEnergy (otherTileX, otherTileY, $sharedEnergy)
+    else
+        map:adjustCellEnergy (tileX, tileY, -$energyCost)
+        map:adjustCellEnergy (otherTileX, otherTileY, map:getCellTotalResources (tileX, tileY))
+
+        print ("Cell death: Share energy", tileX, tileY)
+        return
+    end
 end
 ]]
     },
@@ -229,7 +308,7 @@ end
         hyperparams = {},
         funcString =
 [[
-$assignTo = (map:isTaken (map:getForwardPos (tileX, tileY, 1))) and 1 or 0
+$assignTo = (map:isTaken (cellObj.relViewX, cellObj.relViewY)) and 1 or -1
 ]]
     },
     isSimilar = {
@@ -247,11 +326,10 @@ $assignTo = (map:isTaken (map:getForwardPos (tileX, tileY, 1))) and 1 or 0
         hyperparams = {},
         funcString =
 [[
-otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
 allSimilar = false
-if map:isTaken (otherTileX, otherTileY) == true then
+if map:isTaken (cellObj.relViewX, cellObj.relViewY) == true then
     currCellColor = cellObj.color
-    otherCellColor = map.cellGrid[otherTileX][otherTileY].color
+    otherCellColor = map.cellGrid[cellObj.relViewX][cellObj.relViewY].color
 
     allSimilar = true
     for i = 1, 3 do
@@ -260,7 +338,7 @@ if map:isTaken (otherTileX, otherTileY) == true then
         end
     end
 end
-$assignTo = (allSimilar == true) and 1 or 0
+$assignTo = (allSimilar == true) and 1 or -1
 ]]
     },
     copyVariable = {
@@ -348,23 +426,23 @@ if $assignTo ~= $assignTo then $assignTo = 0 end
 $assignTo = 0
 ]]
     },
-    getConstantNum = {
-        desc = "Sets the value of a variable to one of several predefined numbers",
-        type = "assign",
-        params = {
-            assignTo = true,
-            constNum = {
-                math.huge,
-                math.pi,
-                math.exp(1),
-            },
-        },
-        hyperparams = {},
-        funcString =
-[[
-$assignTo = $constNum
-]]
-    },
+--     getConstantNum = {
+--         desc = "Sets the value of a variable to one of several predefined numbers",
+--         type = "assign",
+--         params = {
+--             assignTo = true,
+--             constNum = {
+--                 math.huge,
+--                 math.pi,
+--                 math.exp(1),
+--             },
+--         },
+--         hyperparams = {},
+--         funcString =
+-- [[
+-- $assignTo = $constNum
+-- ]]
+--     },
     getRandomNum = {
         desc = "Sets the value of a variable to a random number between two variables",
         type = "assign",
@@ -383,18 +461,6 @@ $assignTo = $constNum
 $assignTo = math.random ($bounds)
 ]]
     },
-    getHealth = {
-        desc = "Saves the cell's health to a variable",
-        type = "assign",
-        params = {
-            assignTo = true,
-        },
-        hyperparams = {},
-        funcString =
-[[
-$assignTo = cellObj.health
-]]
-    },
     getEnergy = {
         desc = "Saves the cell's energy to a variable",
         type = "assign",
@@ -404,11 +470,11 @@ $assignTo = cellObj.health
         hyperparams = {},
         funcString =
 [[
-$assignTo = cellObj.energy
+$assignTo = map:getCellEnergy (cellObj.relViewX, cellObj.relViewY)
 ]]
     },
-    getOtherCellEnergy = {
-        desc = "Saves the energy of the cell in front of the current cell to a variable",
+    getHealth = {
+        desc = "Saves the cell's health to a variable",
         type = "assign",
         params = {
             assignTo = true,
@@ -416,8 +482,19 @@ $assignTo = cellObj.energy
         hyperparams = {},
         funcString =
 [[
-otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
-$assignTo = map:getCellEnergy (otherTileX, otherTileY)
+$assignTo = map:getCellHealth (cellObj.relViewX, cellObj.relViewY)
+]]
+    },
+    getAge = {
+        desc = "Saves the cell's age to a variable",
+        type = "assign",
+        params = {
+            assignTo = true,
+        },
+        hyperparams = {},
+        funcString =
+[[
+$assignTo = map:getCellAge (cellObj.relViewX, cellObj.relViewY)
 ]]
     },
     earlyStop = {
@@ -434,26 +511,6 @@ end
 ]]
     },
 }
-
--- TODO: Change actions to use this definition scheme for variables
--- (In an action definition)
--- funcString = "($param1 + $param2) * $rate",
--- params = {
---     param1 = true,
---     param2 = true,
---     rate = {
---         "0.01",
---         "0.05",
---         "0.25",
---     },
--- }
-
--- (In a spawned cell)
--- args = {
---     param1 = "var3_1",
---     param2 = "var1_5",
---     rate = "0.05",
--- }
 
 return {
     actions = cellActions,
