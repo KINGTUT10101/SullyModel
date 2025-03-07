@@ -55,7 +55,8 @@ end
 --- @param width integer The width of the input data.
 --- @param height integer The height of the input data.
 --- @param mapInput fun(param:integer, param:integer):number Used to map the value of each input tile
-function map:reset (width, height, mapInput)
+--- @param mapEnvType? fun(param:integer, param:integer):string Used to map the value of each input tile
+function map:reset (width, height, mapInput, mapEnvType)
     self.width, self.height = width, height
 
     -- Generates the grids
@@ -76,6 +77,10 @@ function map:reset (width, height, mapInput)
 
             if mapInput ~= nil then
                 envTile.input = mapInput (i, j)
+            end
+
+            if mapEnvType ~= nil then
+                envTile.type = mapEnvType (i, j)
             end
 
             envRow[j] = envTile -- Add tile to grid
@@ -152,16 +157,21 @@ function map:draw ()
 
         for j = 1, self.height do
             local cellObj = cellRow[j]
+            local envObj = envRow[j]
 
             -- Check if cell exists at this position
             if cellObj ~= nil then
                 -- Render cell object
                 love.graphics.setColor (cellObj.color)
                 love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
-
+            elseif envObj.type ~= "blank" then
+                -- The only type is currently barrier, so assume it's always that
+                -- Render env tile
+                love.graphics.setColor (1, 0, 0, 1)
+                love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
             else
                 -- Render input tile
-                local scaledColor = mapToScale (envRow[j].input, self.drawBounds.min, self.drawBounds.max, 0, 1)
+                local scaledColor = mapToScale (envObj.input, self.drawBounds.min, self.drawBounds.max, 0, 1)
                 love.graphics.setColor (scaledColor, scaledColor, scaledColor, 1)
                 love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
             end
@@ -272,7 +282,7 @@ end
 --- @param tileY integer The vertical map position.
 --- @return boolean isClear True if the provided position does not have a cell object.
 function map:isClear (tileX, tileY)
-    return self:inBounds (tileX, tileY) and self.cellGrid[tileX][tileY] == nil
+    return self:inBounds (tileX, tileY) and self.cellGrid[tileX][tileY] == nil and self.envGrid[tileX][tileY].type == "blank"
 end
 
 --- Checks if the provided position is taken by a cells.

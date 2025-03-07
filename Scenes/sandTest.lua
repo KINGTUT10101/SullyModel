@@ -19,25 +19,36 @@ local captures = {} -- Holds the last 10 captures
 
 local cyclesSinceLastFail = 0
 
-local failsafeSpawns = 50
+local failsafeSpawns = 25
 local failsafeActivations = -1
 local lastCell = nil
 
 local renderMap = true
 
-local baseX = 1000000 * love.math.random()
-local baseY = 1000000 * love.math.random()
+local baseXInput = 1000000 * love.math.random()
+local baseYInput = 1000000 * love.math.random()
 local function mapInput (tileX, tileY)
-    return mapToScale (love.math.noise(baseX+.05*tileX, baseY+.07*tileY), 0, 1, 0, 500)
+    return mapToScale (love.math.noise(baseXInput+.05*tileX, baseYInput+.07*tileY), 0, 1, 0, 500)
+end
+
+local baseXBarriers = 1000 * love.math.random()
+local baseYBarriers = 1000 * love.math.random()
+local function mapBarriers (tileX, tileY)
+    return (love.math.noise(baseXBarriers+.03*tileX, baseYBarriers+.1*tileY) > 0.85) and "barrier" or "blank"
 end
 
 function thisScene:load (...)
     cell:init (map, require ("Data.cellActions").actions, require ("Data.cellActions").actionVars, {
-        maxCells = 250,
-        maxActions = 500,
+        maxCells = 25,
+        maxActions = 750,
+        hyperargs = {
+            forStruct = {
+                maxLoops = 20,
+            },
+        },
     })
     map:init (cell)
-    map:reset (mapSize, mapSize, mapInput)
+    map:reset (mapSize, mapSize, mapInput, mapBarriers)
     map:setCamera (-110, -10, 5.8)
     map:setTickSpeed (1/8)
 
@@ -121,22 +132,24 @@ function thisScene:update (dt)
             table.remove (captures, maxCaptures + 1)
         end
 
-        baseX = 1000000 * love.math.random()
-        baseY = 1000000 * love.math.random()
-        map:reset (mapSize, mapSize, mapInput)
+        baseXInput = 1000000 * love.math.random()
+        baseYInput = 1000000 * love.math.random()
+        baseXBarriers = 1000 * love.math.random()
+        baseYBarriers = 1000 * love.math.random()
+        map:reset (mapSize, mapSize, mapInput, mapBarriers)
 
         local cellsSpawned = 0
 
-        while cellsSpawned < failsafeSpawns do
+        while cellsSpawned < math.min (failsafeSpawns, cell.maxCells) do
             for i = 1, #captures do
+                print (i)
                 local newCell = copyTable (captures[i])
 
                 -- Heavily mutate cell
                 for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, 200)) do
-                    local mutCell = cell:new (100, 100)
-                    cell:mutate (mutCell, newCell)
-                    newCell = mutCell
+                    cell:mutate (newCell)
                 end
+                
 
                 cell:compileScript (newCell)
 
