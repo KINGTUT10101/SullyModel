@@ -4,6 +4,7 @@ local randomchoice = require ("Libraries.lume").randomchoice
 local weightedchoice = require ("Libraries.lume").weightedchoice
 local copyTable = require ("Helpers.copyTable")
 local mapToScale = require ("Helpers.mapToScale")
+local addLineNumbers = require ("Helpers.addLineNumbers")
 
 local cell = {
     map = nil, -- A reference to the map manager
@@ -410,7 +411,7 @@ function cell:mutate (childCellObj, parentCellObj)
     childCellObj.mutationRates = childMutRates
 end
 
-function cell:compileScript (cellObj)
+function cell:compileScript (cellObj, stringOnly)
     local scriptList = cellObj.scriptList
     local cellVars = cellObj.vars
 
@@ -491,27 +492,24 @@ function cell:compileScript (cellObj)
     -- Assemble full script string
     local scriptStr = table.concat (scriptLines, "")
 
-    -- print ("======================")
-    -- print(scriptStr)
-    -- print ()
-
-    cellObj.scriptStr = scriptStr
-
     local scriptFunc, err = load (scriptStr)
     assert (err == nil, err)
 
-    cellObj.scriptFunc = scriptFunc
+    if stringOnly == true then
+        return scriptStr
+    else
+        cellObj.scriptFunc = scriptFunc
+        return scriptStr
+    end
 end
 
 function cell:printCellInfo (cellObj)
     print ("==========" .. "Cell Info - " .. tostring (cellObj) .. "==========")
     for k, v in pairs (cellObj) do
-        if k ~= "scriptStr" then
-            print (tostring(k) .. ": " .. tostring(v))
-            if type (v) == "table" then
-                for k, v in pairs (v) do
-                    print ("  " .. tostring(k) .. ": " .. tostring(v))
-                end
+        print (tostring(k) .. ": " .. tostring(v))
+        if type (v) == "table" then
+            for k, v in pairs (v) do
+                print ("  " .. tostring(k) .. ": " .. tostring(v))
             end
         end
     end
@@ -543,6 +541,12 @@ function cell:printCellScriptList (cellObj)
             print ("    No hyperarguments used")
         end
     end
+end
+
+function cell:printCellScriptString (cellObj)
+    print ("==========" .. "Cell Script List - " .. tostring (cellObj) .. "==========")
+    print (addLineNumbers (self:compileScript (cellObj, true)))
+    print ()
 end
 
 return cell

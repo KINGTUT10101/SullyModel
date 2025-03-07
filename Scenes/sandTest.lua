@@ -121,26 +121,6 @@ function thisScene:update (dt)
         cyclesSinceLastFail = cyclesSinceLastFail + 1
     end
 
-    -- Save cell to captures table
-    -- if capture ~= nil then
-    --     captureTimer = captureTimer - 1
-
-    --     if captureTimer <= 0 then
-    --         if capture ~= nil then
-    --             table.insert (captures, 1, capture)
-    --             table.remove (captures, maxCaptures)
-
-    --             print ("INFO: Cell captured successfully")
-    --             cell:printCellInfo (capture)
-    --         else
-    --             print ("WARNING: Capture failed", os.date("%H:%M:%S - %Y-%m-%d"))
-    --             print ("Cells left: " .. map.stats.cells)
-    --         end
-
-    --         captureTimer = maxCaptureCycles
-    --     end
-    -- end
-
     if map.stats.cells == 1 and map:getTickSpeed () < math.huge and capture ~= nil then
         lastCell = capture
     end
@@ -272,10 +252,9 @@ function thisScene:keypressed (key, scancode, isrepeat)
         if cellObj ~= nil then
             if love.keyboard.isDown ("lshift") then
                 print ("=====Cell Script=====")
-                print (cellObj.scriptStr)
-                print ()
+                cell:printCellScriptString (cellObj)
             else
-                love.system.setClipboardText (cellObj.scriptStr)
+                love.system.setClipboardText (cell:compileScript (cellObj, true))
                 print ("Script copied to clipboard!")
             end
         end

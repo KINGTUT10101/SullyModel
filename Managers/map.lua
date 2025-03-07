@@ -150,23 +150,26 @@ function map:update (dt)
             local cellRow = cellGrid[i]
 
             for j = 1, self.height do
-                local cell = cellRow[j]
+                local cellObj = cellRow[j]
 
                 -- Check if cell exists at this position
-                if cell ~= nil then
+                if cellObj ~= nil then
                     -- Skip cells that have already been updated this tick
-                    if cell.lastUpdate < updateStartTime then
-                        cell.lastUpdate = updateStartTime
+                    if cellObj.lastUpdate < updateStartTime then
+                        cellObj.lastUpdate = updateStartTime
 
-                        local result, errorStr = pcall (self.cellManager.update, self.cellManager, i, j, cell, self) -- Call cell update function
+                        local result, errorStr = pcall (self.cellManager.update, self.cellManager, i, j, cellObj, self) -- Call cell update function
                     
                         if result == false then
-                            self.cellManager:printCellInfo (cell)
+                            self.cellManager:printCellScriptString (cellObj)
+                            self.cellManager:printCellInfo (cellObj)
+                            love.system.setClipboardText (self.cellManager:compileScript (cellObj, true))
+                            print ("Cell located at (" .. i .. ", " .. j .. ")")
                             error (errorStr)
                         end
                     end
 
-                    capture = cell
+                    capture = cellObj
                 end
             end
         end
