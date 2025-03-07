@@ -7,12 +7,10 @@ local mapToScale = require ("Helpers.mapToScale")
 local round = require ("Libraries.lume").round
 local copyTable = require ("Helpers.copyTable")
 
-local mapSize = 100
+local mapSize = 50
 
 local camVelocity = 15
 local zoomVelocity = 25
-
-local testCell = cell:new (100, 100)
 
 local maxCaptures = 25
 local maxCaptureCycles = 500
@@ -34,33 +32,31 @@ local function mapInput (tileX, tileY)
 end
 
 function thisScene:load (...)
-    cell:init (map)
+    cell:init (map, require ("Data.cellActions").actions, require ("Data.cellActions").actionVars, {
+        maxCells = 250,
+        maxActions = 500,
+    })
     map:init (cell)
     map:reset (mapSize, mapSize, mapInput)
     map:setCamera (-110, -10, 5.8)
     map:setTickSpeed (1/8)
 
-    captures[1] = cell:new (100, 100)
+    -- Adds a few heavily mutated cells to the initial captures list
+    for i = 1, maxCaptures do
+        local newCellObj = cell:new (250, 250)
+
+        -- Heavily mutate cell
+        for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, 200)) do
+            cell:mutate (newCellObj)
+        end
+
+        cell:compileScript (newCellObj)
+
+        captures[i] = newCellObj
+    end
 end
 
 function thisScene:update (dt)
-    if love.keyboard.isDown ("lshift") and love.keyboard.isDown ("b") then
-        local newCell = cell:new (100, 100)
-        cell:mutate (newCell, testCell)
-        cell:compileScript (newCell)
-        testCell = newCell
-
-        for k, v in pairs (testCell) do
-            print (k, v)
-            if type (v) == "table" then
-                for k, v in pairs (v) do
-                    print ("    ", k, v)
-                end
-            end
-        end
-        print ()
-    end
-
     local camX, camY, zoom = map:getCamera ()
     local speedMult = (love.keyboard.isDown ("lshift") == true) and 5 or 1
 
@@ -136,7 +132,7 @@ function thisScene:update (dt)
                 local newCell = copyTable (captures[i])
 
                 -- Heavily mutate cell
-                for i = 1, round (mapToScale (love.math.randomNormal (), 0, 1, 0, 50)) do
+                for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, 200)) do
                     local mutCell = cell:new (100, 100)
                     cell:mutate (mutCell, newCell)
                     newCell = mutCell
@@ -230,6 +226,20 @@ function thisScene:keypressed (key, scancode, isrepeat)
                 else
                     cell:printCellInfo (map:getCell (tileX, tileY))
                 end
+            end
+        end
+
+    -- Copies a cell's script to the clipboard or prints it to the console
+    elseif key == "o" then
+        local cellObj = map:getCell (map:screenToMap (love.mouse.getPosition ()))
+        
+        if cellObj ~= nil then
+            if love.keyboard.isDown ("lshift") then
+                print ("=====Cell Script=====")
+                cell:printCellScriptString (cellObj)
+            else
+                love.system.setClipboardText (cell:compileScript (cellObj, true))
+                print ("Script copied to clipboard!")
             end
         end
     
