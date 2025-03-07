@@ -12,7 +12,7 @@ local mapSize = 50
 local camVelocity = 15
 local zoomVelocity = 25
 
-local maxCaptures = 25
+local maxCaptures = 50
 local maxCaptureCycles = 500
 local captureTimer = maxCaptureCycles
 local captures = {} -- Holds the last 10 captures
@@ -39,15 +39,26 @@ end
 
 function thisScene:load (...)
     cell:init (map, require ("Data.cellActions").actions, require ("Data.cellActions").actionVars, {
-        maxCells = 25,
-        maxActions = 750,
+        maxCells = 200,
+        maxActions = 500,
+        scriptVars = 5,
+        memVars = 1,
         hyperargs = {
             forStruct = {
                 maxLoops = 20,
             },
         },
     })
-    map:init (cell)
+    map:init (cell, {
+        inputBounds = {
+            min = 0,
+            max = math.huge,
+        },
+        drawBounds = {
+            min = 0,
+            max = 2500,
+        }
+    })
     map:reset (mapSize, mapSize, mapInput, mapBarriers)
     map:setCamera (-110, -10, 5.8)
     map:setTickSpeed (1/8)
@@ -58,7 +69,9 @@ function thisScene:load (...)
 
         -- Heavily mutate cell
         for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, 200)) do
-            cell:mutate (newCellObj)
+            local mutCell = cell:new (100, 100)
+            cell:mutate (mutCell, newCellObj)
+            newCellObj = mutCell
         end
 
         cell:compileScript (newCellObj)
@@ -142,12 +155,13 @@ function thisScene:update (dt)
 
         while cellsSpawned < math.min (failsafeSpawns, cell.maxCells) do
             for i = 1, #captures do
-                print (i)
                 local newCell = copyTable (captures[i])
 
                 -- Heavily mutate cell
                 for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, 200)) do
-                    cell:mutate (newCell)
+                    local mutCell = cell:new (100, 100)
+                    cell:mutate (mutCell, newCell)
+                    newCell = mutCell
                 end
                 
 

@@ -11,6 +11,7 @@ local map = {
     height = 0, --- Height of the input grid
     lastTick = 0, --- Time since the last tick, in seconds
     tickSpeed = 0, -- Time between ticks
+    maxMutsOnSpawn = 0,
     camera = {
         x = 0,
         y = 0,
@@ -47,6 +48,7 @@ function map:init (cellManager, options)
     self.drawBounds.max = options.drawMax or self.inputBounds.max
     self.stats.resets = 0
     self.ticksBetweenSaves = options.ticksBetweenSaves or 100000
+    self.maxMutsOnSpawn = options.maxMutsOnSpawn or 5
 
     self.tickSpeed = math.huge
 end
@@ -318,11 +320,12 @@ function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
 
         -- Mutate cell object if a parent is given
         if parentCellObj ~= nil then
+            -- TODO: Mutate the child cell multiple times
             local mutSuccess, mutErr = pcall (self.cellManager.mutate, self.cellManager, newCellObj, parentCellObj)
             local compSuccess, compErr = pcall (self.cellManager.compileScript, self.cellManager, newCellObj)
 
-            assert (mutSuccess == true, "ERROR: Problem with mutation: " .. tostring (mutErr))
-            assert (compSuccess == true, "ERROR: Problem with script compilation: " .. tostring (compErr))
+            assert (mutSuccess == true, "ERROR: Problem with mutation:" .. tostring (mutErr))
+            assert (compSuccess == true, "ERROR: Problem with script compilation:" .. tostring (compErr))
         end
 
         self.cellGrid[tileX][tileY] = newCellObj

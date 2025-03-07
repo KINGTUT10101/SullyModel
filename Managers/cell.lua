@@ -26,7 +26,6 @@ local cell = {
     actionsByType = nil,
     actionVars = nil,
     minScriptVars = 0,
-    -- varsPerLevel = 0,
     scriptVars = 0,
     memVars = 0,
     maxHealth = 0, -- The maximum health of a cell object
@@ -67,7 +66,7 @@ function cell:init (map, actions, actionVars, options)
     self.actionVars = actionVars
 
     self.scriptVars = options.scriptVars or 5
-    self.memVars = options.scriptVars or 2
+    self.memVars = options.memVars or 2
     assert (self.scriptVars + self.memVars >= self.minScriptVars, "More variables are needed to meet the minimum required arguments for the provided action set")
 
     -- Gathers all the cell actions into arrays based on their types and place them into the actionsByIndex array
@@ -250,39 +249,7 @@ local function randomAction (childVars)
     return newAction, newActionDef
 end
 
--- local function getRandomAction (actionList)
---     local scopeAction = actionList[1] -- Get the top-level action, which is a startScript action
-
---     while true do
---         local action = scopeAction.scope[math.random (1, #scopeAction.scope)]
-
---         -- Check if the action creates scope, if it has any actions inside its scope, and if it passes the RNG check
---         if action.scope ~= nil and #action.scope > 0 and math.random () < 0.85 then
---             scopeAction = action
---         else
---             return scopeAction, action
---         end
---     end
--- end
-
--- -- TODO: memoize these functions
--- local function getTotalVarsForLevel (level)
---     return (level - 1) * cell.varsPerLevel + cell.minScriptVars
--- end
-
--- local function selectRandomVarForLevel (level)
---     local index = math.random  (1, getTotalVarsForLevel (level))
-
---     if index <= cell.minScriptVars then
---         return 1
---     else
---         return 
---     end
--- end
-
 function cell:mutate (childCellObj, parentCellObj)
-    parentCellObj = parentCellObj or childCellObj
-
     if math.random () < 0.95 then
         -- Mutate color slightly
         local colorIndex = math.random (1, 3)
@@ -414,7 +381,14 @@ function cell:mutate (childCellObj, parentCellObj)
         if math.random () < 0.05 then
             childVars[varIndex] = 0
         else
-            childVars[varIndex] = childVars[varIndex] + round (mapToScale (love.math.randomNormal () / 10, -3, 3, -100, 100))
+            -- Small chance to multiply a value
+            if math.random () < 0.10 then
+                local multSign = (math.random () < 0.50) and 1 or -1
+
+                childVars[varIndex] = childVars[varIndex] * (multSign * mapToScale (love.math.randomNormal (), -3, 6, -1, 6))
+            else
+                childVars[varIndex] = childVars[varIndex] + round (mapToScale (love.math.randomNormal () / 10, -3, 3, -100, 100))
+            end
         end
     end
 
@@ -422,7 +396,7 @@ function cell:mutate (childCellObj, parentCellObj)
     if math.random () < childMutRates.meta then
         local mutKey = randomchoice ({"major", "moderate", "minor", "meta"})
 
-        childMutRates[mutKey] = clamp (childMutRates[mutKey] + mapToScale (love.math.randomNormal () / 20, -3, 3, -1, 1), 0, 1)
+        childMutRates[mutKey] = clamp (childMutRates[mutKey] + mapToScale (love.math.randomNormal () / 20, -3, 3, -1, 1), 0.05, 1)
     end
 
     childCellObj.scriptList = childScriptList
