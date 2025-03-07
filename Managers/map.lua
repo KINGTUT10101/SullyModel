@@ -39,6 +39,7 @@ local map = {
     ticksBetweenSaves = 100000,
     lastSave = 0,
     resets = 0,
+    lastLogMsg = "",
 }
 
 function map:quickSave ()
@@ -71,13 +72,21 @@ end
 
 --- Initializes the map manager and prepares it for processing.
 --- @param title string The name of the map.
-function map:init (cellManager, title, inputMin, inputMax, drawMin, drawMax)
+function map:init (cellManager, options)
+    options = options or {}
+    assert (type (options) == "table", "Provided options argument is not a table")
+
     self.cellManager = cellManager
-    self.title = title or "Untitled Map"
-    self.inputBounds.min = inputMin or 0
-    self.inputBounds.max = inputMax or 1
-    self.drawBounds.min = drawMin or self.inputBounds.min
-    self.drawBounds.max = drawMax or self.inputBounds.max
+    self.title = options.title or "Untitled Map"
+    self.inputBounds.min = options.inputMin or 0
+    self.inputBounds.max = options.inputMax or 500
+    self.drawBounds.min = options.drawMin or self.inputBounds.min
+    self.drawBounds.max = options.drawMax or self.inputBounds.max
+    self.stats.resets = 0
+    self.ticksBetweenSaves = options.ticksBetweenSaves or 100000
+    self.maxMutsOnSpawn = options.maxMutsOnSpawn or 5 -- TODO: Add this
+
+    self.tickSpeed = math.huge
 end
 
 --- Resets the map with a new size and input data.
@@ -130,6 +139,7 @@ function map:reset (width, height, mapInput, mapBarriers)
     self.cellGrid = cellGrid
     self.stats.cells = 0
     self.resets = self.resets + 1
+    self.lastLogMsg = ""
     -- self.inputRender = love.graphics.newImage (inputRender)
     -- self.inputRender:setFilter ("nearest", "nearest")
 end
@@ -231,6 +241,10 @@ function map:draw ()
     end
 
     love.graphics.pop ()
+end
+
+function map:setLastLogMsg (msg)
+    self.lastLogMsg = msg
 end
 
 function map:getTickSpeed ()
@@ -345,7 +359,7 @@ function map:isTaken (tileX, tileY)
 end
 
 function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
-    if self:isClear (tileX, tileY) == true then
+    if self.stats.cells < self.cellManager.maxCells and self:isClear (tileX, tileY) == true then
         local newCellObj = self.cellManager:new (health, energy) -- Create default cell
 
         -- Mutate cell if a parent is given
@@ -433,14 +447,14 @@ function map:turnRight (tileX, tileY)
     end
 end
 
-function map:transferInputToCell (tileX, tileY, amount)
+function map:transferInputToCell (tileX, tileY, amount, cost)
     if self:isTaken (tileX, tileY) == true then
         local cellObj = self.cellGrid[tileX][tileY]
         local inputVal = self:getInputTile (tileX, tileY)
         local maxEnergy = self.cellManager.maxEnergy
 
         -- Energy cost of consuming a tile
-        cellObj.energy = cellObj.energy - 2
+        cellObj.energy = cellObj.energy - cost
 
         if inputVal <= amount then
             cellObj.energy = cellObj.energy + inputVal
@@ -462,14 +476,14 @@ function map:transferInputToCell (tileX, tileY, amount)
     end
 end
 
-function map:shareInputToCell (tileX1, tileY1, tileX2, tileY2, amount)
+function map:shareInputToCell (tileX1, tileY1, tileX2, tileY2, amount, cost)
     if self:isTaken (tileX1, tileY1) == true and self:isTaken (tileX2, tileY2) == true then
         local currCellObj = self.cellGrid[tileX1][tileY1]
         local otherCellObj = self.cellGrid[tileX2][tileY2]
         local maxEnergy = self.cellManager.maxEnergy
 
         -- Energy cost of sharing energy
-        currCellObj.energy = currCellObj.energy - 3
+        currCellObj.energy = currCellObj.energy - cost
 
         if currCellObj.energy <= amount then
             otherCellObj.energy = otherCellObj.energy + currCellObj.energy

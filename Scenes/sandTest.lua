@@ -45,7 +45,8 @@ end
 
 function thisScene:load (...)
     cell:init (map, cellActions.actionDefs, cellActions.scriptPrefixes, {
-        
+        maxCells = 250,
+        maxActions = 200,
     })
     map:init (cell, "Test Map", 0, math.huge, 0, 2500)
     map:reset (mapSize, mapSize, mapInput, mapBarriers)
