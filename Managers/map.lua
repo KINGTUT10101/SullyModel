@@ -112,7 +112,15 @@ function map:update (dt)
                 if cellObj ~= nil and cellObj.lastUpdate < updateStartTime then
                     cellObj.lastUpdate = updateStartTime
 
-                    self.cellManager:update (i, j, cellObj, self) -- Call cell update function
+                    local result, errorStr = pcall (self.cellManager.update, self.cellManager, i, j, cellObj, self) -- Call cell update function
+                    
+                        if result == false then
+                            self.cellManager:printCellScriptString (cellObj)
+                            self.cellManager:printCellInfo (cellObj)
+                            love.system.setClipboardText (self.cellManager:compileScript (cellObj, true))
+                            print ("Cell located at (" .. i .. ", " .. j .. ")")
+                            error (errorStr)
+                        end
                 end
             end
         end
@@ -221,7 +229,6 @@ end
 function map:getInputTile (tileX, tileY)
     if self:inBounds (tileX, tileY) == true then
         return self.envGrid[tileX][tileY].input
-
     else
         return nil
     end
@@ -300,13 +307,13 @@ function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
         local newCellObj = self.cellManager:new (health, energy) -- Create default cell object
 
         -- Mutate cell object if a parent is given
-        -- if parentCellObj ~= nil then
-        --     local mutSuccess, mutErr = pcall (self.cellManager.mutate, self.cellManager.mutate, newCellObj, parentCellObj)
-        --     local compSuccess, compErr = pcall (self.cellManager.compileScript, self.cellManager.compileScript, newCellObj)
+        if parentCellObj ~= nil then
+            local mutSuccess, mutErr = pcall (self.cellManager.mutate, self.cellManager, newCellObj, parentCellObj)
+            local compSuccess, compErr = pcall (self.cellManager.compileScript, self.cellManager, newCellObj)
 
-        --     assert (mutSuccess == true, "ERROR: Problem with mutation: " .. tostring (mutErr))
-        --     assert (compSuccess == true, "ERROR: Problem with script compilation: " .. tostring (compErr))
-        -- end
+            assert (mutSuccess == true, "ERROR: Problem with mutation: " .. tostring (mutErr))
+            assert (compSuccess == true, "ERROR: Problem with script compilation: " .. tostring (compErr))
+        end
 
         self.cellGrid[tileX][tileY] = newCellObj
         self.stats.cells = self.stats.cells + 1
@@ -332,47 +339,75 @@ function map:deleteCell (tileX, tileY)
     end
 end
 
---- Swaps the positions of two cells in the map.
---- @param tileX1 integer The horizontal map position of the first cell object.
---- @param tileY1 integer The vertical map position of the first cell object.
---- @param tileX2 integer The horizontal map position of the second cell object.
---- @param tileY2 integer The vertical map position of the second cell object.
---- @return integer newTileX1 The new horizontal position of the first cell object.
---- @return integer newTileY1 The new vertical position of the first cell object.
-function map:swapCells (tileX1, tileY1, tileX2, tileY2)
-    if self:isTaken (tileX1, tileY1) == true and self:isClear (tileX2, tileY2) == true then
-        self.cellGrid[tileX1][tileY1], self.cellGrid[tileX2][tileY2] = self.cellGrid[tileX2][tileY2], self.cellGrid[tileX1][tileY1]
+local directionVects = {
+    [1] = {0, -1}, -- Up
+    [2] = {1, 0}, -- Right
+    [3] = {0, 1}, -- Down
+    [4] = {-1, 0}, -- Left
+}
+function map:getForwardPos (tileX, tileY, direction)
+    local vect = directionVects[direction]
 
-        return tileX2, tileY2
+    return tileX + vect[1], tileY + vect[2]
+end
+
+function map:moveCellForward (tileX, tileY)
+    if self:isTaken (tileX, tileY) == true then
+        local cellDirection = self.cellGrid[tileX][tileY].moveDir
+        local vect = directionVects[cellDirection]
+        local newTileX, newTileY = tileX + vect[1], tileY + vect[2]
+
+        if self:isClear (newTileX, newTileY) == true then
+            self.cellGrid[tileX][tileY], self.cellGrid[newTileX][newTileY] = self.cellGrid[newTileX][newTileY], self.cellGrid[tileX][tileY]
+
+            return newTileX, newTileY
+        else
+            return tileX, tileY
+        end
     else
-        return tileX1, tileY1
+        return tileX, tileY
     end
 end
 
-function map:shareInputToCell (tileX1, tileY1, tileX2, tileY2, amount)
-    if self:isTaken (tileX1, tileY1) == true and self:isTaken (tileX2, tileY2) == true then
-        local currCellObj = self.cellGrid[tileX1][tileY1]
-        local otherCellObj = self.cellGrid[tileX2][tileY2]
+function map:turnCellLeft (tileX, tileY)
+    if self:isTaken (tileX, tileY) == true then
+        local cell = self.cellGrid[tileX][tileY]
+        cell.moveDir = cycleValue (cell.moveDir, -1, 4)
+    end
+end
 
-        -- Energy cost of sharing energy
-        currCellObj.energy = currCellObj.energy - 3
+function map:turnCellRight (tileX, tileY)
+    if self:isTaken (tileX, tileY) == true then
+        local cell = self.cellGrid[tileX][tileY]
+        cell.moveDir = cycleValue (cell.moveDir, 1, 4)
+    end
+end
 
-        if currCellObj.energy <= amount then
-            otherCellObj.energy = otherCellObj.energy + currCellObj.energy
-            currCellObj.energy = 0
-        else
-            otherCellObj.energy = otherCellObj.energy + amount
-            currCellObj.energy = currCellObj.energy - amount
-        end
-        
-        if otherCellObj.energy > 500 then -- Cell energy max
-            currCellObj.energy = currCellObj.energy + otherCellObj.energy - 500
-            otherCellObj.energy = 500
-        end
+function map:moveViewForward (tileX, tileY)
+    local cellObj = self.cellGrid[tileX][tileY]
+    local viewDirection = cellObj.viewDir
+    local vect = directionVects[viewDirection]
 
-        if currCellObj.energy <= 0 then
-            self:deleteCell (tileX1, tileY1)
-        end
+    if self:inBounds (cellObj.relViewX + vect[1], cellObj.relViewY + vect[2]) == true then
+        cellObj.relViewX, cellObj.relViewY = cellObj.relViewX + vect[1], cellObj.relViewY + vect[2]
+
+        return cellObj.relViewX, cellObj.relViewY
+    else
+        return cellObj.relViewX, cellObj.relViewY
+    end
+end
+
+function map:turnViewLeft (tileX, tileY)
+    if self:isTaken (tileX, tileY) == true then
+        local cell = self.cellGrid[tileX][tileY]
+        cell.viewDir = cycleValue (cell.viewDir, -1, 4)
+    end
+end
+
+function map:turnViewRight (tileX, tileY)
+    if self:isTaken (tileX, tileY) == true then
+        local cell = self.cellGrid[tileX][tileY]
+        cell.viewDir = cycleValue (cell.viewDir, 1, 4)
     end
 end
 
@@ -383,7 +418,7 @@ end
 function map:adjustCellEnergy (tileX, tileY, amount)
     if self:isTaken (tileX, tileY) == true then
         local cell = self.cellGrid[tileX][tileY]
-        cell.energy = math.min (500, cell.energy + amount)
+        cell.energy = math.min (self.cellManager.maxEnergy, cell.energy + amount)
 
         if cell.energy < 0 then
             map:adjustCellHealth (tileX, tileY, cell.energy)
@@ -395,11 +430,19 @@ end
 function map:adjustCellHealth (tileX, tileY, amount)
     if self:isTaken (tileX, tileY) == true then
         local cell = self.cellGrid[tileX][tileY]
-        cell.health = math.min (500, cell.health + amount)
+        cell.health = math.min (self.cellManager.maxHealth, cell.health + amount)
 
         if cell.health <= 0 then
             self:deleteCell (tileX, tileY)
         end
+    end
+end
+
+function map:getCellEnergy (tileX, tileY)
+    if self:isTaken (tileX, tileY) == true then
+        return self.cellGrid[tileX][tileY].energy
+    else
+        return 0
     end
 end
 
@@ -411,9 +454,9 @@ function map:getCellHealth (tileX, tileY)
     end
 end
 
-function map:getCellEnergy (tileX, tileY)
+function map:getCellAge (tileX, tileY)
     if self:isTaken (tileX, tileY) == true then
-        return self.cellGrid[tileX][tileY].energy
+        return self.cellGrid[tileX][tileY].ticksLeft
     else
         return 0
     end
