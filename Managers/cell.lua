@@ -5,6 +5,7 @@ local weightedchoice = require ("Libraries.lume").weightedchoice
 local memoize = require ("Libraries.lume").memoize
 local copyTable = require ("Helpers.copyTable")
 local mapToScale = require ("Helpers.mapToScale")
+local addLineNumbers = require ("Helpers.addLineNumbers")
 
 local requiredAttributes = {
     desc = "string",
@@ -198,10 +199,10 @@ function cell:new (health, energy)
         relViewX = 0,
         relViewY = 0,
         mutationRates = {
-            major = 0.1,
-            moderate = 0.1,
-            minor = 0.1,
-            meta = 0.1,
+            major = self.initialMutRates.major,
+            moderate = self.initialMutRates.moderate,
+            minor = self.initialMutRates.minor,
+            meta = self.initialMutRates.meta,
         },
     }
 
@@ -225,7 +226,7 @@ function cell:update (tileX, tileY, cellObj, map)
         self.map:deleteCell (tileX, tileY)
     else
         -- Run cell script
-        -- cellObj.scriptFunc (tileX, tileY, cellObj, map)
+        cellObj.scriptFunc (tileX, tileY, cellObj, map)
     end
 end
 
@@ -280,6 +281,8 @@ end
 -- end
 
 function cell:mutate (childCellObj, parentCellObj)
+    parentCellObj = parentCellObj or childCellObj
+
     if math.random () < 0.95 then
         -- Mutate color slightly
         local colorIndex = math.random (1, 3)
@@ -527,21 +530,13 @@ function cell:printCellScriptList (cellObj)
         print ("  Action " .. i .. " - " .. action.id)
 
         -- Parameters
-        if #action.args > 0 then
-            for k, v in ipairs (action.args) do
-                print ("    " .. k .. ": " .. v)
-            end
-        else
-            print ("    No arguments used")
+        local numArgs = 0
+        for k, v in pairs (action.args) do
+            print ("    " .. k .. ": " .. v)
+            numArgs = numArgs + 1
         end
-
-        -- Hyperparameters
-        if #action.hyperargs > 0 then
-            for k, v in ipairs (action.hyperargs) do
-                print ("    " .. k .. ": " .. v)
-            end
-        else
-            print ("    No hyperarguments used")
+        if numArgs <= 0 then
+            print ("    No arguments used")
         end
     end
     print ()
@@ -549,7 +544,7 @@ end
 
 function cell:printCellScriptString (cellObj)
     print ("==========" .. "Cell Script List - " .. tostring (cellObj) .. "==========")
-    print (self:compileScript (cellObj, true))
+    print (addLineNumbers (self:compileScript (cellObj, true)))
     print ()
 end
 
