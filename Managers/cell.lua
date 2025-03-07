@@ -105,8 +105,8 @@ function cell:init (map, actions, actionVars, options)
     self.initialMutRates.meta = clamp (options.initialMutRates.meta or 0.25, self.minMutRate, 1)
 
     options.cellAge = options.cellAge or {}
-    self.cellAge.min = options.cellAge.min or 500
-    self.cellAge.max = options.cellAge.max or 500
+    self.cellAge.min = options.cellAge.min or 3000
+    self.cellAge.max = options.cellAge.max or 6500
     self.cellAge.mean = options.cellAge.mean or 500
 end
 
@@ -185,7 +185,7 @@ end
 function cell:new (health, energy)
     local newCell = {
         lastUpdate = 0,
-        ticksLeft = math.random (self.cellAge.min, self.cellAge.max),
+        ticksLeft = round (mapToScale (love.math.randomNormal ()/ 10, -3, 3, self.cellAge.min, self.cellAge.max)),
         health = clamp (health or self.maxHealth, 0, self.maxHealth),
         energy = clamp (energy or self.maxEnergy, 0, self.maxEnergy),
         totalEnergy = 0,
