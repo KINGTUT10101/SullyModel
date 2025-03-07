@@ -30,11 +30,11 @@ local renderMap = true
 local baseXInput = 1000000 * love.math.random()
 local baseYInput = 1000000 * love.math.random()
 local function mapInput (tileX, tileY)
-    if math.random () < 0.002 then
-        return math.huge
-    else
+    -- if math.random () < 0.002 then
+    --     return math.huge
+    -- else
         return mapToScale (love.math.noise(baseXInput+.05*tileX, baseYInput+.07*tileY), 0, 1, 0, 500)
-    end
+    -- end
 end
 
 local baseXBarriers = 1000 * love.math.random()
