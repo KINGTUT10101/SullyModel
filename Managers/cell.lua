@@ -26,6 +26,7 @@ local cell = {
     minScriptVars = 0,
     scriptVars = 0,
     memVars = 0,
+    displayVars = 0,
     maxHealth = 0, -- The maximum health of a cell object
     maxEnergy = 0, -- The maximum energy of a cell object
     tickCost = 0,
@@ -87,6 +88,7 @@ function cell:init (map, actionDefs, scriptPrefixes, options)
     self.maxCells = options.maxCells or math.huge
     self.maxActions = options.maxActions or 1000
     self.minMutRate = options.minMutRate or 0.10
+    self.displayVars = options.displayVars or 1
 
     options.mutsPerChild = options.mutsPerChild or {}
     self.mutsPerChild.min = options.mutsPerChild.min or 0
@@ -146,7 +148,7 @@ function cell:validateCompileActions (cellActions, actionHyperargs)
         for match in actionDef.funcString:gmatch("%$([%w_]+)") do
             local paramVal = actionDef.params[match]
             
-            if type (paramVal) ~= "table" and paramVal ~= true then
+            if type (paramVal) ~= "table" and paramVal ~= "variable" and paramVal ~= "display" then
                 error (string.format ("Found an interpolated function string value (%s) in action function string %s with no compatible parameters", match, id))
             end
         end
@@ -167,7 +169,13 @@ function cell:validateCompileActions (cellActions, actionHyperargs)
         end
     
         -- Adds the action's ID to its definition
-        actionDef.id = id      
+        actionDef.id = id
+
+        -- FOR TESTING: Prefixes the action's name as a comment to its function string
+        actionDef.funcString = "-- " .. actionDef.id .. "\n" .. actionDef.funcString
+
+        -- FOR TESTING: Adds an assertion to the end of each action's function string that checks if the cell is dead
+        -- actionDef.funcString = actionDef.funcString .. "\nassert (cellObj.health > 0 and cellObj.energy >= 0, 'Invalid cell values caused by action " .. actionDef.id .. " located at ' .. tileX .. ', ' .. tileY)\n\n"
     end
 
     return highestMinVars
@@ -182,10 +190,11 @@ function cell:new (health, energy)
         scriptList = {},
         scriptFunc = function () end,
         vars = {},
+        displayVars = {},
         health = clamp (health or self.maxHealth, 0, self.maxHealth),
         energy = clamp (energy or self.maxEnergy, 0, self.maxEnergy),
         totalEnergy = 0,
-        ticksLeft = round (mapToScale (love.math.randomNormal ()/ 10, -3, 3, 3000, 6500)),
+        ticksLeft = round (mapToScale (love.math.randomNormal () / 10, -3, 3, 3000, 6500)),
         direction = 1,
         mutationRates = {
             major = self.initialMutRates.major,
@@ -197,6 +206,10 @@ function cell:new (health, energy)
 
     for i = 1, self.scriptVars + self.memVars do
         newCell.vars[i] = 0
+    end
+
+    for i = 1, self.displayVars do
+        newCell.displayVars[i] = 0
     end
 
     return newCell
@@ -227,12 +240,20 @@ local function randomAction (childVars)
     -- Add random arguments
     newAction.args = {}
     for key, value in pairs (newActionDef.params) do
-        if value == true then
+        if value == "variable" then
             -- Variable parameter
             newAction.args[key] = "var" .. math.random (1, #childVars)
-        else
+
+        elseif value == "display" then
+            -- Display parameter
+            newAction.args[key] = math.random (1, cell.displayVars)
+
+        elseif type(value) == "table" then
             -- Option parameter
             newAction.args[key] = value[math.random (1, #value)]
+
+        else
+            error ("Invalid parameter key (" .. key ") provided with value (" .. value .. ") for action " .. action.id)
         end
     end
 
@@ -351,9 +372,12 @@ function cell:mutate (childCellObj, parentCellObj)
             if action.id ~= "endStruct" and #actionDef.paramKeys > 0 then
                 local argKey = actionDef.paramKeys[math.random (1, #actionDef.paramKeys)]
 
-                if actionDef.params[argKey] == true then
+                if actionDef.params[argKey] == "variable" then
                     -- Assign a random variable key
                     action.args[argKey] = "var" .. math.random (1, #childVars)
+                elseif actionDef.params[argKey] == "display" then
+                    -- Assign a random display variable
+                    action.args[argKey] = math.random (1, self.displayVars)
                 else
                     -- Assign a random option key
                     action.args[argKey] = actionDef.params[argKey][math.random (1, #actionDef.params[argKey])]
@@ -444,7 +468,7 @@ function cell:compileScript (cellObj, stringOnly)
                 -- Fill the function string with the interpolated parameters
                 filledFuncString = actionDef.funcString:gsub("%$([%w_]+)", function(key)
                     -- Return the replacement value if it exists in lookup_table; otherwise, keep the original substring.
-                    return action.args[key] or error ()
+                    return action.args[key] or error ("Invalid parameter key (" .. key .. ") provided for action " .. action.id)
                 end)
             else
                 filledFuncString = actionDef.funcString
@@ -486,10 +510,14 @@ end
 function cell:printCellInfo (cellObj)
     print ("==========" .. "Cell Info - " .. tostring (cellObj) .. "==========")
     for k, v in pairs (cellObj) do
-        print (tostring(k) .. ": " .. tostring(v))
-        if type (v) == "table" then
-            for k, v in pairs (v) do
-                print ("  " .. tostring(k) .. ": " .. tostring(v))
+        if k == "scriptList" then
+            print (tostring(k) .. ": " .. #v .. " actions")
+        else
+            print (tostring(k) .. ": " .. tostring(v))
+            if type (v) == "table" then
+                for k, v in pairs (v) do
+                    print ("  " .. tostring(k) .. ": " .. tostring(v))
+                end
             end
         end
     end
