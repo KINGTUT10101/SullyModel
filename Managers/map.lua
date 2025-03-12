@@ -460,30 +460,31 @@ function map:transferInputToCell (tileX, tileY, amount, cost)
         local cellObj = self.cellGrid[tileX][tileY]
         local inputVal = self:getInputTile (tileX, tileY)
         local maxEnergy = self.cellManager.maxEnergy
-
-        local origInputVal = inputVal
-        local origEnergy = cellObj.energy
-
-        -- Energy cost of consuming a tile
-        self:adjustCellEnergy (tileX, tileY, -cost)
-
-        if inputVal <= amount then
-            cellObj.energy = cellObj.energy + inputVal
-            cellObj.totalEnergy = cellObj.totalEnergy + inputVal
-            inputVal = 0
-        else
-            cellObj.energy = cellObj.energy + amount
-            cellObj.totalEnergy = cellObj.totalEnergy + amount
-            inputVal = inputVal - amount
-        end
         
-        if cellObj.energy > maxEnergy then -- Cell energy max
-            cellObj.totalEnergy = cellObj.totalEnergy - (cellObj.energy - maxEnergy)
-            inputVal = inputVal + cellObj.energy - maxEnergy
-            cellObj.energy = maxEnergy
-        end
+        -- For some reason, this check is needed to make stable ecosystems possible...
+        -- My guess is that the cells would waste too much energy abusing this function otherwise cuz energy is so sparse
+        if inputVal > cost then
+            -- Energy cost of consuming a tile
+            self:adjustCellEnergy (tileX, tileY, -cost)
 
-        self:setInputTile (tileX, tileY, inputVal)
+            if inputVal <= amount then
+                cellObj.energy = cellObj.energy + inputVal
+                cellObj.totalEnergy = cellObj.totalEnergy + inputVal
+                inputVal = 0
+            else
+                cellObj.energy = cellObj.energy + amount
+                cellObj.totalEnergy = cellObj.totalEnergy + amount
+                inputVal = inputVal - amount
+            end
+            
+            if cellObj.energy > maxEnergy then -- Cell energy max
+                cellObj.totalEnergy = cellObj.totalEnergy - (cellObj.energy - maxEnergy)
+                inputVal = inputVal + cellObj.energy - maxEnergy
+                cellObj.energy = maxEnergy
+            end
+
+            self:setInputTile (tileX, tileY, inputVal)
+        end
     end
 end
 
