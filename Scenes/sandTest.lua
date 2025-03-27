@@ -14,7 +14,7 @@ local zoomVelocity = 25
 
 local testCell = cell:new (100, 100)
 
-local maxCaptures = 25
+local maxCaptures = 50
 local maxCaptureCycles = 10000
 local captureTimer = maxCaptureCycles
 local captures = {} -- Holds the last 10 captures
@@ -46,7 +46,7 @@ end
 function thisScene:load (...)
     cell:init (map, cellActions.actionDefs, cellActions.scriptPrefixes, {
         maxCells = 200,
-        maxActions = 150,
+        maxActions = 250,
     })
     map:init (cell, {
         inputBounds = {
