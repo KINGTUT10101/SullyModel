@@ -137,7 +137,7 @@ function thisScene:update (dt)
 
     -- Activate failsafe if all cells are dead
     if map.stats.cells <= 0 then
-        print ("WARNING: Failsafe #" .. failsafeActivations .. " activated", os.date("%H:%M:%S - %Y-%m-%d"))
+        print ("WARNING: Failsafe #" .. failsafeActivations .. " activated", os.date("%H:%M:%S - %Y-%m-%d"), "Ticks survived: " .. cyclesSinceLastFail)
         print ("Number of available captures: " .. #captures)
 
         -- Add last surviving cell to captures list
