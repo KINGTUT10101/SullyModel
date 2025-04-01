@@ -38,6 +38,7 @@ local map = {
     lastSave = 0,
     resets = 0,
     lastLogMsg = "",
+    globalVars = {},
 }
 
 function map:quickSave ()
@@ -132,6 +133,12 @@ function map:reset (width, height, mapEnvInputs, mapEnvTypes)
     self.lastLogMsg = ""
     -- self.inputRender = love.graphics.newImage (inputRender)
     -- self.inputRender:setFilter ("nearest", "nearest")
+
+    -- Set starting values for cell global variables
+    self.globalVars = {}
+    for i = 1, self.cellManager.globalVars do
+        self.globalVars[i] = 0
+    end
 end
 
 --- Updates the cells on the map if enough time has passed since the last tick.
@@ -411,9 +418,9 @@ function map:moveTo (tileX1, tileY1, tileX2, tileY2)
     if self:isTaken (tileX1, tileY1) == true and self:isClear (tileX2, tileY2) == true then
         self.cellGrid[tileX1][tileY1], self.cellGrid[tileX2][tileY2] = nil, self.cellGrid[tileX1][tileY1]
 
-        return tileX2, tileY2
+        return tileX2, tileY2, true
     else
-        return tileX1, tileY1
+        return tileX1, tileY1, false
     end
 end
 
@@ -437,7 +444,7 @@ function map:moveForward (tileX, tileY)
 
         return self:moveTo (tileX, tileY, tileX + vect[1], tileY + vect[2])
     else
-        return tileX, tileY
+        return tileX, tileY, false
     end
 end
 

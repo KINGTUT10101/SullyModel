@@ -6,6 +6,7 @@ local mapToScale = require ("Helpers.mapToScale")
 local round = require ("Libraries.lume").round
 local copyTable = require ("Helpers.copyTable")
 local cellActions = require ("Data.cellActions")
+local shortenNumber = require ("Helpers.shortenNumber")
 
 local mapSize = 50
 
@@ -40,12 +41,12 @@ end
 local baseXBarriers = 1000 * love.math.random()
 local baseYBarriers = 1000 * love.math.random()
 local function mapBarriers (tileX, tileY)
-    return (love.math.noise(baseXBarriers+.03*tileX, baseYBarriers+.1*tileY) > 0.70) and "barrier" or "blank"
+    return (love.math.noise(baseXBarriers+.03*tileX, baseYBarriers+.1*tileY) > 0.85) and "barrier" or "blank"
 end
 
 function thisScene:load (...)
     cell:init (map, cellActions.actionDefs, cellActions.scriptPrefixes, {
-        maxCells = 200,
+        maxCells = 150,
         maxActions = 250,
     })
     map:init (cell, {
@@ -229,6 +230,19 @@ function thisScene:draw ()
     love.graphics.rectangle ("fill", 720, 45, 76, 25)
     love.graphics.setColor (1, 1, 1, 1)
     love.graphics.printf ("FSs: " .. failsafeActivations, 725, 50, 100, "left")
+
+    -- Show the values of global variables
+    love.graphics.setColor (0, 0, 0, 0.75)
+    love.graphics.rectangle ("fill", 720, 80, 76, 25)
+    love.graphics.setColor (1, 1, 1, 1)
+    love.graphics.printf ("Globals:", 725, 85, 100, "left")
+
+    for i = 1, cell.globalVars do
+        love.graphics.setColor (0, 0, 0, 0.75)
+        love.graphics.rectangle ("fill", 720, 80 + i * 25, 76, 25)
+        love.graphics.setColor (1, 1, 1, 1)
+        love.graphics.printf (shortenNumber (map.globalVars[i], 5), 725, 85 + i * 25, 100, "left")
+    end
 end
 
 function thisScene:keypressed (key, scancode, isrepeat)
@@ -267,6 +281,13 @@ function thisScene:keypressed (key, scancode, isrepeat)
                 love.system.setClipboardText (cell:compileScript (cellObj, true))
                 print ("Script copied to clipboard!")
             end
+        end
+
+    -- Prints the values of the cell global variables
+    elseif key == "u" then
+        print ("==========Cell Global Variables==========")
+        for i = 1, cell.globalVars do
+            print (map.globalVars[i])
         end
 
     -- Quick saves

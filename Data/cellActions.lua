@@ -3,6 +3,35 @@ local scriptPrefixes = {
 }
 
 local actionDefs = {
+    readGlobal = {
+        desc = "Reads the value from the selected global variable",
+        type = "assign",
+        params = {
+            assignTo = "variable",
+            copyFrom = "global",
+        },
+        hyperparams = {},
+        funcString = 
+[[
+$assignTo = $copyFrom
+]]
+    },
+    incrementGlobal = {
+        desc = "Increments the selected global variable",
+        type = "assign",
+        params = {
+            assignTo = "global",
+            op = {
+                "+",
+                "-",
+            }
+        },
+        hyperparams = {},
+        funcString = 
+[[
+$assignTo = $assignTo $op 1
+]]
+    },
     readInput = {
         desc = "Reads the value from the input tile below the cell",
         type = "assign",
@@ -70,11 +99,13 @@ cellObj.displayVars[$displayIndex] = $copyFrom
         },
         funcString = 
 [[
-tileX, tileY = map:moveForward (tileX, tileY)
-map:adjustCellEnergy (tileX, tileY, -$energyCost)
-if map:isTaken(tileX, tileY) == false then
-    -- print ("Cell death: Move forward", tileX, tileY)
-    return
+tileX, tileY, result = map:moveForward (tileX, tileY)
+if result == true then
+    map:adjustCellEnergy (tileX, tileY, -$energyCost)
+    if map:isTaken(tileX, tileY) == false then
+        -- print ("Cell death: Move forward", tileX, tileY)
+        return
+    end
 end
 ]]
     },

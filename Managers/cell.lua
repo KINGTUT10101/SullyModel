@@ -27,6 +27,7 @@ local cell = {
     scriptVars = 0,
     memVars = 0,
     displayVars = 0,
+    globalVars = 0,
     maxHealth = 0, -- The maximum health of a cell object
     maxEnergy = 0, -- The maximum energy of a cell object
     tickCost = 0,
@@ -62,7 +63,7 @@ function cell:init (map, actionDefs, scriptPrefixes, options)
     self.actionsByIndex = {}
     self.actionVars = scriptPrefixes
 
-    self.scriptVars = options.scriptVars or 5
+    self.scriptVars = options.scriptVars or 4
     self.memVars = options.memVars or 2
     assert (self.scriptVars + self.memVars >= self.minScriptVars, "More variables are needed to meet the minimum required arguments for the provided action set")
 
@@ -89,6 +90,7 @@ function cell:init (map, actionDefs, scriptPrefixes, options)
     self.maxActions = options.maxActions or 1000
     self.minMutRate = options.minMutRate or 0.10
     self.displayVars = options.displayVars or 1
+    self.globalVars = options.globalVars or 3
 
     options.mutsPerChild = options.mutsPerChild or {}
     self.mutsPerChild.min = options.mutsPerChild.min or 0
@@ -148,7 +150,7 @@ function cell:validateCompileActions (cellActions, actionHyperargs)
         for match in actionDef.funcString:gmatch("%$([%w_]+)") do
             local paramVal = actionDef.params[match]
             
-            if type (paramVal) ~= "table" and paramVal ~= "variable" and paramVal ~= "display" then
+            if type (paramVal) ~= "table" and paramVal ~= "variable" and paramVal ~= "display" and paramVal ~= "global" then
                 error (string.format ("Found an interpolated function string value (%s) in action function string %s with no compatible parameters", match, id))
             end
         end
@@ -230,6 +232,13 @@ function cell:update (tileX, tileY, cellObj, map)
         -- Run cell script
         cellObj.scriptFunc (tileX, tileY, cellObj, map)
     end
+
+    -- Check if any global vars are infinite and reset them
+    for i = 1, self.globalVars do
+        if math.abs (self.map.globalVars[i]) == math.huge then
+            self.map.globalVars[i] = 0
+        end
+    end
 end
 
 local function randomAction (childVars)
@@ -247,6 +256,10 @@ local function randomAction (childVars)
         elseif value == "display" then
             -- Display parameter
             newAction.args[key] = math.random (1, cell.displayVars)
+
+        elseif value == "global" then
+            -- Display parameter
+            newAction.args[key] = "map.globalVars[" .. math.random (1, cell.globalVars) .. "]"
 
         elseif type(value) == "table" then
             -- Option parameter
@@ -378,6 +391,9 @@ function cell:mutate (childCellObj, parentCellObj)
                 elseif actionDef.params[argKey] == "display" then
                     -- Assign a random display variable
                     action.args[argKey] = math.random (1, self.displayVars)
+                elseif actionDef.params[argKey] == "global" then
+                    -- Assign a random variable key
+                    action.args[argKey] = "map.globalVars[" .. math.random (1, cell.globalVars) .. "]"
                 else
                     -- Assign a random option key
                     action.args[argKey] = actionDef.params[argKey][math.random (1, #actionDef.params[argKey])]
@@ -435,7 +451,7 @@ function cell:compileScript (cellObj, stringOnly)
         "local parentHalfHealth, parentHalfEnergy = 0, 0\n",
         "local bound1, bound2 = 0, 0\n",
         "local inf = math.huge\n", -- Bandaid fix to prevent crashes when a variable equals infinity
-        "local result = 0\n",
+        "local result = false\n",
         "\n",
     }
     
@@ -450,7 +466,6 @@ function cell:compileScript (cellObj, stringOnly)
         scriptLines[#scriptLines+1] = string.format ("local var%s = cellObj.vars[%s]\n", i, i)
     end
     scriptLines[#scriptLines+1] = "\n"
-
 
     -- Add the body of the script
     for i = 1, #scriptList do
