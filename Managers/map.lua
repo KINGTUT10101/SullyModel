@@ -93,9 +93,14 @@ end
 --- Resets the map with a new size and input data.
 --- @param width integer The width of the input data.
 --- @param height integer The height of the input data.
+--- @param removeCells boolean If true, all cells will be removed. True by default.
 --- @param mapEnvInputs? fun(param:integer, param:integer):number Used to map the value of each input tile
 --- @param mapEnvTypes? fun(param:integer, param:integer):boolean Used to map the impassible barrier tiles
-function map:reset (width, height, mapEnvInputs, mapEnvTypes)
+function map:reset (width, height, removeCells, mapEnvInputs, mapEnvTypes)
+    if removeCells == nil then
+        removeCells = true
+    end
+    
     self.width, self.height = width, height
 
     -- Generates the input grid and input render
@@ -127,8 +132,10 @@ function map:reset (width, height, mapEnvInputs, mapEnvTypes)
     end
 
     self.envGrid = envGrid
-    self.cellGrid = cellGrid
-    self.stats.cells = 0
+    if removeCells == true then
+        self.cellGrid = cellGrid
+        self.stats.cells = 0
+    end
     self.resets = self.resets + 1
     self.lastLogMsg = ""
     -- self.inputRender = love.graphics.newImage (inputRender)
@@ -240,13 +247,29 @@ function map:setLastLogMsg (msg)
     self.lastLogMsg = msg
 end
 
+-- Runs a function for all cells in the map
+function map:getCells (cellFunc)
+    if self.stats.cells > 0 then
+        local cellGrid = self.cellGrid
+        for i = 1, self.width do
+            local cellRow = cellGrid[i]
+
+            for j = 1, self.height do
+                local cellObj = cellRow[j]
+
+                if cellObj ~= nil then
+                    cellFunc (i, j, cellObj)
+                end
+            end
+        end
+    end
+end
 
 --- Gets the current tick speed.
 --- @return number tickSpeed The amount of time between map updates.
 function map:getTickSpeed ()
     return self.tickSpeed
 end
-
 
 --- Sets the tick speed.
 --- @param value number The new amount of time between map updates. Expects a value between 0 and infinity.

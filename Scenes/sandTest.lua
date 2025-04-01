@@ -8,25 +8,93 @@ local copyTable = require ("Helpers.copyTable")
 local cellActions = require ("Data.cellActions")
 local shortenNumber = require ("Helpers.shortenNumber")
 
-local mapSize = 50
+local mapSize = 20
 
 local camVelocity = 15
 local zoomVelocity = 25
 
 local testCell = cell:new (100, 100)
 
-local maxCaptures = 50
+local maxCaptures = 250
 local maxCaptureCycles = 10000
 local captureTimer = maxCaptureCycles
 local captures = {} -- Holds the last 10 captures
 
 local cyclesSinceLastFail = 0
 
-local failsafeSpawns = 5
+local failsafeSpawns = 50
 local failsafeActivations = -1
 local lastCell = nil
 
 local renderMap = true
+
+local rewardEnergy = 100
+local punishHealth = 250
+local predRetries = 500
+local cyclesPerPred = 2500 
+local predTimer = cyclesPerPred
+local confusionMatrix = {
+    tp = 0,
+    fp = 0,
+    fn = 0,
+    tn = 0,
+}
+local currLabel = 1 -- 1 = wide, -1 = tall
+
+local function createInputMapper ()
+    local rectX1, rectY1 = math.random (1, math.floor (mapSize / 2)), math.random (1, math.floor (mapSize / 2))
+    local rectX2, rectY2 = mapSize - math.random (0, math.floor (mapSize / 2)), mapSize - math.random (0, math.floor (mapSize / 2))
+    
+    if rectX2 - rectX1 > rectY2 - rectY1 then
+        currLabel = 1
+    else
+        currLabel = -1
+    end
+    
+    local function mapInputRect (tileX, tileY)
+        if tileX >= rectX1 and tileX <= rectX2 and tileY >= rectY1 and tileY <= rectY2 then
+            return 100
+        else
+            return -100
+        end
+    end
+
+    return mapInputRect
+end
+
+local function calcAccuracy ()
+    local accuracy = (confusionMatrix.tp + confusionMatrix.tn) / (confusionMatrix.tp + confusionMatrix.fp + confusionMatrix.fn + confusionMatrix.tn)
+
+    return (accuracy ~= accuracy) and 0 or accuracy
+end
+
+-- Rewards/punishes each cell after a prediction
+local function rewardCell (tileX, tileY, cellObj)
+    map:adjustCellEnergy (tileX, tileY, rewardEnergy * mapToScale (calcAccuracy (), 0, 1, 0, 2))
+    cellObj.contributions = 0
+end
+local function punishCell (tileX, tileY, cellObj)
+    if confusionMatrix.fn + confusionMatrix.fp > predRetries then
+        map:adjustCellEnergy (tileX, tileY, -punishHealth * -mapToScale (1 - calcAccuracy (), 0, 1, 0, 2))
+    end
+    cellObj.contributions = 0
+end
+
+local function treatCell (tileX, tileY, cellObj)
+    if cellObj.contributions > 0 then
+        if currLabel > 0 then
+            rewardCell (tileX, tileY, cellObj) -- True positive
+        else
+            punishCell (tileX, tileY, cellObj) -- False positive
+        end
+    else
+        if currLabel < 0 then
+            rewardCell (tileX, tileY, cellObj) -- True negative
+        else
+            punishCell (tileX, tileY, cellObj) -- False negative
+        end
+    end
+end
 
 local baseXInput = 1000000 * love.math.random()
 local baseYInput = 1000000 * love.math.random()
@@ -46,26 +114,50 @@ end
 
 function thisScene:load (...)
     cell:init (map, cellActions.actionDefs, cellActions.scriptPrefixes, {
-        maxCells = 150,
-        maxActions = 250,
+        maxCells = 50,
+        maxActions = 500,
+        dropEnergy = false,
+        scriptVars = 3,
+        memVars = 2,
+        displayVars = 2,
+        globalVars = 1,
+        cellAge = {
+            min = 5000,
+            max = 5000,
+        },
+        tickCost = 1,
+        maxEnergy = 10000,
+        hyperargs = {
+            -- moveForward = {
+            --     energyCost = 0,
+            -- },
+            reproduce = {
+                energyCost = 1000,
+                babyEnergy = 500,
+                babyHealth = 500,
+            },
+            -- applyDamage = {
+            --     energyCost = 0,
+            -- },
+        },
     })
     map:init (cell, {
         inputBounds = {
-            min = 0,
-            max = math.huge,
+            min = -100,
+            max = 100,
         },
         drawBounds = {
-            min = 0,
-            max = 2500,
+            min = -100,
+            max = 100,
         }
     })
-    map:reset (mapSize, mapSize, mapInput, mapBarriers)
+    map:reset (mapSize, mapSize, true, createInputMapper ())
     map:setCamera (-110, -10, 5.8)
     map:setTickSpeed (1/8)
 
     -- Adds a few heavily mutated cells to the initial captures list
     for i = 1, maxCaptures do
-        local newCellObj = cell:new (250, 250)
+        local newCellObj = cell:new (cell.maxEnergy, cell.maxHealth)
 
         newCellObj.mutationRates.major = 0.35
         newCellObj.mutationRates.moderate = 0.30
@@ -74,7 +166,7 @@ function thisScene:load (...)
 
         -- Heavily mutate cell
         for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, 500)) do
-            local mutCell = cell:new (100, 100)
+            local mutCell = cell:new (cell.maxEnergy, cell.maxHealth)
             cell:mutate (mutCell, newCellObj)
             newCellObj = mutCell
         end
@@ -87,7 +179,7 @@ end
 
 function thisScene:update (dt)
     if love.keyboard.isDown ("lshift") and love.keyboard.isDown ("b") then
-        local newCell = cell:new (100, 100)
+        local newCell = cell:new (cell.maxEnergy, cell.maxHealth)
         cell:mutate (newCell, testCell)
         cell:compileScript (newCell)
         testCell = newCell
@@ -130,6 +222,57 @@ function thisScene:update (dt)
 
     if capture ~= nil then
         cyclesSinceLastFail = cyclesSinceLastFail + 1
+        predTimer = predTimer - 1
+
+        if predTimer <= 0 then
+            local origAccuracy = calcAccuracy ()
+            local correctPred = false
+
+            predTimer = cyclesPerPred
+
+            print ("########## Prediction Made ##########")
+
+            -- Positive predition
+            if map.globalVars[1] > 0 then
+                if currLabel > 0 then
+                    correctPred = true
+                    confusionMatrix.tp = confusionMatrix.tp + 1
+                    print ("(TP) True positive prediction (O)")
+                else
+                    confusionMatrix.fp = confusionMatrix.fp + 1
+                    print ("(FP) False positive prediction (X)")
+                end
+
+            -- Negative prediction
+            else
+                if currLabel < 0 then
+                    correctPred = true
+                    confusionMatrix.tn = confusionMatrix.tn + 1
+                    print ("(TN) True negative prediction (O)")
+                else
+                    confusionMatrix.fn = confusionMatrix.fn + 1
+                    print ("(FN) False negative prediction (X)")
+                end
+            end
+
+            map:getCells (treatCell)
+
+            print ("Prediction: " .. map.globalVars[1])
+            print ("Accuracy: " .. origAccuracy .. " -> " .. calcAccuracy ())
+            print ("Change: " .. calcAccuracy () - origAccuracy)
+            print ("-------------------")
+            print ("TP: " .. confusionMatrix.tp .. " | FP: " .. confusionMatrix.fp)
+            print ("-------------------")
+            print ("FN: " .. confusionMatrix.fn .. " | TN: " .. confusionMatrix.tn)
+            print ("-------------------")
+
+            map.globalVars[1] = 0
+
+            -- Reset the shape in the background
+            if confusionMatrix.fn + confusionMatrix.fp > 100 or correctPred == true then
+                map:reset (mapSize, mapSize, false, createInputMapper ())
+            end
+        end
     end
 
     if map.stats.cells == 1 and map:getTickSpeed () < math.huge and capture ~= nil then
@@ -151,31 +294,29 @@ function thisScene:update (dt)
         baseYInput = 1000000 * love.math.random()
         baseXBarriers = 1000000 * love.math.random()
         baseYBarriers = 1000000 * love.math.random()
-        map:reset (mapSize, mapSize, mapInput, mapBarriers)
+        map:reset (mapSize, mapSize, true, createInputMapper ())
 
         local cellsSpawned = 0
 
-        while cellsSpawned < math.min (failsafeSpawns, cell.maxCells) do
-            for i = 1, #captures do
-                local newCell = copyTable (captures[i])
+        for i = 1, math.min (failsafeSpawns, cell.maxCells) do
+            local newCell = copyTable (captures[i])
 
-                -- Heavily mutate cell
-                for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, 80)) do
-                    local mutCell = cell:new (100, 100)
-                    cell:mutate (mutCell, newCell)
-                    newCell = mutCell
-                end
+            -- Heavily mutate cell
+            for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, 80)) do
+                local mutCell = cell:new (cell.maxEnergy, cell.maxHealth)
+                cell:mutate (mutCell, newCell)
+                newCell = mutCell
+            end
 
-                cell:compileScript (newCell)
+            cell:compileScript (newCell)
 
-                -- print ("INFO:", i)
-                -- cell:printCellInfo (newCell)
-                -- cell:printCellScriptList (newCell)
+            -- print ("INFO:", i)
+            -- cell:printCellInfo (newCell)
+            -- cell:printCellScriptList (newCell)
 
-                -- Attempt to spawn the cell
-                if map:spawnCell (math.random (1, map.width), math.random (1, map.height), 250, 250, newCell) == true then
-                    cellsSpawned = cellsSpawned + 1
-                end
+            -- Attempt to spawn the cell
+            if map:spawnCell (math.random (1, map.width), math.random (1, map.height), cell.maxHealth, cell.maxEnergy, newCell) == true then
+                cellsSpawned = cellsSpawned + 1
             end
         end
 
@@ -217,7 +358,21 @@ function thisScene:draw ()
     love.graphics.setColor (0, 0, 0, 0.75)
     love.graphics.rectangle ("fill", 10, 45, 95, 25)
     love.graphics.setColor (1, 1, 1, 1)
-    love.graphics.printf ("Cycles: " .. cyclesSinceLastFail, 15, 50, 85, "left")
+    love.graphics.printf ("Cycles: " .. cyclesSinceLastFail, 15, 50, 120, "left")
+
+    -- Shows the current label
+    love.graphics.setColor (0, 0, 0, 0.75)
+    love.graphics.rectangle ("fill", 10, 80, 95, 25)
+    love.graphics.setColor (1, 1, 1, 1)
+    love.graphics.printf ("Label: " .. currLabel, 15, 85, 85, "left")
+
+    -- Show the current accuracy
+    love.graphics.setColor (0, 0, 0, 0.75)
+    love.graphics.rectangle ("fill", 10, 115, 95, 25)
+    love.graphics.setColor (1, 1, 1, 1)
+    love.graphics.printf ("Acc: " .. round (calcAccuracy () * 100) / 100, 15, 120, 85, "left")
+
+    -- Show the current confusion matrix
 
     -- Show number of cells
     love.graphics.setColor (0, 0, 0, 0.75)
@@ -237,12 +392,20 @@ function thisScene:draw ()
     love.graphics.setColor (1, 1, 1, 1)
     love.graphics.printf ("Globals:", 725, 85, 100, "left")
 
+    -- Show value of cell global variables
     for i = 1, cell.globalVars do
         love.graphics.setColor (0, 0, 0, 0.75)
         love.graphics.rectangle ("fill", 720, 80 + i * 25, 76, 25)
         love.graphics.setColor (1, 1, 1, 1)
         love.graphics.printf (shortenNumber (map.globalVars[i], 5), 725, 85 + i * 25, 100, "left")
     end
+
+    -- Show map position under cursor
+    local mapX, mapY = map:screenToMap (love.mouse.getPosition ())
+    love.graphics.setColor (0, 0, 0, 0.75)
+    love.graphics.rectangle ("fill", 10, 560, 95, 25)
+    love.graphics.setColor (1, 1, 1, 1)
+    love.graphics.printf ("(" .. mapX .. ", " .. mapY .. ")", 15, 565, 85, "left")
 end
 
 function thisScene:keypressed (key, scancode, isrepeat)
@@ -285,9 +448,19 @@ function thisScene:keypressed (key, scancode, isrepeat)
 
     -- Prints the values of the cell global variables
     elseif key == "u" then
-        print ("==========Cell Global Variables==========")
-        for i = 1, cell.globalVars do
-            print (map.globalVars[i])
+        if love.keyboard.isDown ("lshift") then
+            local totalContributions = 0
+            print ("==========Cell Contributions==========")
+            map:getCells (function (tileX, tileY, cellObj)
+                totalContributions = totalContributions + cellObj.contributions
+            end)
+            print ("Total:", totalContributions)
+            print ("Current:", map.globalVars[1])
+        else
+            print ("==========Cell Global Variables==========")
+            for i = 1, cell.globalVars do
+                print (map.globalVars[i])
+            end
         end
 
     -- Quick saves

@@ -209,6 +209,7 @@ function cell:new (health, energy)
             minor = self.initialMutRates.minor,
             meta = self.initialMutRates.meta,
         },
+        contributions = 0,
     }
 
     for i = 1, self.scriptVars + self.memVars do

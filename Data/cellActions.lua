@@ -23,13 +23,14 @@ $assignTo = $copyFrom
             assignTo = "global",
             op = {
                 "+",
-                "-",
+                -- "-",
             }
         },
         hyperparams = {},
         funcString = 
 [[
 $assignTo = $assignTo $op 1
+cellObj.contributions = cellObj.contributions $op 1
 ]]
     },
     readInput = {
@@ -41,26 +42,26 @@ $assignTo = $assignTo $op 1
         hyperparams = {},
         funcString = 
 [[
-$assignTo = map:getInputTile (tileX, tileY)
+$assignTo = map:getInputTile (map:getForwardPos (tileX, tileY, 1)) or 0
 ]]
     },
-    consumeInput = {
-        desc = "Takes some of the input value to increase the energy level of the cell",
-        type = "action",
-        params = {},
-        hyperparams = {
-            energyFromTile = 25,
-            energyCost = 2,
-        },
-        funcString = 
-[[
-map:transferInputToCell (tileX, tileY, $energyFromTile, $energyCost)
-if map:isTaken(tileX, tileY) == false then
-    -- print ("Cell death: Consume input", tileX, tileY)
-    return
-end
-]]
-    },
+--     consumeInput = {
+--         desc = "Takes some of the input value to increase the energy level of the cell",
+--         type = "action",
+--         params = {},
+--         hyperparams = {
+--             energyFromTile = 25,
+--             energyCost = 2,
+--         },
+--         funcString = 
+-- [[
+-- map:transferInputToCell (tileX, tileY, $energyFromTile, $energyCost)
+-- if map:isTaken(tileX, tileY) == false then
+--     -- print ("Cell death: Consume input", tileX, tileY)
+--     return
+-- end
+-- ]]
+--     },
     getOtherDisplayVar = {
         desc = "Gets the display value of another cell",
         type = "assign",
@@ -217,6 +218,8 @@ for i = 1, math.min ($loopTo, $maxLoops) do
         params = {},
         hyperparams = {
             energyCost = 500,
+            babyHealth = 250,
+            babyEnergy = 250,
         },
         funcString =
 [[
@@ -224,7 +227,7 @@ babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
 if map.stats.cells < map.cellManager.maxCells and map:isClear (babyTileX, babyTileY) == true then
     if cellObj.energy + cellObj.health > $energyCost then
         map:adjustCellEnergy (tileX, tileY, -$energyCost)
-        map:spawnCell (babyTileX, babyTileY, $energyCost / 2, $energyCost / 2, cellObj)
+        map:spawnCell (babyTileX, babyTileY, $babyEnergy, $babyHealth, cellObj)
         -- print ("Cell spawned")
     end
 end
@@ -376,24 +379,24 @@ if $assignTo ~= $assignTo then $assignTo = 0 end
 $assignTo = 0
 ]]
     },
-    randomNumber = {
-        desc = "Assigns a random value to a variable that is between two provided variables",
-        type = "assign",
-        params = {
-            assignTo = "variable",
-            bounds = {
-                "-1000, 1000",
-                "-1, 1",
-                "",
-                "0, 1",
-            },
-        },
-        hyperparams = {},
-        funcString =
-[[
-$assignTo = math.random ($bounds)
-]]
-    },
+--     randomNumber = {
+--         desc = "Assigns a random value to a variable that is between two provided variables",
+--         type = "assign",
+--         params = {
+--             assignTo = "variable",
+--             bounds = {
+--                 "-1000, 1000",
+--                 "-1, 1",
+--                 "",
+--                 "0, 1",
+--             },
+--         },
+--         hyperparams = {},
+--         funcString =
+-- [[
+-- $assignTo = math.random ($bounds)
+-- ]]
+--     },
     getHealth = {
         desc = "Saves the cell's health to a variable",
         type = "assign",
