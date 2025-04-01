@@ -34,6 +34,7 @@ local cell = {
     maxCells = 0,
     maxActions = 0,
     minMutRate = 0,
+    dropEnergy = true,
     mutsPerChild = {
         min = 0,
         max = 0,
@@ -91,6 +92,10 @@ function cell:init (map, actionDefs, scriptPrefixes, options)
     self.minMutRate = options.minMutRate or 0.10
     self.displayVars = options.displayVars or 1
     self.globalVars = options.globalVars or 3
+
+    if options.dropEnergy == nil then
+        self.dropEnergy = true
+    end
 
     options.mutsPerChild = options.mutsPerChild or {}
     self.mutsPerChild.min = options.mutsPerChild.min or 0

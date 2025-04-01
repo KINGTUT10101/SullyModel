@@ -407,7 +407,9 @@ function map:deleteCell (tileX, tileY)
         local cellObj = self.cellGrid[tileX][tileY]
 
         -- Add cell's remaining energy and health to the ground
-        map:adjustInputTile (tileX, tileY, cellObj.totalEnergy)
+        if self.cellManager.dropEnergy == true then
+            map:adjustInputTile (tileX, tileY, cellObj.totalEnergy)
+        end
 
         self.cellGrid[tileX][tileY] = nil
         self.stats.cells = self.stats.cells - 1
