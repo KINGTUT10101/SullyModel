@@ -84,6 +84,7 @@ function cell:init (map, actionDefs, scriptPrefixes, options)
 
     self.maxHealth = options.maxHealth or 500
     self.maxEnergy = options.maxEnergy or 500
+    self.eggTimer = options.eggTimer or 350
     self.tickCost = options.tickCost or 1
     self.maxCells = options.maxCells or math.huge
     self.maxActions = options.maxActions or 1000
@@ -183,8 +184,9 @@ end
 
 --- Generates a default cell with no actions
 --- @return table cellObj The new default cell object
-function cell:new (health, energy)
+function cell:new (health, energy, type)
     local newCell = {
+        type = type or "normal",
         lastUpdate = 0,
         color = {0.5, 0.5, 0.5, 1},
         scriptList = {},
@@ -217,18 +219,32 @@ end
 
 --- Updates a single cell during a game tick
 function cell:update (tileX, tileY, cellObj, map)
-    -- Energy cost
-    self.map:adjustCellEnergy (tileX, tileY, -self.tickCost)
-
+    if cellObj.type == "normal" or cellObj.type == "egg" then
+        -- Energy cost
+        self.map:adjustCellEnergy (tileX, tileY, -self.tickCost)
+    end
+    
     -- Age the cell by one tick
     cellObj.ticksLeft = cellObj.ticksLeft - 1
-
+    
     if cellObj.health <= 0 or cellObj.ticksLeft <= 0 then
         -- Delete cell
         self.map:deleteCell (tileX, tileY)
-    else
+
+    elseif cellObj.type == "normal" then
         -- Run cell script
         cellObj.scriptFunc (tileX, tileY, cellObj, map)
+
+    elseif cellObj.type == "egg" then
+        cellObj.tickTimer = cellObj.tickTimer - 1
+
+        if cellObj.tickTimer <= 0 then
+            local babyCellObj = cellObj.childCell
+            babyCellObj.energy = cellObj.energy
+            babyCellObj.health = cellObj.health
+
+            self.map.cellGrid[tileX][tileY] = babyCellObj
+        end
     end
 end
 
@@ -261,11 +277,11 @@ local function randomAction (childVars)
 end
 
 function cell:mutate (childCellObj, parentCellObj)
-    if math.random () < 0.95 then
+    if math.random () < 0.75 then
         -- Mutate color slightly
         local colorIndex = math.random (1, 3)
         local newColor = copyTable (parentCellObj.color)
-        newColor[colorIndex] = clamp (newColor[colorIndex] + math.random (-5, 5) / 100, 0.10, 0.85)
+        newColor[colorIndex] = clamp (newColor[colorIndex] + (math.random () < 0.50 and -10 or 10) / 100, 0.10, 0.85)
         childCellObj.color = newColor
     end
 

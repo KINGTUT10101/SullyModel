@@ -277,7 +277,7 @@ serialize_value = function(value, seen)
 		return
 	end
 	(types[t] or
-		error("cannot serialize type " .. t)
+		error("cannot serialize type " .. t .. " - " .. tostring (value))
 		)(value, seen)
 end
 

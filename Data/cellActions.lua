@@ -93,6 +93,34 @@ end
 map:$turnMethod (tileX, tileY)
 ]]
     },
+        turnLeft = {
+        desc = "Turns the cell left",
+        type = "action",
+        params = {
+            turnMethod = {
+                "turnLeft",
+            }
+        },
+        hyperparams = {},
+        funcString = 
+[[
+map:$turnMethod (tileX, tileY)
+]]
+    },
+        turnRight = {
+        desc = "Turns the cell either right",
+        type = "action",
+        params = {
+            turnMethod = {
+                "turnRight"
+            }
+        },
+        hyperparams = {},
+        funcString = 
+[[
+map:$turnMethod (tileX, tileY)
+]]
+    },
     applyDamage = {
         desc = "Applies damage to the cell the current cell is facing",
         type = "action",
@@ -180,8 +208,27 @@ if $term1 $op $term2 then
 for i = 1, math.min ($loopTo, $maxLoops) do
 ]]
     },
-    reproduce = {
-        desc = "Halves the cell's energy to split and create a new cell",
+--     reproduce = {
+--         desc = "Uses the cell's energy to split and create a new cell",
+--         type = "action",
+--         params = {},
+--         hyperparams = {
+--             energyCost = 500,
+--         },
+--         funcString =
+-- [[
+-- babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
+-- if map.stats.cells < map.cellManager.maxCells and map:isClear (babyTileX, babyTileY) == true then
+--     if cellObj.energy + cellObj.health > $energyCost then
+--         map:adjustCellEnergy (tileX, tileY, -$energyCost)
+--         map:spawnCell (babyTileX, babyTileY, $energyCost / 2, $energyCost / 2, cellObj)
+--         -- print ("Cell spawned")
+--     end
+-- end
+-- ]]
+--     },
+    layEgg = {
+        desc = "Uses the cell's energy to lay an egg.",
         type = "action",
         params = {},
         hyperparams = {
@@ -193,8 +240,27 @@ babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
 if map.stats.cells < map.cellManager.maxCells and map:isClear (babyTileX, babyTileY) == true then
     if cellObj.energy + cellObj.health > $energyCost then
         map:adjustCellEnergy (tileX, tileY, -$energyCost)
-        map:spawnCell (babyTileX, babyTileY, $energyCost / 2, $energyCost / 2, cellObj)
+        map:spawnEgg (babyTileX, babyTileY, $energyCost / 2, $energyCost / 2, cellObj)
         -- print ("Cell spawned")
+    end
+end
+]]
+    },
+    createWall = {
+        desc = "Uses the cell's energy to create a wall cell",
+        type = "action",
+        params = {},
+        hyperparams = {
+            energyCost = 500,
+        },
+        funcString =
+[[
+babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
+if map.stats.cells < map.cellManager.maxCells and map:isClear (babyTileX, babyTileY) == true then
+    if cellObj.energy + cellObj.health > $energyCost then
+        map:adjustCellEnergy (tileX, tileY, -$energyCost)
+        map:spawnWall (babyTileX, babyTileY, $energyCost / 2)
+        -- print ("Wall spawned")
     end
 end
 ]]

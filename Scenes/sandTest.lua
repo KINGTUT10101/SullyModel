@@ -6,6 +6,7 @@ local mapToScale = require ("Helpers.mapToScale")
 local round = require ("Libraries.lume").round
 local copyTable = require ("Helpers.copyTable")
 local cellActions = require ("Data.cellActions")
+local cycleValue = require ("Helpers.cycleValue")
 
 local mapSize = 50
 
@@ -26,15 +27,19 @@ local failsafeActivations = -1
 local lastCell = nil
 
 local renderMap = true
+local renderModeIndex = 1
+local validModes = {
+    "normal",
+    "energy",
+    "health",
+    "total",
+    "none"
+}
 
 local baseXInput = 1000000 * love.math.random()
 local baseYInput = 1000000 * love.math.random()
 local function mapInput (tileX, tileY)
-    -- if math.random () < 0.002 then
-    --     return math.huge
-    -- else
-        return mapToScale (love.math.noise(baseXInput+.05*tileX, baseYInput+.02*tileY), 0, 1, 0, 500)
-    -- end
+    return mapToScale (love.math.noise(baseXInput+.05*tileX, baseYInput+.02*tileY), 0, 1, 0, 500)
 end
 
 local baseXBarriers = 1000 * love.math.random()
@@ -45,8 +50,23 @@ end
 
 function thisScene:load (...)
     cell:init (map, cellActions.actionDefs, cellActions.scriptPrefixes, {
-        maxCells = 200,
-        maxActions = 250,
+        maxCells = math.huge,
+        maxActions = 65,
+        eggTimer = 150,
+        hyperargs = {
+            shareEnergy = {
+                energyCost = 0,
+            },
+            reproduce = {
+                energyCost = 250,
+            },
+            layEgg = {
+                energyCost = 350,
+            },
+            createWall = {
+                energyCost = 50,
+            },
+        }
     })
     map:init (cell, {
         inputBounds = {
@@ -72,7 +92,7 @@ function thisScene:load (...)
         newCellObj.mutationRates.meta = 0.15
 
         -- Heavily mutate cell
-        for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, 500)) do
+        for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, 100)) do
             local mutCell = cell:new (100, 100)
             cell:mutate (mutCell, newCellObj)
             newCellObj = mutCell
@@ -187,7 +207,7 @@ function thisScene:draw ()
     love.graphics.setBackgroundColor (0, 0, 1, 1)
 
     if renderMap == true then
-        map:draw ()
+        map:draw (validModes[renderModeIndex])
     end
 
     -- Super speed border
@@ -214,9 +234,9 @@ function thisScene:draw ()
 
     -- Show the number of cycles the current generation has survived
     love.graphics.setColor (0, 0, 0, 0.75)
-    love.graphics.rectangle ("fill", 10, 45, 95, 25)
+    love.graphics.rectangle ("fill", 10, 45, 95, 40)
     love.graphics.setColor (1, 1, 1, 1)
-    love.graphics.printf ("Cycles: " .. cyclesSinceLastFail, 15, 50, 85, "left")
+    love.graphics.printf ("Cycles:\n" .. cyclesSinceLastFail, 15, 50, 85, "left")
 
     -- Show number of cells
     love.graphics.setColor (0, 0, 0, 0.75)
@@ -229,6 +249,12 @@ function thisScene:draw ()
     love.graphics.rectangle ("fill", 720, 45, 76, 25)
     love.graphics.setColor (1, 1, 1, 1)
     love.graphics.printf ("FSs: " .. failsafeActivations, 725, 50, 100, "left")
+
+    -- Shows the rendering mode
+    love.graphics.setColor (0, 0, 0, 0.75)
+    love.graphics.rectangle ("fill", 10, 565, 100, 25)
+    love.graphics.setColor (1, 1, 1, 1)
+    love.graphics.printf (validModes[renderModeIndex] .. " mode", 15, 570, 100, "left")
 end
 
 function thisScene:keypressed (key, scancode, isrepeat)
@@ -292,6 +318,10 @@ function thisScene:keypressed (key, scancode, isrepeat)
         else
             map:setTickSpeed (math.huge)
         end
+
+    -- Changes the rendering mode
+    elseif key == "m" then
+        renderModeIndex = cycleValue (renderModeIndex, 1, #validModes)
     end
 end
 

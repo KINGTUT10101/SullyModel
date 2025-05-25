@@ -41,30 +41,34 @@ local map = {
 }
 
 function map:quickSave ()
-    local cellGridCopy = {}
+    -- local cellGridCopy = {}
 
-    for i = 1, self.width do
-        local cellRow = {}
-        cellGridCopy[i] = cellRow -- Add row to cell grid
+    -- for i = 1, self.width do
+    --     local cellRow = {}
+    --     cellGridCopy[i] = cellRow -- Add row to cell grid
 
-        for j = 1, self.height do
-            if self.cellGrid[i][j] ~= nil then
-                cellRow[j] = copyTable (self.cellGrid[i][j])
-                cellRow[j].scriptFunc = nil
-            end
-        end
-    end
+    --     for j = 1, self.height do
+    --         if self.cellGrid[i][j] ~= nil then
+    --             cellRow[j] = copyTable (self.cellGrid[i][j])
+    --             cellRow[j].scriptFunc = nil
+    --             -- if cellRow[j].babyCellObj ~= nil then
+    --             --     cellRow[j].babyCellObj.scriptFunc = nil
+    --             -- end
+    --             cellRow[j].babyCellObj = nil
+    --         end
+    --     end
+    -- end
     
-    local fileName = "quickSave_" .. os.date("%Y-%m-%d_%H-%M-%S") .. ".slf"
-    bitser.dumpLoveFile (fileName, {
-        envGrid = self.envGrid,
-        cellGrid = cellGridCopy,
-        stats = self.stats,
-        lastSave = self.lastSave,
-        resets = self.resets,
-        lastTick = self.lastTick,
-    })
-    print ("QUICK SAVE: " .. fileName)
+    -- local fileName = "quickSave_" .. os.date("%Y-%m-%d_%H-%M-%S") .. ".slf"
+    -- bitser.dumpLoveFile (fileName, {
+    --     envGrid = self.envGrid,
+    --     cellGrid = cellGridCopy,
+    --     stats = self.stats,
+    --     lastSave = self.lastSave,
+    --     resets = self.resets,
+    --     lastTick = self.lastTick,
+    -- })
+    -- print ("QUICK SAVE: " .. fileName)
 end
 
 --- Initializes the map manager and prepares it for processing.
@@ -190,7 +194,21 @@ function map:update (dt)
     return capture
 end
 
-function map:draw ()
+local validModes = {
+    normal = true,
+    energy = true,
+    health = true,
+    total = true,
+    none = true,
+}
+function map:draw (mode)
+    mode = mode or "normal"
+
+    assert (validModes[mode] == true, "Invalid rendering mode provided")
+
+    local maxEnergy = self.cellManager.maxEnergy
+    local maxHealth = self.cellManager.maxHealth
+
     love.graphics.push ()
     love.graphics.translate (-self.camera.x, -self.camera.y)
     love.graphics.scale (self.camera.zoom)
@@ -209,8 +227,22 @@ function map:draw ()
             -- Check what exists at the current position to determine what to render
             if cellObj ~= nil then
                 -- Render cell
-                love.graphics.setColor (cellObj.color)
-                love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
+                if mode == "normal" then
+                    love.graphics.setColor (cellObj.color)
+                    love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
+                elseif mode == "energy" then
+                    local cellEnergyPercent = cellObj.energy / maxEnergy
+                    love.graphics.setColor (0, cellEnergyPercent, 0, 1)
+                    love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
+                elseif mode == "health" then
+                    local cellHealthPercent = cellObj.health / maxHealth
+                    love.graphics.setColor (0, cellHealthPercent, 0, 1)
+                    love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
+                elseif mode == "total" then
+                    local cellTotalPercent = (cellObj.energy + cellObj.health) / (maxEnergy + maxHealth)
+                    love.graphics.setColor (0, cellTotalPercent, 0, 1)
+                    love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
+                end
 
             elseif envTile.type ~= "blank" then
                 -- Render barrier (assume this is the only other tile type right now)
@@ -392,18 +424,81 @@ function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
     end
 end
 
+--- Spawns a new cell egg into the map.
+--- The new cell object will have n rounds of mutations applied to it if a parent is provided, depending on the value of map.cellManager.meanMut.
+--- @param tileX integer The horizontal map position.
+--- @param tileY integer The vertical map position.
+--- @param health number The health value of the new cell object.
+--- @param energy number The energy value of the new cell object.
+--- @param parentCellObj? table The parent cell object object.
+--- @return boolean success True if a cell object was spawned successfully.
+function map:spawnEgg (tileX, tileY, health, energy, parentCellObj)
+    if self.stats.cells < self.cellManager.maxCells and self:isClear (tileX, tileY) == true then
+        local newCellObj = self.cellManager:new (math.huge, math.huge) -- Create default cell object
+
+        -- Mutate cell if a parent is given
+        if parentCellObj ~= nil then
+            -- TODO: Mutate the child cell multiple times
+            local mutSuccess, mutErr = pcall (self.cellManager.mutate, self.cellManager, newCellObj, parentCellObj)
+            local compSuccess, compErr = pcall (self.cellManager.compileScript, self.cellManager, newCellObj)
+
+            assert (mutSuccess == true, "ERROR: Problem with mutation:" .. tostring (mutErr))
+            assert (compSuccess == true, "ERROR: Problem with script compilation:" .. tostring (compErr))
+        end
+
+        local eggCellObj = self.cellManager:new (health, energy, "egg") -- Create default cell object
+        eggCellObj.childCell = newCellObj
+        eggCellObj.tickTimer = self.cellManager.eggTimer
+        eggCellObj.ticksLeft = math.huge
+        eggCellObj.color = {0, 0, 1, 1}
+
+        self.cellGrid[tileX][tileY] = eggCellObj
+        self.stats.cells = self.stats.cells + 1
+        
+        return true
+    else
+        return false
+    end
+end
+
+--- Spawns a new cell wall into the map.
+--- @param tileX integer The horizontal map position.
+--- @param tileY integer The vertical map position.
+--- @param health number The health value of the new cell object.
+--- @return boolean success True if a cell object was spawned successfully.
+function map:spawnWall (tileX, tileY, health)
+    if self.stats.cells < self.cellManager.maxCells and self:isClear (tileX, tileY) == true then
+        local newCellObj = self.cellManager:new (health, 0, "wall") -- Create default cell object
+
+        newCellObj.color = {1, 1, 0, 1}
+
+        self.cellGrid[tileX][tileY] = newCellObj
+        -- self.stats.cells = self.stats.cells + 1
+        
+        return true
+    else
+        return false
+    end
+end
+
 --- Removes a cell object from the map.
 --- @param tileX integer The horizontal map position.
 --- @param tileY integer The vertical map position.
-function map:deleteCell (tileX, tileY)
+--- @param dropEnergy boolean If true, the energy from the deleted cell will be added to the environment
+function map:deleteCell (tileX, tileY, dropEnergy)
     if self:isTaken (tileX, tileY) == true then
         local cellObj = self.cellGrid[tileX][tileY]
 
         -- Add cell's remaining energy and health to the ground
-        map:adjustInputTile (tileX, tileY, cellObj.totalEnergy)
+        if dropEnergy ~= false then
+            map:adjustInputTile (tileX, tileY, cellObj.totalEnergy)
+        end
 
         self.cellGrid[tileX][tileY] = nil
-        self.stats.cells = self.stats.cells - 1
+
+        if cellObj.type == "normal" or cellObj.type == "egg" then
+            self.stats.cells = self.stats.cells - 1
+        end
     end
 end
 
