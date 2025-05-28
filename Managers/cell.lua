@@ -243,6 +243,8 @@ function cell:update (tileX, tileY, cellObj, map)
             childCellObj.energy = cellObj.energy
             childCellObj.health = cellObj.health
 
+            childCellObj.totalEnergy = self.actionsByKey.layEgg.hyperparams.energyCost - cellObj.energy - cellObj.health
+
             self.map.cellGrid[tileX][tileY] = childCellObj
         end
     end
