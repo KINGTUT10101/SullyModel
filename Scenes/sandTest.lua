@@ -22,7 +22,7 @@ local captures = {} -- Holds the last 10 captures
 
 local cyclesSinceLastFail = 0
 
-local failsafeSpawns = 5
+local failsafeSpawns = 50
 local failsafeActivations = -1
 local lastCell = nil
 

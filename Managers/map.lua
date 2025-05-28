@@ -41,34 +41,33 @@ local map = {
 }
 
 function map:quickSave ()
-    -- local cellGridCopy = {}
+    local cellGridCopy = {}
 
-    -- for i = 1, self.width do
-    --     local cellRow = {}
-    --     cellGridCopy[i] = cellRow -- Add row to cell grid
+    for i = 1, self.width do
+        local cellRow = {}
+        cellGridCopy[i] = cellRow -- Add row to cell grid
 
-    --     for j = 1, self.height do
-    --         if self.cellGrid[i][j] ~= nil then
-    --             cellRow[j] = copyTable (self.cellGrid[i][j])
-    --             cellRow[j].scriptFunc = nil
-    --             -- if cellRow[j].babyCellObj ~= nil then
-    --             --     cellRow[j].babyCellObj.scriptFunc = nil
-    --             -- end
-    --             cellRow[j].babyCellObj = nil
-    --         end
-    --     end
-    -- end
+        for j = 1, self.height do
+            if self.cellGrid[i][j] ~= nil then
+                cellRow[j] = copyTable (self.cellGrid[i][j])
+                cellRow[j].scriptFunc = nil
+                if cellRow[j].childCell ~= nil then
+                    cellRow[j].childCell.scriptFunc = nil
+                end
+            end
+        end
+    end
     
-    -- local fileName = "quickSave_" .. os.date("%Y-%m-%d_%H-%M-%S") .. ".slf"
-    -- bitser.dumpLoveFile (fileName, {
-    --     envGrid = self.envGrid,
-    --     cellGrid = cellGridCopy,
-    --     stats = self.stats,
-    --     lastSave = self.lastSave,
-    --     resets = self.resets,
-    --     lastTick = self.lastTick,
-    -- })
-    -- print ("QUICK SAVE: " .. fileName)
+    local fileName = "quickSave_" .. os.date("%Y-%m-%d_%H-%M-%S") .. ".slf"
+    bitser.dumpLoveFile (fileName, {
+        envGrid = self.envGrid,
+        cellGrid = cellGridCopy,
+        stats = self.stats,
+        lastSave = self.lastSave,
+        resets = self.resets,
+        lastTick = self.lastTick,
+    })
+    print ("QUICK SAVE: " .. fileName)
 end
 
 --- Initializes the map manager and prepares it for processing.

@@ -239,11 +239,11 @@ function cell:update (tileX, tileY, cellObj, map)
         cellObj.tickTimer = cellObj.tickTimer - 1
 
         if cellObj.tickTimer <= 0 then
-            local babyCellObj = cellObj.childCell
-            babyCellObj.energy = cellObj.energy
-            babyCellObj.health = cellObj.health
+            local childCellObj = cellObj.childCell
+            childCellObj.energy = cellObj.energy
+            childCellObj.health = cellObj.health
 
-            self.map.cellGrid[tileX][tileY] = babyCellObj
+            self.map.cellGrid[tileX][tileY] = childCellObj
         end
     end
 end
