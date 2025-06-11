@@ -104,6 +104,8 @@ function cell:init (map, actionDefs, scriptPrefixes, options)
     options.cellAge = options.cellAge or {}
     self.cellAge.min = options.cellAge.min or 3000
     self.cellAge.max = options.cellAge.max or 6500
+
+    self.maxMultiCell = options.maxMultiCell or 10
 end
 
 function cell:validateCompileActions (cellActions, actionHyperargs)
@@ -204,6 +206,7 @@ function cell:new (health, energy, type)
             minor = self.initialMutRates.minor,
             meta = self.initialMutRates.meta,
         },
+        count = 1,
     }
 
     for i = 1, self.scriptVars + self.memVars do

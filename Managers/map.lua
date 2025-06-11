@@ -188,6 +188,12 @@ function map:update (dt)
 
             self.lastSave = self.ticksBetweenSaves
         end
+
+        -- Bandaid fix for cells not being deleted and counted correctly
+        if capture == nil then
+            print ("Warning: Map updated with no cells")
+            self.stats.cells = 0
+        end
     end
 
     return capture
@@ -198,15 +204,20 @@ local validModes = {
     energy = true,
     health = true,
     total = true,
+    multicell = true,
     none = true,
 }
+local multicellColors = {}
+local multicellColorCount = 0
+
 function map:draw (mode)
     mode = mode or "normal"
 
     assert (validModes[mode] == true, "Invalid rendering mode provided")
 
-    local maxEnergy = self.cellManager.maxEnergy
-    local maxHealth = self.cellManager.maxHealth
+    if multicellColorCount > 100000 then
+        multicellColors = {}
+    end
 
     love.graphics.push ()
     love.graphics.translate (-self.camera.x, -self.camera.y)
@@ -225,6 +236,9 @@ function map:draw (mode)
 
             -- Check what exists at the current position to determine what to render
             if cellObj ~= nil then
+                local maxEnergy = self.cellManager.maxEnergy * cellObj.count
+                local maxHealth = self.cellManager.maxHealth * cellObj.count
+
                 -- Render cell
                 if mode == "normal" then
                     love.graphics.setColor (cellObj.color)
@@ -240,6 +254,14 @@ function map:draw (mode)
                 elseif mode == "total" then
                     local cellTotalPercent = (cellObj.energy + cellObj.health) / (maxEnergy + maxHealth)
                     love.graphics.setColor (0, cellTotalPercent, 0, 1)
+                    love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
+                elseif mode == "multicell" then
+                    if multicellColors[cellObj] == nil then
+                        multicellColors[cellObj] = {math.random (), math.random (), math.random (), 1}
+                        multicellColorCount = multicellColorCount + 1
+                    end
+
+                    love.graphics.setColor (multicellColors[cellObj])
                     love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
                 end
 
@@ -405,13 +427,17 @@ function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
         local newCellObj = self.cellManager:new (health, energy) -- Create default cell object
 
         -- Mutate cell if a parent is given
-        if parentCellObj ~= nil then
+        if parentCellObj ~= nil and parentCellObj.count < self.cellManager.maxMultiCell then
+            newCellObj = parentCellObj
+            
             -- TODO: Mutate the child cell multiple times
             local mutSuccess, mutErr = pcall (self.cellManager.mutate, self.cellManager, newCellObj, parentCellObj)
             local compSuccess, compErr = pcall (self.cellManager.compileScript, self.cellManager, newCellObj)
 
             assert (mutSuccess == true, "ERROR: Problem with mutation:" .. tostring (mutErr))
             assert (compSuccess == true, "ERROR: Problem with script compilation:" .. tostring (compErr))
+
+            parentCellObj.count = parentCellObj.count + 1
         end
 
         self.cellGrid[tileX][tileY] = newCellObj
@@ -483,7 +509,7 @@ end
 --- Removes a cell object from the map.
 --- @param tileX integer The horizontal map position.
 --- @param tileY integer The vertical map position.
---- @param dropEnergy boolean If true, the energy from the deleted cell will be added to the environment
+--- @param dropEnergy? boolean If true, the energy from the deleted cell will be added to the environment
 function map:deleteCell (tileX, tileY, dropEnergy)
     if self:isTaken (tileX, tileY) == true then
         local cellObj = self.cellGrid[tileX][tileY]
@@ -495,9 +521,16 @@ function map:deleteCell (tileX, tileY, dropEnergy)
 
         self.cellGrid[tileX][tileY] = nil
 
+        -- print ("Delete before", self.stats.cells)
+
         if cellObj.type == "normal" or cellObj.type == "egg" then
             self.stats.cells = self.stats.cells - 1
+            -- print ("not a wall")
+        elseif cellObj.type == "wall" then
+            -- print ("wall")
         end
+
+        -- print ("Delete after", self.stats.cells)
     end
 end
 
@@ -571,10 +604,10 @@ function map:transferInputToCell (tileX, tileY, amount, cost)
                 inputVal = inputVal - amount
             end
             
-            if cellObj.energy > maxEnergy then -- Cell energy max
-                cellObj.totalEnergy = cellObj.totalEnergy - (cellObj.energy - maxEnergy)
-                inputVal = inputVal + cellObj.energy - maxEnergy
-                cellObj.energy = maxEnergy
+            if cellObj.energy > maxEnergy * cellObj.count then -- Cell energy max
+                cellObj.totalEnergy = cellObj.totalEnergy - (cellObj.energy - maxEnergy * cellObj.count)
+                inputVal = inputVal + cellObj.energy - maxEnergy * cellObj.count
+                cellObj.energy = maxEnergy * cellObj.count
             end
 
             self:setInputTile (tileX, tileY, inputVal)
@@ -599,9 +632,9 @@ function map:shareInputToCell (tileX1, tileY1, tileX2, tileY2, amount, cost)
             currCellObj.energy = currCellObj.energy - amount
         end
         
-        if otherCellObj.energy > maxEnergy then -- Cell energy max
-            currCellObj.energy = currCellObj.energy + otherCellObj.energy - maxEnergy
-            otherCellObj.energy = maxEnergy
+        if otherCellObj.energy > maxEnergy * otherCellObj.count then -- Cell energy max
+            currCellObj.energy = currCellObj.energy + otherCellObj.energy - maxEnergy * otherCellObj.count
+            otherCellObj.energy = maxEnergy * otherCellObj.count
         end
 
         if currCellObj.energy <= 0 then
@@ -613,7 +646,7 @@ end
 function map:adjustCellEnergy (tileX, tileY, amount)
     if self:isTaken (tileX, tileY) == true then
         local cell = self.cellGrid[tileX][tileY]
-        cell.energy = math.min (self.cellManager.maxEnergy, cell.energy + amount)
+        cell.energy = math.min (self.cellManager.maxEnergy * cell.count, cell.energy + amount)
 
         if cell.energy < 0 then
             map:adjustCellHealth (tileX, tileY, cell.energy)
@@ -625,7 +658,7 @@ end
 function map:adjustCellHealth (tileX, tileY, amount)
     if self:isTaken (tileX, tileY) == true then
         local cell = self.cellGrid[tileX][tileY]
-        cell.health = math.min (self.cellManager.maxHealth, cell.health + amount)
+        cell.health = math.min (self.cellManager.maxHealth * cell.count, cell.health + amount)
 
         if cell.health <= 0 then
             self:deleteCell (tileX, tileY)

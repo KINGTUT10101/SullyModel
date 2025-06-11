@@ -61,23 +61,23 @@ end
 cellObj.displayVars[$displayIndex] = $copyFrom
 ]]
     },
-    moveForward = {
-        desc = "Moves the cell in the direction it's facing",
-        type = "action",
-        params = {},
-        hyperparams = {
-            energyCost = 3,
-        },
-        funcString = 
-[[
-tileX, tileY = map:moveForward (tileX, tileY)
-map:adjustCellEnergy (tileX, tileY, -$energyCost)
-if map:isTaken(tileX, tileY) == false then
-    -- print ("Cell death: Move forward", tileX, tileY)
-    return
-end
-]]
-    },
+--     moveForward = {
+--         desc = "Moves the cell in the direction it's facing",
+--         type = "action",
+--         params = {},
+--         hyperparams = {
+--             energyCost = 3,
+--         },
+--         funcString = 
+-- [[
+-- tileX, tileY = map:moveForward (tileX, tileY)
+-- map:adjustCellEnergy (tileX, tileY, -$energyCost)
+-- if map:isTaken(tileX, tileY) == false then
+--     -- print ("Cell death: Move forward", tileX, tileY)
+--     return
+-- end
+-- ]]
+--     },
     turn = {
         desc = "Turns the cell either left or right",
         type = "action",
@@ -208,25 +208,25 @@ if $term1 $op $term2 then
 for i = 1, math.min ($loopTo, $maxLoops) do
 ]]
     },
---     reproduce = {
---         desc = "Uses the cell's energy to split and create a new cell",
---         type = "action",
---         params = {},
---         hyperparams = {
---             energyCost = 500,
---         },
---         funcString =
--- [[
--- babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
--- if map.stats.cells < map.cellManager.maxCells and map:isClear (babyTileX, babyTileY) == true then
---     if cellObj.energy + cellObj.health > $energyCost then
---         map:adjustCellEnergy (tileX, tileY, -$energyCost)
---         map:spawnCell (babyTileX, babyTileY, $energyCost / 2, $energyCost / 2, cellObj)
---         -- print ("Cell spawned")
---     end
--- end
--- ]]
---     },
+    reproduce = {
+        desc = "Uses the cell's energy to split and create a new cell",
+        type = "action",
+        params = {},
+        hyperparams = {
+            energyCost = 500,
+        },
+        funcString =
+[[
+babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
+if map.stats.cells < map.cellManager.maxCells and map:isClear (babyTileX, babyTileY) == true then
+    if cellObj.energy + cellObj.health > $energyCost then
+        map:adjustCellEnergy (tileX, tileY, -$energyCost)
+        map:spawnCell (babyTileX, babyTileY, $energyCost / 2, $energyCost / 2, cellObj)
+        -- print ("Cell spawned")
+    end
+end
+]]
+    },
     layEgg = {
         desc = "Uses the cell's energy to lay an egg.",
         type = "action",
@@ -246,25 +246,25 @@ if map.stats.cells < map.cellManager.maxCells and map:isClear (babyTileX, babyTi
 end
 ]]
     },
-    createWall = {
-        desc = "Uses the cell's energy to create a wall cell",
-        type = "action",
-        params = {},
-        hyperparams = {
-            energyCost = 500,
-        },
-        funcString =
-[[
-babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
-if map.stats.cells < map.cellManager.maxCells and map:isClear (babyTileX, babyTileY) == true then
-    if cellObj.energy + cellObj.health > $energyCost then
-        map:adjustCellEnergy (tileX, tileY, -$energyCost)
-        map:spawnWall (babyTileX, babyTileY, $energyCost / 2)
-        -- print ("Wall spawned")
-    end
-end
-]]
-    },
+--     createWall = {
+--         desc = "Uses the cell's energy to create a wall cell",
+--         type = "action",
+--         params = {},
+--         hyperparams = {
+--             energyCost = 500,
+--         },
+--         funcString =
+-- [[
+-- babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
+-- if map.stats.cells < map.cellManager.maxCells and map:isClear (babyTileX, babyTileY) == true then
+--     if cellObj.energy + cellObj.health > $energyCost then
+--         map:adjustCellEnergy (tileX, tileY, -$energyCost)
+--         map:spawnWall (babyTileX, babyTileY, $energyCost / 2)
+--         -- print ("Wall spawned")
+--     end
+-- end
+-- ]]
+--     },
     shareEnergy = {
         desc = "Shares some energy with the cell in front of the current cell",
         type = "action",

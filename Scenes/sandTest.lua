@@ -8,21 +8,21 @@ local copyTable = require ("Helpers.copyTable")
 local cellActions = require ("Data.cellActions")
 local cycleValue = require ("Helpers.cycleValue")
 
-local mapSize = 50
+local mapSize = 100
 
 local camVelocity = 15
 local zoomVelocity = 25
 
 local testCell = cell:new (100, 100)
 
-local maxCaptures = 50
+local maxCaptures = 100
 local maxCaptureCycles = 10000
 local captureTimer = maxCaptureCycles
 local captures = {} -- Holds the last 10 captures
 
 local cyclesSinceLastFail = 0
 
-local failsafeSpawns = 50
+local failsafeSpawns = 100
 local failsafeActivations = -1
 local lastCell = nil
 
@@ -33,6 +33,7 @@ local validModes = {
     "energy",
     "health",
     "total",
+    "multicell",
     "none"
 }
 
@@ -52,19 +53,19 @@ function thisScene:load (...)
     cell:init (map, cellActions.actionDefs, cellActions.scriptPrefixes, {
         maxCells = math.huge,
         maxActions = 65,
-        eggTimer = 150,
+        eggTimer = 2500,
         hyperargs = {
             shareEnergy = {
                 energyCost = 0,
             },
             reproduce = {
-                energyCost = 250,
-            },
-            layEgg = {
                 energyCost = 350,
             },
+            layEgg = {
+                energyCost = 1000,
+            },
             createWall = {
-                energyCost = 50,
+                energyCost = 250,
             },
         }
     })
