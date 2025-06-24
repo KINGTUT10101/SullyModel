@@ -17,7 +17,7 @@ $assignTo = $copyFrom
 ]]
     },
     incrementGlobal = {
-        desc = "Increments the selected global variable",
+        desc = "Changes the selected global variable",
         type = "assign",
         params = {
             assignTo = "global",
@@ -29,6 +29,23 @@ $assignTo = $copyFrom
         hyperparams = {},
         funcString = 
 [[
+$assignTo = $assignTo $op 1
+cellObj.contributions = cellObj.contributions $op 1
+]]
+    },
+    decrementGlobal = {
+        desc = "Changes the selected global variable",
+        type = "assign",
+        params = {
+            assignTo = "global",
+            op = {
+                -- "+",
+                "-",
+            }
+        },
+        hyperparams = {},
+        funcString =
+        [[
 $assignTo = $assignTo $op 1
 cellObj.contributions = cellObj.contributions $op 1
 ]]
@@ -253,19 +270,17 @@ end
     },
     isTaken = {
         desc = "Determines if the position in front of the current cell contains another cell",
-        type = "assign",
-        params = {
-            assignTo = "variable",
-        },
+        type = "control",
+        params = {},
         hyperparams = {},
         funcString =
 [[
-$assignTo = (map:isTaken (map:getForwardPos (tileX, tileY, 1))) and 1 or 0
+if map:isTaken (map:getForwardPos (tileX, tileY, 1)) then
 ]]
     },
     isSimilar = {
         desc = "Determines if the position in front of the current cell contains another cell with a similar color",
-        type = "assign",
+        type = "control",
         params = {
             assignTo = "variable",
             similarRating = {
@@ -291,7 +306,7 @@ if map:isTaken (otherTileX, otherTileY) == true then
         end
     end
 end
-$assignTo = (allSimilar == true) and 1 or 0
+if allSimilar == true then
 ]]
     },
     copyVariable = {
@@ -379,24 +394,24 @@ if $assignTo ~= $assignTo then $assignTo = 0 end
 $assignTo = 0
 ]]
     },
---     randomNumber = {
---         desc = "Assigns a random value to a variable that is between two provided variables",
---         type = "assign",
---         params = {
---             assignTo = "variable",
---             bounds = {
---                 "-1000, 1000",
---                 "-1, 1",
---                 "",
---                 "0, 1",
---             },
---         },
---         hyperparams = {},
---         funcString =
--- [[
--- $assignTo = math.random ($bounds)
--- ]]
---     },
+    randomNumber = {
+        desc = "Assigns a random value to a variable that is between two provided variables",
+        type = "assign",
+        params = {
+            assignTo = "variable",
+            bounds = {
+                "-1000, 1000",
+                "-1, 1",
+                "",
+                "0, 1",
+            },
+        },
+        hyperparams = {},
+        funcString =
+[[
+$assignTo = math.random ($bounds)
+]]
+    },
     getHealth = {
         desc = "Saves the cell's health to a variable",
         type = "assign",

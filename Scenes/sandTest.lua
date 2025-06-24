@@ -22,16 +22,16 @@ local captures = {} -- Holds the last 10 captures
 
 local cyclesSinceLastFail = 0
 
-local failsafeSpawns = 50
+local failsafeSpawns = 200
 local failsafeActivations = -1
 local lastCell = nil
 
 local renderMap = true
 
-local rewardEnergy = 100
+local rewardEnergy = 150
 local punishHealth = 250
 local predRetries = 500
-local cyclesPerPred = 2500 
+local cyclesPerPred = 750 
 local predTimer = cyclesPerPred
 local confusionMatrix = {
     tp = 0,
@@ -53,9 +53,9 @@ local function createInputMapper ()
     
     local function mapInputRect (tileX, tileY)
         if tileX >= rectX1 and tileX <= rectX2 and tileY >= rectY1 and tileY <= rectY2 then
-            return 100
+            return 1000
         else
-            return -100
+            return -1000
         end
     end
 
@@ -114,31 +114,31 @@ end
 
 function thisScene:load (...)
     cell:init (map, cellActions.actionDefs, cellActions.scriptPrefixes, {
-        maxCells = 50,
-        maxActions = 500,
+        maxCells = 200,
+        maxActions = 80,
         dropEnergy = false,
         scriptVars = 3,
         memVars = 2,
-        displayVars = 2,
+        displayVars = 1,
         globalVars = 1,
         cellAge = {
-            min = 5000,
-            max = 5000,
+            min = math.huge,
+            max = math.huge,
         },
-        tickCost = 1,
-        maxEnergy = 10000,
+        tickCost = 0,
+        maxEnergy = 2500,
         hyperargs = {
-            -- moveForward = {
-            --     energyCost = 0,
-            -- },
-            reproduce = {
-                energyCost = 1000,
-                babyEnergy = 500,
-                babyHealth = 500,
+            moveForward = {
+                energyCost = 0,
             },
-            -- applyDamage = {
-            --     energyCost = 0,
+            -- reproduce = {
+            --     energyCost = 1000,
+            --     babyEnergy = 500,
+            --     babyHealth = 500,
             -- },
+            applyDamage = {
+                energyCost = 0,
+            },
         },
     })
     map:init (cell, {
