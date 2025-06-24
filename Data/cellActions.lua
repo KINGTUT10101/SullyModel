@@ -16,20 +16,19 @@ local actionDefs = {
 $assignTo = $copyFrom
 ]]
     },
-    incrementGlobal = {
+    changeGlobal = {
         desc = "Increments the selected global variable",
         type = "assign",
         params = {
             assignTo = "global",
             op = {
                 "+",
-                -- "-",
+                "-",
             }
         },
         hyperparams = {},
         funcString = 
 [[
-$assignTo = $assignTo $op 1
 cellObj.contributions = cellObj.contributions $op 1
 ]]
     },
@@ -196,6 +195,22 @@ map:$turnMethod (tileX, tileY)
         funcString =
 [[
 if $term1 $op $term2 then
+]]
+    },
+    isSign = {
+        desc = "Determines if the provided value is positive or negative",
+        type = "control",
+        params = {
+            term = "variable",
+            op = {
+                "<",
+                ">"
+            }
+        },
+        hyperparams = {},
+        funcString =
+[[
+if $term $op 0 then
 ]]
     },
     isTaken = {
@@ -455,6 +470,18 @@ $assignTo = math.random ($bounds)
 -- $assignTo = map:getCellHealth (map:getForwardPos (tileX, tileY, 1))
 -- ]]
 --     },
+    getLastPred = {
+        desc = "Saves the cell's last prediction to a variable",
+        type = "assign",
+        params = {
+            assignTo = "variable",
+        },
+        hyperparams = {},
+        funcString =
+[[
+$assignTo = cellObj.lastContribution
+]]
+    },
     getPosition = {
         desc = "Saves the position of the cell to a pair of variables",
         type = "assign",
