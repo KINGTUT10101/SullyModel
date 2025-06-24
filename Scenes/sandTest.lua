@@ -70,18 +70,19 @@ end
 
 -- Rewards/punishes each cell after a prediction
 local function rewardCell (tileX, tileY, cellObj)
-    map:adjustCellEnergy (tileX, tileY, rewardEnergy * mapToScale (calcAccuracy (), 0, 1, 0, 2))
-    cellObj.contributions = 0
+    -- map:adjustCellEnergy (tileX, tileY, rewardEnergy * mapToScale (calcAccuracy (), 0, 1, 0, 2))
+    cellObj.correct = cellObj.correct + 1
 end
 local function punishCell (tileX, tileY, cellObj)
     if confusionMatrix.fn + confusionMatrix.fp > predRetries then
-        map:adjustCellEnergy (tileX, tileY, -punishHealth * -mapToScale (1 - calcAccuracy (), 0, 1, 0, 2))
+        -- map:adjustCellEnergy (tileX, tileY, -punishHealth * -mapToScale (1 - calcAccuracy (), 0, 1, 0, 2))
     end
-    cellObj.contributions = 0
 end
 
 local function treatCell (tileX, tileY, cellObj)
     if cellObj.contributions > 0 then
+        cellObj.positivePreds = cellObj.positivePreds + 1
+
         if currLabel > 0 then
             rewardCell (tileX, tileY, cellObj) -- True positive
         else
@@ -94,6 +95,10 @@ local function treatCell (tileX, tileY, cellObj)
             punishCell (tileX, tileY, cellObj) -- False negative
         end
     end
+
+    cellObj.lastContribution = cellObj.contributions
+    cellObj.contributions = 0
+    cellObj.total = cellObj.total + 1
 end
 
 local baseXInput = 1000000 * love.math.random()

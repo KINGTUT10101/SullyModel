@@ -210,6 +210,10 @@ function cell:new (health, energy)
             meta = self.initialMutRates.meta,
         },
         contributions = 0,
+        correct = 0,
+        total = 0,
+        positivePreds = 0,
+        lastContribution = 0,
     }
 
     for i = 1, self.scriptVars + self.memVars do
