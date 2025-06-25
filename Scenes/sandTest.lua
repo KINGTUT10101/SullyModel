@@ -15,23 +15,27 @@ local zoomVelocity = 25
 
 local testCell = cell:new (100, 100)
 
-local maxCaptures = 250
+local maxCaptures = 500
 local maxCaptureCycles = 10000
 local captureTimer = maxCaptureCycles
 local captures = {} -- Holds the last 10 captures
 
 local cyclesSinceLastFail = 0
 
-local failsafeSpawns = 50
+local failsafeSpawns = 200
 local failsafeActivations = -1
 local lastCell = nil
 
 local renderMap = true
 
+local replacementPercent = 0.15
+local datasetRatio = 0.5 -- TODO: Make this automatic later
+local shuffles = 4
+
 local rewardEnergy = 100
 local punishHealth = 250
 local predRetries = 500
-local cyclesPerPred = 2500 
+local cyclesPerPred = 750
 local predTimer = cyclesPerPred
 local confusionMatrix = {
     tp = 0,
@@ -63,7 +67,10 @@ local function createInputMapper ()
 end
 
 local function calcAccuracy ()
-    local accuracy = (confusionMatrix.tp + confusionMatrix.tn) / (confusionMatrix.tp + confusionMatrix.fp + confusionMatrix.fn + confusionMatrix.tn)
+    local total = confusionMatrix.tp + confusionMatrix.fp + confusionMatrix.fn + confusionMatrix.tn
+    local accuracy = (confusionMatrix.tp + confusionMatrix.tn) / total
+
+    datasetRatio = (confusionMatrix.tp + confusionMatrix.fn) / total
 
     return (accuracy ~= accuracy) and 0 or accuracy
 end
@@ -76,6 +83,20 @@ end
 local function punishCell (tileX, tileY, cellObj)
     if confusionMatrix.fn + confusionMatrix.fp > predRetries then
         -- map:adjustCellEnergy (tileX, tileY, -punishHealth * -mapToScale (1 - calcAccuracy (), 0, 1, 0, 2))
+    end
+end
+
+local cellList = {}
+local function replaceCells(list)
+    local endIndex = math.ceil(#list * replacementPercent)
+    local listLength = #list
+
+    for i = 1, endIndex do
+        local cellDataGood = list[listLength - (i - 1)]
+        local cellDataBad = list[i]
+
+        map:deleteCell(cellDataBad.tileX, cellDataBad.tileY)
+        while map:spawnCell(math.random(1, map.width), math.random(1, map.height), cell.maxHealth, cell.maxEnergy, cellDataGood.cellObj) do end
     end
 end
 
@@ -99,6 +120,12 @@ local function treatCell (tileX, tileY, cellObj)
     cellObj.lastContribution = cellObj.contributions
     cellObj.contributions = 0
     cellObj.total = cellObj.total + 1
+
+    table.insert (cellList, {
+        cellObj = cellObj,
+        tileX = tileX,
+        tileY = tileY,
+    })
 end
 
 local baseXInput = 1000000 * love.math.random()
@@ -119,28 +146,28 @@ end
 
 function thisScene:load (...)
     cell:init (map, cellActions.actionDefs, cellActions.scriptPrefixes, {
-        maxCells = 50,
-        maxActions = 500,
+        maxCells = 200,
+        maxActions = 80,
         dropEnergy = false,
         scriptVars = 3,
         memVars = 2,
-        displayVars = 2,
-        globalVars = 1,
+        displayVars = 1,
+        globalVars = 2,
         cellAge = {
-            min = 5000,
-            max = 5000,
+            min = math.huge,
+            max = math.huge,
         },
-        tickCost = 1,
+        tickCost = 0,
         maxEnergy = 10000,
         hyperargs = {
-            -- moveForward = {
-            --     energyCost = 0,
-            -- },
-            reproduce = {
-                energyCost = 1000,
-                babyEnergy = 500,
-                babyHealth = 500,
+            moveForward = {
+                energyCost = 0,
             },
+            -- reproduce = {
+            --     energyCost = 1000,
+            --     babyEnergy = 500,
+            --     babyHealth = 500,
+            -- },
             -- applyDamage = {
             --     energyCost = 0,
             -- },
@@ -158,7 +185,7 @@ function thisScene:load (...)
     })
     map:reset (mapSize, mapSize, true, createInputMapper ())
     map:setCamera (-110, -10, 5.8)
-    map:setTickSpeed (1/8)
+    map:setTickSpeed (math.huge)
 
     -- Adds a few heavily mutated cells to the initial captures list
     for i = 1, maxCaptures do
@@ -230,15 +257,19 @@ function thisScene:update (dt)
         predTimer = predTimer - 1
 
         if predTimer <= 0 then
+            -- currLabel = currLabel * -1
+
             local origAccuracy = calcAccuracy ()
             local correctPred = false
 
             predTimer = cyclesPerPred
 
-            print ("########## Prediction Made ##########")
+            local totalPreds = confusionMatrix.fn + confusionMatrix.fp + confusionMatrix.tn + confusionMatrix.tp
+
+            print("============= Prediction #" .. totalPreds .. " =============")
 
             -- Positive predition
-            if map.globalVars[1] > 0 then
+            if map.currPred > 0 then
                 if currLabel > 0 then
                     correctPred = true
                     confusionMatrix.tp = confusionMatrix.tp + 1
@@ -262,16 +293,49 @@ function thisScene:update (dt)
 
             map:getCells (treatCell)
 
-            print ("Prediction: " .. map.globalVars[1])
+            for i = 1, shuffles do
+                local partialCellList = {}
+
+                local iters = math.ceil (#cellList / shuffles)
+                for i = 1, iters do
+                    table.insert (partialCellList, table.remove (cellList, math.random (1, #cellList)))
+                end
+                table.sort(partialCellList, function(cellData1, cellData2)
+                    local cellObj1 = cellData1.cellObj
+                    local cellObj2 = cellData2.cellObj
+
+                    local accuracy1 = cellObj1.correct / cellObj1.total
+                    local accuracy2 = cellObj2.correct / cellObj2.total
+
+                    local predRatioDiff1 = math.abs (datasetRatio - (cellObj1.positivePreds / cellObj1.total))
+                    local predRatioDiff2 = math.abs (datasetRatio - (cellObj2.positivePreds / cellObj2.total))
+
+                    local total1 = cellObj1.total
+                    local total2 = cellObj2.total
+
+                    if accuracy2 ~= accuracy1 then
+                        return accuracy2 > accuracy1
+                    elseif predRatioDiff2 ~= predRatioDiff1 then
+                        return predRatioDiff2 < predRatioDiff1
+                    else
+                        return total2 > total1
+                    end
+                end)
+                replaceCells (partialCellList)
+            end
+            cellList = {}
+
+            print("Prediction: " .. map.currPred)
             print ("Accuracy: " .. origAccuracy .. " -> " .. calcAccuracy ())
             print ("Change: " .. calcAccuracy () - origAccuracy)
+            print ("Actual Ratio: " .. datasetRatio)
             print ("-------------------")
             print ("TP: " .. confusionMatrix.tp .. " | FP: " .. confusionMatrix.fp)
             print ("-------------------")
             print ("FN: " .. confusionMatrix.fn .. " | TN: " .. confusionMatrix.tn)
             print ("-------------------")
 
-            map.globalVars[1] = 0
+            map.currPred = 0
 
             -- Reset the shape in the background
             if confusionMatrix.fn + confusionMatrix.fp > 100 or correctPred == true then
@@ -320,9 +384,10 @@ function thisScene:update (dt)
             -- cell:printCellScriptList (newCell)
 
             -- Attempt to spawn the cell
-            if map:spawnCell (math.random (1, map.width), math.random (1, map.height), cell.maxHealth, cell.maxEnergy, newCell) == true then
-                cellsSpawned = cellsSpawned + 1
+            while map:spawnCell (math.random (1, map.width), math.random (1, map.height), cell.maxHealth, cell.maxEnergy, newCell) == true do
+                
             end
+            cellsSpawned = cellsSpawned + 1
         end
 
         failsafeActivations = failsafeActivations + 1
@@ -402,7 +467,7 @@ function thisScene:draw ()
         love.graphics.setColor (0, 0, 0, 0.75)
         love.graphics.rectangle ("fill", 720, 80 + i * 25, 76, 25)
         love.graphics.setColor (1, 1, 1, 1)
-        love.graphics.printf (shortenNumber (map.globalVars[i], 5), 725, 85 + i * 25, 100, "left")
+        love.graphics.printf(shortenNumber(map.globalVars[i], 5), 725, 85 + i * 25, 100, "left")
     end
 
     -- Show map position under cursor
@@ -460,7 +525,7 @@ function thisScene:keypressed (key, scancode, isrepeat)
                 totalContributions = totalContributions + cellObj.contributions
             end)
             print ("Total:", totalContributions)
-            print ("Current:", map.globalVars[1])
+            print("Current:", map.currPred)
         else
             print ("==========Cell Global Variables==========")
             for i = 1, cell.globalVars do

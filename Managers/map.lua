@@ -39,6 +39,7 @@ local map = {
     resets = 0,
     lastLogMsg = "",
     globalVars = {},
+    currPred = 0,
 }
 
 function map:quickSave ()
@@ -146,6 +147,8 @@ function map:reset (width, height, removeCells, mapEnvInputs, mapEnvTypes)
     for i = 1, self.cellManager.globalVars do
         self.globalVars[i] = 0
     end
+
+    self.currPred = 0
 end
 
 --- Updates the cells on the map if enough time has passed since the last tick.
@@ -405,12 +408,14 @@ function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
 
         -- Mutate cell if a parent is given
         if parentCellObj ~= nil then
-            -- TODO: Mutate the child cell multiple times
-            local mutSuccess, mutErr = pcall (self.cellManager.mutate, self.cellManager, newCellObj, parentCellObj)
-            local compSuccess, compErr = pcall (self.cellManager.compileScript, self.cellManager, newCellObj)
+            for i = 1, math.random (self.cellManager.mutsPerChild.min, self.cellManager.mutsPerChild.max) do
+                -- TODO: Mutate the child cell multiple times
+                local mutSuccess, mutErr = pcall (self.cellManager.mutate, self.cellManager, newCellObj, parentCellObj)
+                local compSuccess, compErr = pcall (self.cellManager.compileScript, self.cellManager, newCellObj)
 
-            assert (mutSuccess == true, "ERROR: Problem with mutation:" .. tostring (mutErr))
-            assert (compSuccess == true, "ERROR: Problem with script compilation:" .. tostring (compErr))
+                assert (mutSuccess == true, "ERROR: Problem with mutation:" .. tostring (mutErr))
+                assert (compSuccess == true, "ERROR: Problem with script compilation:" .. tostring (compErr))
+            end
         end
 
         self.cellGrid[tileX][tileY] = newCellObj

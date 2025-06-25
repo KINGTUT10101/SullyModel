@@ -16,7 +16,7 @@ local actionDefs = {
 $assignTo = $copyFrom
 ]]
     },
-    changeGlobal = {
+    changePred = {
         desc = "Increments the selected global variable",
         type = "assign",
         params = {
@@ -29,7 +29,24 @@ $assignTo = $copyFrom
         hyperparams = {},
         funcString = 
 [[
+map.currPred = map.currPred $op 1
 cellObj.contributions = cellObj.contributions $op 1
+]]
+    },
+    changeGlobal = {
+        desc = "Increments the selected global variable",
+        type = "assign",
+        params = {
+            assignTo = "global",
+            op = {
+                "+",
+                "-",
+            }
+        },
+        hyperparams = {},
+        funcString =
+        [[
+$assignTo = $assignTo $op 1
 ]]
     },
     readInput = {

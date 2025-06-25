@@ -201,7 +201,7 @@ function cell:new (health, energy)
         health = clamp (health or self.maxHealth, 0, self.maxHealth),
         energy = clamp (energy or self.maxEnergy, 0, self.maxEnergy),
         totalEnergy = 0,
-        ticksLeft = round (mapToScale (love.math.randomNormal () / 10, -3, 3, 3000, 6500)),
+        ticksLeft = round (mapToScale (love.math.randomNormal () / 10, -3, 3, self.cellAge.min, self.cellAge.max)),
         direction = 1,
         mutationRates = {
             major = self.initialMutRates.major,
