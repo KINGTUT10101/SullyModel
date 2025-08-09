@@ -35,6 +35,11 @@ local predRatio = 0.5
 local shuffles = 4
 local batchSize = 10
 local predsSinceLastReset = 0
+local attemptPreds = {
+    pos = 0,
+    neg = 0,
+    total = 0,
+}
 
 local rewardEnergy = 100
 local punishHealth = 250
@@ -99,6 +104,8 @@ local function punishCell (tileX, tileY, cellObj)
 end
 
 local cellList = {}
+local posCellList = {}
+local negCellList = {}
 local function replaceCells(list)
     local endIndex = math.ceil(#list * (replacementPercent + newPercent))
     local listLength = #list
@@ -132,9 +139,11 @@ local function treatCell (tileX, tileY, cellObj)
         cellObj.contributions = cellObj.contributions * multi
     end
 
+    attemptPreds.total = attemptPreds.total + 1
 
     if cellObj.contributions > 0 then
         cellObj.positivePreds = cellObj.positivePreds + 1
+        attemptPreds.pos = attemptPreds.pos + 1
 
         if currLabel > 0 then
             rewardCell (tileX, tileY, cellObj) -- True positive
@@ -142,6 +151,8 @@ local function treatCell (tileX, tileY, cellObj)
             punishCell (tileX, tileY, cellObj) -- False positive
         end
     else
+        attemptPreds.neg = attemptPreds.neg + 1
+
         if currLabel < 0 then
             rewardCell (tileX, tileY, cellObj) -- True negative
         else
@@ -298,6 +309,9 @@ function thisScene:update (dt)
 
             local origAccuracy = calcAccuracy ()
             local correctPred = false
+            attemptPreds.pos = 0
+            attemptPreds.neg = 0
+            attemptPreds.total = 0
 
             predTimer = cyclesPerPred
 
@@ -375,6 +389,7 @@ function thisScene:update (dt)
             print ("Change: " .. calcAccuracy () - origAccuracy)
             print ("Dataset Ratio: " .. datasetRatio)
             print("Prediction Ratio: " .. predRatio)
+            print("Cell Prediction Ratio: " .. (attemptPreds.pos / attemptPreds.total))
             print ("-------------------")
             print ("TP: " .. confusionMatrix.tp .. " | FP: " .. confusionMatrix.fp)
             print ("-------------------")
