@@ -57,13 +57,28 @@ local currLabel = 1 -- 1 = wide, -1 = tall
 local function createInputMapper ()
     local rectX1, rectY1 = math.random (1, math.floor (mapSize / 2)), math.random (1, math.floor (mapSize / 2))
     local rectX2, rectY2 = mapSize - math.random (0, math.floor (mapSize / 2)), mapSize - math.random (0, math.floor (mapSize / 2))
-    
-    if rectX2 - rectX1 > rectY2 - rectY1 then
-        currLabel = 1
-    else
+
+    -- Adjust tall/wide chance based on predRatio
+    -- predRatio is the fraction of positive predictions
+    -- So, chance of negative label = predRatio, chance of positive label = 1 - predRatio
+    if math.random() < predRatio then
+        -- Make tall rectangle (negative label)
+        if rectX2 - rectX1 > rectY2 - rectY1 then
+            -- Swap to make tall
+            local mid = math.floor((rectX1 + rectX2) / 2)
+            rectX2 = mid
+        end
         currLabel = -1
+    else
+        -- Make wide rectangle (positive label)
+        if rectY2 - rectY1 > rectX2 - rectX1 then
+            -- Swap to make wide
+            local mid = math.floor((rectY1 + rectY2) / 2)
+            rectY2 = mid
+        end
+        currLabel = 1
     end
-    
+
     local function mapInputRect (tileX, tileY)
         if tileX >= rectX1 and tileX <= rectX2 and tileY >= rectY1 and tileY <= rectY2 then
             return 100
@@ -132,6 +147,41 @@ local function replaceCells(list)
     end
 end
 
+local function replaceCellInList (list)
+    for i = 1, shuffles do
+        local partialCellList = {}
+
+        local iters = math.ceil (#list / shuffles)
+        for i = 1, iters do
+            table.insert (partialCellList, table.remove (list, math.random (1, #list)))
+        end
+        table.sort(partialCellList, function(cellData1, cellData2)
+            local cellObj1 = cellData1.cellObj
+            local cellObj2 = cellData2.cellObj
+
+            local accuracy1 = cellObj1.correct / cellObj1.total
+            local accuracy2 = cellObj2.correct / cellObj2.total
+
+            local predRatioDiff1 = math.abs (datasetRatio - (cellObj1.positivePreds / cellObj1.total))
+            local predRatioDiff2 = math.abs (datasetRatio - (cellObj2.positivePreds / cellObj2.total))
+
+            local total1 = cellObj1.total
+            local total2 = cellObj2.total
+
+            if cellObj2.lastCorrect ~= cellObj1.lastCorrect then
+                return cellObj2 == true
+            elseif accuracy2 ~= accuracy1 then
+                return accuracy2 > accuracy1
+            elseif predRatioDiff2 ~= predRatioDiff1 then
+                return predRatioDiff2 < predRatioDiff1
+            else
+                return total2 > total1
+            end
+        end)
+        replaceCells (partialCellList)
+    end
+end
+
 local function treatCell (tileX, tileY, cellObj)
     if math.random () >= 0.20 then
         local multi = math.random (0, 5)
@@ -150,6 +200,12 @@ local function treatCell (tileX, tileY, cellObj)
         else
             punishCell (tileX, tileY, cellObj) -- False positive
         end
+
+        table.insert (posCellList, {
+            cellObj = cellObj,
+            tileX = tileX,
+            tileY = tileY,
+        })
     else
         attemptPreds.neg = attemptPreds.neg + 1
 
@@ -158,6 +214,12 @@ local function treatCell (tileX, tileY, cellObj)
         else
             punishCell (tileX, tileY, cellObj) -- False negative
         end
+
+        table.insert (negCellList, {
+            cellObj = cellObj,
+            tileX = tileX,
+            tileY = tileY,
+        })
     end
 
     cellObj.lastContribution = cellObj.contributions
@@ -349,38 +411,8 @@ function thisScene:update (dt)
 
             if predsSinceLastReset >= batchSize then
                 predsSinceLastReset = 0
-                for i = 1, shuffles do
-                    local partialCellList = {}
-
-                    local iters = math.ceil (#cellList / shuffles)
-                    for i = 1, iters do
-                        table.insert (partialCellList, table.remove (cellList, math.random (1, #cellList)))
-                    end
-                    table.sort(partialCellList, function(cellData1, cellData2)
-                        local cellObj1 = cellData1.cellObj
-                        local cellObj2 = cellData2.cellObj
-
-                        local accuracy1 = cellObj1.correct / cellObj1.total
-                        local accuracy2 = cellObj2.correct / cellObj2.total
-
-                        local predRatioDiff1 = math.abs (datasetRatio - (cellObj1.positivePreds / cellObj1.total))
-                        local predRatioDiff2 = math.abs (datasetRatio - (cellObj2.positivePreds / cellObj2.total))
-
-                        local total1 = cellObj1.total
-                        local total2 = cellObj2.total
-
-                        if cellObj2.lastCorrect ~= cellObj1.lastCorrect then
-                            return cellObj2 == true
-                        elseif accuracy2 ~= accuracy1 then
-                            return accuracy2 > accuracy1
-                        elseif predRatioDiff2 ~= predRatioDiff1 then
-                            return predRatioDiff2 < predRatioDiff1
-                        else
-                            return total2 > total1
-                        end
-                    end)
-                    replaceCells (partialCellList)
-                end
+                replaceCellInList (posCellList)
+                replaceCellInList (negCellList)
             end
             cellList = {}
 
