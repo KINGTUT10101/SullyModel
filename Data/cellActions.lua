@@ -20,17 +20,17 @@ $assignTo = $copyFrom
         desc = "Increments the selected global variable",
         type = "assign",
         params = {
-            assignTo = "global",
-            op = {
-                "+",
-                "-",
+            vote = {
+                "1",
+                -- "0",
+                "-1",
             }
         },
         hyperparams = {},
         funcString = 
 [[
-map.currPred = map.currPred $op 1
-cellObj.contributions = cellObj.contributions $op 1
+map.currPred = map.currPred + $vote - cellObj.contributions
+cellObj.contributions = $vote
 ]]
     },
     changeGlobal = {

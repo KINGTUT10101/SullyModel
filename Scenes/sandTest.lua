@@ -28,13 +28,17 @@ local lastCell = nil
 
 local renderMap = true
 
+local newPercent = 0.00
 local replacementPercent = 0.15
-local datasetRatio = 0.5 -- TODO: Make this automatic later
+local datasetRatio = 0.5
+local predRatio = 0.5
 local shuffles = 4
+local batchSize = 10
+local predsSinceLastReset = 0
 
 local rewardEnergy = 100
 local punishHealth = 250
-local predRetries = 500
+local predRetries = 0
 local cyclesPerPred = 750
 local predTimer = cyclesPerPred
 local confusionMatrix = {
@@ -66,11 +70,16 @@ local function createInputMapper ()
     return mapInputRect
 end
 
+local function calcTotalPreds ()
+    return confusionMatrix.tp + confusionMatrix.fp + confusionMatrix.fn + confusionMatrix.tn
+end
+
 local function calcAccuracy ()
-    local total = confusionMatrix.tp + confusionMatrix.fp + confusionMatrix.fn + confusionMatrix.tn
+    local total = calcTotalPreds ()
     local accuracy = (confusionMatrix.tp + confusionMatrix.tn) / total
 
     datasetRatio = (confusionMatrix.tp + confusionMatrix.fn) / total
+    predRatio = (confusionMatrix.tp + confusionMatrix.fp) / total
 
     return (accuracy ~= accuracy) and 0 or accuracy
 end
@@ -79,28 +88,51 @@ end
 local function rewardCell (tileX, tileY, cellObj)
     -- map:adjustCellEnergy (tileX, tileY, rewardEnergy * mapToScale (calcAccuracy (), 0, 1, 0, 2))
     cellObj.correct = cellObj.correct + 1
+    cellObj.lastCorrect = true
 end
 local function punishCell (tileX, tileY, cellObj)
     if confusionMatrix.fn + confusionMatrix.fp > predRetries then
         -- map:adjustCellEnergy (tileX, tileY, -punishHealth * -mapToScale (1 - calcAccuracy (), 0, 1, 0, 2))
     end
+
+    cellObj.lastCorrect = false
 end
 
 local cellList = {}
 local function replaceCells(list)
-    local endIndex = math.ceil(#list * replacementPercent)
+    local endIndex = math.ceil(#list * (replacementPercent + newPercent))
     local listLength = #list
 
     for i = 1, endIndex do
-        local cellDataGood = list[listLength - (i - 1)]
-        local cellDataBad = list[i]
+        if i < math.ceil (#list * newPercent) then
+            local newCellObj = cell:new(cell.maxEnergy, cell.maxHealth)
 
-        map:deleteCell(cellDataBad.tileX, cellDataBad.tileY)
-        while map:spawnCell(math.random(1, map.width), math.random(1, map.height), cell.maxHealth, cell.maxEnergy, cellDataGood.cellObj) do end
+            -- Heavily mutate cell
+            for i = 1, round(mapToScale(love.math.randomNormal(), -0.5, 3, 0, 500)) do
+                local mutCell = cell:new(cell.maxEnergy, cell.maxHealth)
+                cell:mutate(mutCell, newCellObj)
+                newCellObj = mutCell
+            end
+
+            while map:spawnCell(math.random(1, map.width), math.random(1, map.height), cell.maxHealth, cell.maxEnergy, newCellObj) do end
+        else
+            local cellDataGood = list[listLength - (i - 1)]
+            local cellDataBad = list[i]
+
+            map:deleteCell(cellDataBad.tileX, cellDataBad.tileY)
+            while map:spawnCell(math.random(1, map.width), math.random(1, map.height), cell.maxHealth, cell.maxEnergy, cellDataGood.cellObj) do end
+        end
     end
 end
 
 local function treatCell (tileX, tileY, cellObj)
+    if math.random () >= 0.20 then
+        local multi = math.random (0, 5)
+        map.currPred = map.currPred - cellObj.contributions + cellObj.contributions * multi
+        cellObj.contributions = cellObj.contributions * multi
+    end
+
+
     if cellObj.contributions > 0 then
         cellObj.positivePreds = cellObj.positivePreds + 1
 
@@ -120,6 +152,10 @@ local function treatCell (tileX, tileY, cellObj)
     cellObj.lastContribution = cellObj.contributions
     cellObj.contributions = 0
     cellObj.total = cellObj.total + 1
+
+    for i = cell.scriptVars + 1, cell.scriptVars + cell.memVars do
+        cellObj.vars[i] = 0
+    end
 
     table.insert (cellList, {
         cellObj = cellObj,
@@ -256,6 +292,7 @@ function thisScene:update (dt)
         cyclesSinceLastFail = cyclesSinceLastFail + 1
         predTimer = predTimer - 1
 
+        -- End the current prediction
         if predTimer <= 0 then
             -- currLabel = currLabel * -1
 
@@ -291,44 +328,53 @@ function thisScene:update (dt)
                 end
             end
 
+            local origPred = map.currPred
             map:getCells (treatCell)
 
-            for i = 1, shuffles do
-                local partialCellList = {}
+            predsSinceLastReset = predsSinceLastReset + 1
 
-                local iters = math.ceil (#cellList / shuffles)
-                for i = 1, iters do
-                    table.insert (partialCellList, table.remove (cellList, math.random (1, #cellList)))
-                end
-                table.sort(partialCellList, function(cellData1, cellData2)
-                    local cellObj1 = cellData1.cellObj
-                    local cellObj2 = cellData2.cellObj
+            if predsSinceLastReset >= batchSize then
+                predsSinceLastReset = 0
+                for i = 1, shuffles do
+                    local partialCellList = {}
 
-                    local accuracy1 = cellObj1.correct / cellObj1.total
-                    local accuracy2 = cellObj2.correct / cellObj2.total
-
-                    local predRatioDiff1 = math.abs (datasetRatio - (cellObj1.positivePreds / cellObj1.total))
-                    local predRatioDiff2 = math.abs (datasetRatio - (cellObj2.positivePreds / cellObj2.total))
-
-                    local total1 = cellObj1.total
-                    local total2 = cellObj2.total
-
-                    if accuracy2 ~= accuracy1 then
-                        return accuracy2 > accuracy1
-                    elseif predRatioDiff2 ~= predRatioDiff1 then
-                        return predRatioDiff2 < predRatioDiff1
-                    else
-                        return total2 > total1
+                    local iters = math.ceil (#cellList / shuffles)
+                    for i = 1, iters do
+                        table.insert (partialCellList, table.remove (cellList, math.random (1, #cellList)))
                     end
-                end)
-                replaceCells (partialCellList)
+                    table.sort(partialCellList, function(cellData1, cellData2)
+                        local cellObj1 = cellData1.cellObj
+                        local cellObj2 = cellData2.cellObj
+
+                        local accuracy1 = cellObj1.correct / cellObj1.total
+                        local accuracy2 = cellObj2.correct / cellObj2.total
+
+                        local predRatioDiff1 = math.abs (datasetRatio - (cellObj1.positivePreds / cellObj1.total))
+                        local predRatioDiff2 = math.abs (datasetRatio - (cellObj2.positivePreds / cellObj2.total))
+
+                        local total1 = cellObj1.total
+                        local total2 = cellObj2.total
+
+                        if cellObj2.lastCorrect ~= cellObj1.lastCorrect then
+                            return cellObj2 == true
+                        elseif accuracy2 ~= accuracy1 then
+                            return accuracy2 > accuracy1
+                        elseif predRatioDiff2 ~= predRatioDiff1 then
+                            return predRatioDiff2 < predRatioDiff1
+                        else
+                            return total2 > total1
+                        end
+                    end)
+                    replaceCells (partialCellList)
+                end
             end
             cellList = {}
 
-            print("Prediction: " .. map.currPred)
+            print("Prediction: " .. map.currPred .. "(" .. origPred .. ")")
             print ("Accuracy: " .. origAccuracy .. " -> " .. calcAccuracy ())
             print ("Change: " .. calcAccuracy () - origAccuracy)
-            print ("Actual Ratio: " .. datasetRatio)
+            print ("Dataset Ratio: " .. datasetRatio)
+            print("Prediction Ratio: " .. predRatio)
             print ("-------------------")
             print ("TP: " .. confusionMatrix.tp .. " | FP: " .. confusionMatrix.fp)
             print ("-------------------")
@@ -338,7 +384,7 @@ function thisScene:update (dt)
             map.currPred = 0
 
             -- Reset the shape in the background
-            if confusionMatrix.fn + confusionMatrix.fp > 100 or correctPred == true then
+            if confusionMatrix.fn + confusionMatrix.fp > predRetries or correctPred == true then
                 map:reset (mapSize, mapSize, false, createInputMapper ())
             end
         end
@@ -442,7 +488,17 @@ function thisScene:draw ()
     love.graphics.setColor (1, 1, 1, 1)
     love.graphics.printf ("Acc: " .. round (calcAccuracy () * 100) / 100, 15, 120, 85, "left")
 
-    -- Show the current confusion matrix
+    -- Show the number of predictions made
+    love.graphics.setColor(0, 0, 0, 0.75)
+    love.graphics.rectangle("fill", 10, 150, 95, 25)
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.printf("Pred #" .. calcTotalPreds () + 1, 15, 155, 85, "left")
+
+    -- Show the current prediction
+    love.graphics.setColor(0, 0, 0, 0.75)
+    love.graphics.rectangle("fill", 10, 185, 95, 25)
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.printf("C. Pred: " .. map.currPred, 15, 190, 85, "left")
 
     -- Show number of cells
     love.graphics.setColor (0, 0, 0, 0.75)
@@ -526,6 +582,15 @@ function thisScene:keypressed (key, scancode, isrepeat)
             end)
             print ("Total:", totalContributions)
             print("Current:", map.currPred)
+        elseif love.keypressed.isDown ("rshift") then
+            local cellObj = map:getCell(map:screenToMap(love.mouse.getPosition()))
+
+            print("==========Cell Stats==========")
+            print("Vote: " .. cellObj.contributions)
+            print("Total votes: " .. cellObj.total)
+            print("Accuracy: " .. cellObj.correct / cellObj.total)
+            print("Pred. ratio: " .. cellObj.positivePreds / cellObj.total)
+            print("Last pred correct: " .. cellObj.lastCorrect)
         else
             print ("==========Cell Global Variables==========")
             for i = 1, cell.globalVars do
