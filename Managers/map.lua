@@ -414,6 +414,24 @@ function map:getCell (tileX, tileY)
     end
 end
 
+-- Runs a function for all cells in the map
+function map:getCells (cellFunc)
+    if self.stats.cells > 0 then
+        local cellGrid = self.cellGrid
+        for i = 1, self.width do
+            local cellRow = cellGrid[i]
+
+            for j = 1, self.height do
+                local cellObj = cellRow[j]
+
+                if cellObj ~= nil then
+                    cellFunc (i, j, cellObj)
+                end
+            end
+        end
+    end
+end
+
 --- Spawns a new cell object into the map.
 --- The new cell object will have n rounds of mutations applied to it if a parent is provided, depending on the value of map.cellManager.meanMut.
 --- @param tileX integer The horizontal map position.
