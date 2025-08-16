@@ -461,6 +461,10 @@ function map:adjustPaintTile (tileX, tileY, value)
     end
 end
 
+function map:cellPaintMatchesTile (tileX, tileY, cellObj)
+    return (cellObj.paint == "red" and map:getPaintTile (tileX, tileY) > 0) or (cellObj.paint == "blue" and map:getPaintTile (tileX, tileY) < 0)
+end
+
 --- Checks if the provided position is clear of any cells or barriers.
 --- It also implicitly checks if the provided position is within bounds.
 --- @param tileX integer The horizontal map position.
