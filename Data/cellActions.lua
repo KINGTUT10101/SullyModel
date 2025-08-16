@@ -25,6 +25,24 @@ $assignTo = map:getPaintTile (tileX, tileY)
 if map:cellPaintMatchesTile (tileX, tileY, cellObj) == true then
 ]]
     },
+    paintTile = {
+        desc = "Paints the tile below the cell",
+        type = "action",
+        params = {},
+        hyperparams = {
+            amount = 1,
+        },
+        funcString = 
+[[
+if cellObj.paint == "red" then
+    map:adjustPaintTile (tileX, tileY, $amount)
+elseif cellObj.paint == "blue" then
+    map:adjustPaintTile (tileX, tileY, -$amount)
+else
+    error ("Invalid cell paint color: " .. tostring (cellObj.paint))
+end
+]]
+    },
     readInput = {
         desc = "Reads the value from the input tile below the cell",
         type = "assign",
