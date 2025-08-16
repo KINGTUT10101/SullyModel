@@ -207,6 +207,7 @@ function cell:new (health, energy, type)
             meta = self.initialMutRates.meta,
         },
         count = 1,
+        paintColor = (math.random () > 0.50) and "red" or "blue",
     }
 
     for i = 1, self.scriptVars + self.memVars do
@@ -437,6 +438,7 @@ function cell:mutate (childCellObj, parentCellObj)
     childCellObj.scriptList = childScriptList
     childCellObj.vars = childVars
     childCellObj.mutationRates = childMutRates
+    childCellObj.paint = parentCellObj.paint
 end
 
 function cell:compileScript (cellObj, stringOnly)
