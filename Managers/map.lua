@@ -225,6 +225,7 @@ local validModes = {
 local validSubmodes = {
     energy = true,
     paint = true,
+    combined = true,
 }
 local multicellColors = {}
 local multicellColorCount = 0
@@ -295,7 +296,7 @@ function map:draw (mode, subMode)
 
             elseif envTile.type ~= "blank" then
                 -- Render barrier (assume this is the only other tile type right now)
-                love.graphics.setColor ({1, 0, 0, 1})
+                love.graphics.setColor ({1, 1, 0, 1})
                 love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
 
             else
@@ -307,10 +308,21 @@ function map:draw (mode, subMode)
                     local b = clamp(1 - scaledColor, 0, 1)
                     love.graphics.setColor(r, 0, b, 1)
                     love.graphics.rectangle("fill", i - 1, j - 1, 1, 1)
-                else
+
+                elseif subMode == "energy" then
                     -- Render input value
                     local scaledColor = mapToScale (envTile.input, self.drawBounds.min, self.drawBounds.max, 0, 1)
                     love.graphics.setColor (scaledColor, scaledColor, scaledColor, 1)
+                    love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
+
+                elseif subMode == "combined" then
+                    if envTile.paint < 0 then
+                        local scaledColor = mapToScale (envTile.input, self.drawBounds.min, self.drawBounds.max, 0, 1)
+                        love.graphics.setColor (scaledColor, 0, 0, 1)
+                    else
+                        local scaledColor = mapToScale (envTile.input, self.drawBounds.min, self.drawBounds.max, 0, 1)
+                        love.graphics.setColor (0, 0, scaledColor, 1)
+                    end
                     love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
                 end
             end
@@ -540,6 +552,8 @@ function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
 
         self.cellGrid[tileX][tileY] = newCellObj
         self.stats.cells = self.stats.cells + 1
+
+        assert (newCellObj.paint ~= nil, "Cell spawned without a paint value")
         
         return true
     else
