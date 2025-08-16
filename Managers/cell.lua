@@ -439,6 +439,11 @@ function cell:mutate (childCellObj, parentCellObj)
     childCellObj.vars = childVars
     childCellObj.mutationRates = childMutRates
     childCellObj.paint = parentCellObj.paint
+
+    -- Small chance to use a new paint value
+    if math.random () < 0.01 then
+        childCellObj.paint = (childCellObj.paint == "red") and "blue" or "red"
+    end
 end
 
 function cell:compileScript (cellObj, stringOnly)
