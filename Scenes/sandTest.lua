@@ -8,7 +8,7 @@ local copyTable = require ("Helpers.copyTable")
 local cellActions = require ("Data.cellActions")
 local cycleValue = require ("Helpers.cycleValue")
 
-local mapSize = 100
+local mapSize = 50
 
 local camVelocity = 15
 local zoomVelocity = 25
@@ -30,11 +30,18 @@ local renderMap = true
 local renderModeIndex = 1
 local validModes = {
     "normal",
+    "paint",
     "energy",
     "health",
     "total",
     "multicell",
     "none"
+}
+local subRenderModeIndex = 1
+local validSubmodes = {
+    "energy",
+    "paint",
+    "combined",
 }
 
 local baseXInput = 1000000 * love.math.random()
@@ -51,23 +58,34 @@ end
 
 function thisScene:load (...)
     cell:init (map, cellActions.actionDefs, cellActions.scriptPrefixes, {
-        maxCells = math.huge,
-        maxActions = 65,
-        eggTimer = 2500,
+        maxCells = 200,
+        maxActions = 80,
+        scriptVars = 3,
+        memVars = 2,
+        displayVars = 1,
+        globalVars = 2,
+        cellAge = {
+            min = math.huge,
+            max = math.huge,
+        },
+        tickCost = 0,
+        maxEnergy = 10000,
         hyperargs = {
-            shareEnergy = {
+            moveForward = {
                 energyCost = 0,
             },
-            reproduce = {
-                energyCost = 350,
-            },
-            layEgg = {
-                energyCost = 1000,
-            },
-            createWall = {
-                energyCost = 250,
-            },
-        }
+            -- createWall = {
+            --     energyCost = 0,
+            -- },
+            -- reproduce = {
+            --     energyCost = 1000,
+            --     babyEnergy = 500,
+            --     babyHealth = 500,
+            -- },
+            -- applyDamage = {
+            --     energyCost = 0,
+            -- },
+        },
     })
     map:init (cell, {
         inputBounds = {
@@ -77,6 +95,10 @@ function thisScene:load (...)
         drawBounds = {
             min = 0,
             max = 2500,
+        },
+        paintBounds = {
+            min = -1,
+            max = 1,
         }
     })
     map:reset (mapSize, mapSize, mapInput, mapBarriers)
@@ -205,10 +227,10 @@ function thisScene:update (dt)
 end
 
 function thisScene:draw ()
-    love.graphics.setBackgroundColor (0, 0, 1, 1)
+    love.graphics.setBackgroundColor (0.15, 0.15, 0.15, 1)
 
     if renderMap == true then
-        map:draw (validModes[renderModeIndex])
+        map:draw (validModes[renderModeIndex], validSubmodes[subRenderModeIndex])
     end
 
     -- Super speed border
@@ -251,15 +273,21 @@ function thisScene:draw ()
     love.graphics.setColor (1, 1, 1, 1)
     love.graphics.printf ("FSs: " .. failsafeActivations, 725, 50, 100, "left")
 
+    -- Shows the subrendering mode
+    love.graphics.setColor (0, 0, 0, 0.75)
+    love.graphics.rectangle ("fill", 10, 530, 125, 25)
+    love.graphics.setColor (1, 1, 1, 1)
+    love.graphics.printf (validSubmodes[subRenderModeIndex] .. " submode", 15, 535, 125, "left")
+
     -- Shows the rendering mode
     love.graphics.setColor (0, 0, 0, 0.75)
-    love.graphics.rectangle ("fill", 10, 565, 100, 25)
+    love.graphics.rectangle ("fill", 10, 565, 125, 25)
     love.graphics.setColor (1, 1, 1, 1)
-    love.graphics.printf (validModes[renderModeIndex] .. " mode", 15, 570, 100, "left")
+    love.graphics.printf (validModes[renderModeIndex] .. " mode", 15, 570, 125, "left")
 end
 
 function thisScene:keypressed (key, scancode, isrepeat)
-    -- Kills  a cell in the map
+    -- Kills a cell in the map
     if key == "k" then
         local tileX, tileY = map:screenToMap (love.mouse.getPosition ())
         map:deleteCell (tileX, tileY)
@@ -303,6 +331,16 @@ function thisScene:keypressed (key, scancode, isrepeat)
     -- Toggle rendering
     elseif key == "z" then
         renderMap = not renderMap
+
+    -- Kill all cells
+    elseif key == "r" then
+        if love.keyboard.isDown ("lshift") and love.keyboard.isDown ("lctrl") then
+            map:getCells (function (tileX, tileY)
+                map:deleteCell (tileX, tileY)
+            end)
+
+            print ("All cells deleted")
+        end
     
     -- Toggles superspeed
     elseif key == "tab" then
@@ -322,7 +360,11 @@ function thisScene:keypressed (key, scancode, isrepeat)
 
     -- Changes the rendering mode
     elseif key == "m" then
-        renderModeIndex = cycleValue (renderModeIndex, 1, #validModes)
+        if love.keyboard.isDown ("lshift") then
+            subRenderModeIndex = cycleValue (subRenderModeIndex, 1, #validSubmodes)
+        else
+            renderModeIndex = cycleValue (renderModeIndex, 1, #validModes)
+        end
     end
 end
 
