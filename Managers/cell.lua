@@ -207,7 +207,7 @@ function cell:new (health, energy, type)
             meta = self.initialMutRates.meta,
         },
         count = 1,
-        paintColor = (math.random () > 0.50) and "red" or "blue",
+        paint = (math.random () > 0.50) and "red" or "blue",
     }
 
     for i = 1, self.scriptVars + self.memVars do
