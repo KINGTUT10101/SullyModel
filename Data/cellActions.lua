@@ -3,6 +3,28 @@ local scriptPrefixes = {
 }
 
 local actionDefs = {
+    readPaint = {
+        desc = "Reads the paint value from the input tile below the cell",
+        type = "assign",
+        params = {
+            assignTo = "variable",
+        },
+        hyperparams = {},
+        funcString = 
+[[
+$assignTo = map:getPaintTile (tileX, tileY)
+]]
+    },
+    paintMatches = {
+        desc = "Determines if the color below the cell matches the cell's color",
+        type = "control",
+        params = {},
+        hyperparams = {},
+        funcString = 
+[[
+if map:cellPaintMatchesTile (tileX, tileY, cellObj) == true then
+]]
+    },
     readInput = {
         desc = "Reads the value from the input tile below the cell",
         type = "assign",
@@ -16,7 +38,7 @@ $assignTo = map:getInputTile (tileX, tileY)
 ]]
     },
     consumeInput = {
-        desc = "Takes some of the input value to increase the energy level of the cell",
+        desc = "Takes some of the input value to increase the energy level of the cell. Cells can only consume input from tiles of the same color.",
         type = "action",
         params = {},
         hyperparams = {
@@ -25,10 +47,12 @@ $assignTo = map:getInputTile (tileX, tileY)
         },
         funcString = 
 [[
-map:transferInputToCell (tileX, tileY, $energyFromTile, $energyCost)
-if map:isTaken(tileX, tileY) == false then
-    -- print ("Cell death: Consume input", tileX, tileY)
-    return
+if map:cellPaintMatchesTile (tileX, tileY, cellObj) == true then
+    map:transferInputToCell (tileX, tileY, $energyFromTile, $energyCost)
+    if map:isTaken(tileX, tileY) == false then
+        -- print ("Cell death: Consume input", tileX, tileY)
+        return
+    end
 end
 ]]
     },
@@ -61,38 +85,38 @@ end
 cellObj.displayVars[$displayIndex] = $copyFrom
 ]]
     },
---     moveForward = {
---         desc = "Moves the cell in the direction it's facing",
---         type = "action",
---         params = {},
---         hyperparams = {
---             energyCost = 3,
---         },
---         funcString = 
--- [[
--- tileX, tileY = map:moveForward (tileX, tileY)
--- map:adjustCellEnergy (tileX, tileY, -$energyCost)
--- if map:isTaken(tileX, tileY) == false then
---     -- print ("Cell death: Move forward", tileX, tileY)
---     return
--- end
--- ]]
---     },
-    turn = {
-        desc = "Turns the cell either left or right",
+    moveForward = {
+        desc = "Moves the cell in the direction it's facing",
         type = "action",
-        params = {
-            turnMethod = {
-                "turnLeft",
-                "turnRight"
-            }
+        params = {},
+        hyperparams = {
+            energyCost = 3,
         },
-        hyperparams = {},
         funcString = 
 [[
-map:$turnMethod (tileX, tileY)
+tileX, tileY = map:moveForward (tileX, tileY)
+map:adjustCellEnergy (tileX, tileY, -$energyCost)
+if map:isTaken(tileX, tileY) == false then
+    -- print ("Cell death: Move forward", tileX, tileY)
+    return
+end
 ]]
     },
+--     turn = {
+--         desc = "Turns the cell either left or right",
+--         type = "action",
+--         params = {
+--             turnMethod = {
+--                 "turnLeft",
+--                 "turnRight"
+--             }
+--         },
+--         hyperparams = {},
+--         funcString = 
+-- [[
+-- map:$turnMethod (tileX, tileY)
+-- ]]
+--     },
         turnLeft = {
         desc = "Turns the cell left",
         type = "action",
@@ -246,25 +270,25 @@ if map.stats.cells < map.cellManager.maxCells and map:isClear (babyTileX, babyTi
 end
 ]]
     },
---     createWall = {
---         desc = "Uses the cell's energy to create a wall cell",
---         type = "action",
---         params = {},
---         hyperparams = {
---             energyCost = 500,
---         },
---         funcString =
--- [[
--- babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
--- if map.stats.cells < map.cellManager.maxCells and map:isClear (babyTileX, babyTileY) == true then
---     if cellObj.energy + cellObj.health > $energyCost then
---         map:adjustCellEnergy (tileX, tileY, -$energyCost)
---         map:spawnWall (babyTileX, babyTileY, $energyCost / 2)
---         -- print ("Wall spawned")
---     end
--- end
--- ]]
---     },
+    createWall = {
+        desc = "Uses the cell's energy to create a wall cell",
+        type = "action",
+        params = {},
+        hyperparams = {
+            energyCost = 500,
+        },
+        funcString =
+[[
+babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
+if map.stats.cells < map.cellManager.maxCells and map:isClear (babyTileX, babyTileY) == true then
+    if cellObj.energy + cellObj.health > $energyCost then
+        map:adjustCellEnergy (tileX, tileY, -$energyCost)
+        map:spawnWall (babyTileX, babyTileY, $energyCost / 2)
+        -- print ("Wall spawned")
+    end
+end
+]]
+    },
     shareEnergy = {
         desc = "Shares some energy with the cell in front of the current cell",
         type = "action",
