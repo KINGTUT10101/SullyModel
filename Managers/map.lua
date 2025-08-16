@@ -215,6 +215,7 @@ end
 
 local validModes = {
     normal = true,
+    paint = true,
     energy = true,
     health = true,
     total = true,
@@ -262,6 +263,13 @@ function map:draw (mode, subMode)
                 -- Render cell
                 if mode == "normal" then
                     love.graphics.setColor (cellObj.color)
+                    love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
+                elseif mode == "paint" then
+                    if cellObj.paint == "red" then
+                        love.graphics.setColor (1, 0, 0, 1)
+                    else
+                        love.graphics.setColor (0, 0, 1, 1)
+                    end
                     love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
                 elseif mode == "energy" then
                     local cellEnergyPercent = cellObj.energy / maxEnergy
