@@ -25,6 +25,10 @@ local map = {
         min = 0,
         max = 0,
     },
+    paintBounds = {
+        min = 0,
+        max = 0,
+    },
     drawBounds = {
         min = 0,
         max = 0,
@@ -85,6 +89,10 @@ function map:init (cellManager, options)
     self.inputBounds.min = options.inputBounds.min or 0
     self.inputBounds.max = options.inputBounds.max or 500
 
+    options.paintBounds = options.paintBounds or {}
+    self.paintBounds.min = options.paintBounds.min or -100
+    self.paintBounds.max = options.paintBounds.max or 100
+
     options.drawBounds = options.drawBounds or {}
     self.drawBounds.min = options.drawBounds.min or self.inputBounds.min
     self.drawBounds.max = options.drawBounds.max or self.inputBounds.max
@@ -97,7 +105,8 @@ end
 --- @param height integer The height of the input data.
 --- @param mapEnvInputs? fun(param:integer, param:integer):number Used to map the value of each input tile
 --- @param mapEnvTypes? fun(param:integer, param:integer):boolean Used to map the impassible barrier tiles
-function map:reset (width, height, mapEnvInputs, mapEnvTypes)
+--- @param mapPaint? fun(param:integer, param:integer):number Used to map the paint value of each tile
+function map:reset (width, height, mapEnvInputs, mapEnvTypes, mapPaint)
     self.width, self.height = width, height
 
     -- Generates the input grid and input render
@@ -113,6 +122,7 @@ function map:reset (width, height, mapEnvInputs, mapEnvTypes)
         for j = 1, self.height do
             local envTile = {
                 input = 0,
+                paint = 0,
                 type = "blank",
             }
 
@@ -122,6 +132,10 @@ function map:reset (width, height, mapEnvInputs, mapEnvTypes)
 
             if mapEnvTypes ~= nil then
                 envTile.type = mapEnvTypes (i, j)
+            end
+
+            if mapPaint ~= nil then
+                envTile.paint = mapPaint (i, j)
             end
 
             envRow[j] = envTile
@@ -207,13 +221,19 @@ local validModes = {
     multicell = true,
     none = true,
 }
+local validSubmodes = {
+    energy = true,
+    paint = true,
+}
 local multicellColors = {}
 local multicellColorCount = 0
 
-function map:draw (mode)
+function map:draw (mode, subMode)
     mode = mode or "normal"
+    subMode = subMode or "energy"
 
     assert (validModes[mode] == true, "Invalid rendering mode provided")
+    assert (validSubmodes[subMode] == true, "Invalid subrendering mode provided")
 
     if multicellColorCount > 100000 then
         multicellColors = {}
@@ -271,10 +291,20 @@ function map:draw (mode)
                 love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
 
             else
-                -- Render input tile
-                local scaledColor = mapToScale (envTile.input, self.drawBounds.min, self.drawBounds.max, 0, 1)
-                love.graphics.setColor (scaledColor, scaledColor, scaledColor, 1)
-                love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
+                if subMode == "paint" then
+                    -- Render paint tile
+                    local scaledColor = mapToScale(envTile.paint, self.paintBounds.min, self.paintBounds.max, -1, 1)
+                    -- scaledColor: -1 (min) = blue, 0 = white, 1 (max) = red
+                    local r = clamp(1 + scaledColor, 0, 1)
+                    local b = clamp(1 - scaledColor, 0, 1)
+                    love.graphics.setColor(r, 0, b, 1)
+                    love.graphics.rectangle("fill", i - 1, j - 1, 1, 1)
+                else
+                    -- Render input value
+                    local scaledColor = mapToScale (envTile.input, self.drawBounds.min, self.drawBounds.max, 0, 1)
+                    love.graphics.setColor (scaledColor, scaledColor, scaledColor, 1)
+                    love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
+                end
             end
         end
     end
@@ -382,6 +412,44 @@ function map:adjustInputTile (tileX, tileY, value)
 
     if self:inBounds (tileX, tileY) == true then
         self.envGrid[tileX][tileY].input = clamp (self.envGrid[tileX][tileY].input + value, self.inputBounds.min, self.inputBounds.max)
+    end
+end
+
+--- Gets the value of the paint tile at the provided position
+--- @param tileX integer The horizontal map position
+--- @param tileY integer The vertical map position
+--- @return number | nil paintValue The value of the paint tile or nil if the provided position was out of bounds
+function map:getPaintTile (tileX, tileY)
+    assert (tileX == tileX and tileY == tileY, "Bad coords found " .. tileX .. " " .. tileY)
+    if self:inBounds (tileX, tileY) == true then
+        return self.envGrid[tileX][tileY].paint
+
+    else
+        return nil
+    end
+end
+
+--- Sets the value of the paint tile at the provided position
+--- @param tileX integer The horizontal map position
+--- @param tileY integer The vertical map position
+--- @param value number The new value of the paint tile
+function map:setPaintTile (tileX, tileY, value)
+    assert (type (value) == "number", "Provided value is not a number")
+
+    if self:inBounds (tileX, tileY) == true then
+        self.envGrid[tileX][tileY].paint = clamp (value, self.paintBounds.min, self.paintBounds.max)
+    end
+end
+
+--- Increments the value of the paint tile at the provided position
+--- @param tileX integer The horizontal map position
+--- @param tileY integer The vertical map position
+--- @param value number The amount to increment the paint value by
+function map:adjustPaintTile (tileX, tileY, value)
+    assert (type (value) == "number", "Provided value is not a number")
+
+    if self:inBounds (tileX, tileY) == true then
+        self.envGrid[tileX][tileY].paint = clamp (self.envGrid[tileX][tileY].paint + value, self.paintBounds.min, self.paintBounds.max)
     end
 end
 
