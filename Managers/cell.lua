@@ -207,7 +207,6 @@ function cell:new (health, energy, type)
             meta = self.initialMutRates.meta,
         },
         count = 1,
-        paint = (math.random () > 0.50) and "red" or "blue",
     }
 
     for i = 1, self.scriptVars + self.memVars do
@@ -283,11 +282,11 @@ local function randomAction (childVars)
 end
 
 function cell:mutate (childCellObj, parentCellObj)
-    if math.random () < 0.75 then
+    if math.random () < 0.01 then
         -- Mutate color slightly
         local colorIndex = math.random (1, 3)
         local newColor = copyTable (parentCellObj.color)
-        newColor[colorIndex] = clamp (newColor[colorIndex] + (math.random () < 0.50 and -10 or 10) / 100, 0.10, 0.85)
+        newColor[colorIndex] = clamp (newColor[colorIndex] + (math.random () < 0.50 and -50 or 50) / 100, 0.10, 0.85)
         childCellObj.color = newColor
     end
 
@@ -438,12 +437,6 @@ function cell:mutate (childCellObj, parentCellObj)
     childCellObj.scriptList = childScriptList
     childCellObj.vars = childVars
     childCellObj.mutationRates = childMutRates
-    childCellObj.paint = parentCellObj.paint
-
-    -- Small chance to use a new paint value
-    if math.random () < 0.01 then
-        childCellObj.paint = (childCellObj.paint == "red") and "blue" or "red"
-    end
 end
 
 function cell:compileScript (cellObj, stringOnly)

@@ -30,7 +30,6 @@ local renderMap = true
 local renderModeIndex = 1
 local validModes = {
     "normal",
-    "paint",
     "energy",
     "health",
     "total",
@@ -59,7 +58,7 @@ end
 function thisScene:load (...)
     cell:init (map, cellActions.actionDefs, cellActions.scriptPrefixes, {
         maxCells = 200,
-        maxActions = 80,
+        maxActions = 150,
         scriptVars = 3,
         memVars = 2,
         displayVars = 1,
@@ -96,10 +95,6 @@ function thisScene:load (...)
             min = 0,
             max = 2500,
         },
-        paintBounds = {
-            min = -1,
-            max = 1,
-        }
     })
     map:reset (mapSize, mapSize, mapInput, mapBarriers)
     map:setCamera (-110, -10, 5.8)

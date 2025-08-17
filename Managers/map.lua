@@ -25,10 +25,6 @@ local map = {
         min = 0,
         max = 0,
     },
-    paintBounds = {
-        min = 0,
-        max = 0,
-    },
     drawBounds = {
         min = 0,
         max = 0,
@@ -89,10 +85,6 @@ function map:init (cellManager, options)
     self.inputBounds.min = options.inputBounds.min or 0
     self.inputBounds.max = options.inputBounds.max or 500
 
-    options.paintBounds = options.paintBounds or {}
-    self.paintBounds.min = options.paintBounds.min or -100
-    self.paintBounds.max = options.paintBounds.max or 100
-
     options.drawBounds = options.drawBounds or {}
     self.drawBounds.min = options.drawBounds.min or self.inputBounds.min
     self.drawBounds.max = options.drawBounds.max or self.inputBounds.max
@@ -122,7 +114,7 @@ function map:reset (width, height, mapEnvInputs, mapEnvTypes, mapPaint)
         for j = 1, self.height do
             local envTile = {
                 input = 0,
-                paint = 0,
+                paint = {0, 0, 0},
                 type = "blank",
             }
 
@@ -215,7 +207,6 @@ end
 
 local validModes = {
     normal = true,
-    paint = true,
     energy = true,
     health = true,
     total = true,
@@ -265,13 +256,6 @@ function map:draw (mode, subMode)
                 if mode == "normal" then
                     love.graphics.setColor (cellObj.color)
                     love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
-                elseif mode == "paint" then
-                    if cellObj.paint == "red" then
-                        love.graphics.setColor (1, 0, 0, 1)
-                    else
-                        love.graphics.setColor (0, 0, 1, 1)
-                    end
-                    love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
                 elseif mode == "energy" then
                     local cellEnergyPercent = cellObj.energy / maxEnergy
                     love.graphics.setColor (0, cellEnergyPercent, 0, 1)
@@ -301,12 +285,7 @@ function map:draw (mode, subMode)
 
             else
                 if subMode == "paint" then
-                    -- Render paint tile
-                    local scaledColor = mapToScale(envTile.paint, self.paintBounds.min, self.paintBounds.max, -1, 1)
-                    -- scaledColor: -1 (min) = blue, 0 = white, 1 (max) = red
-                    local r = clamp(1 + scaledColor, 0, 1)
-                    local b = clamp(1 - scaledColor, 0, 1)
-                    love.graphics.setColor(r, 0, b, 1)
+                    love.graphics.setColor(envTile.paint)
                     love.graphics.rectangle("fill", i - 1, j - 1, 1, 1)
 
                 elseif subMode == "energy" then
@@ -316,13 +295,9 @@ function map:draw (mode, subMode)
                     love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
 
                 elseif subMode == "combined" then
-                    if envTile.paint < 0 then
-                        local scaledColor = mapToScale (envTile.input, self.drawBounds.min, self.drawBounds.max, 0, 1)
-                        love.graphics.setColor (scaledColor, 0, 0, 1)
-                    else
-                        local scaledColor = mapToScale (envTile.input, self.drawBounds.min, self.drawBounds.max, 0, 1)
-                        love.graphics.setColor (0, 0, scaledColor, 1)
-                    end
+                    local scaledColor = mapToScale (envTile.input, self.drawBounds.min, self.drawBounds.max, 0, 1)
+                    local paintTable = envTile.paint
+                    love.graphics.setColor (paintTable[1] * scaledColor, paintTable[2] * scaledColor, paintTable[3] * scaledColor, 1)
                     love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
                 end
             end
@@ -443,8 +418,8 @@ function map:getPaintTile (tileX, tileY)
     assert (tileX == tileX and tileY == tileY, "Bad coords found " .. tileX .. " " .. tileY)
     if self:inBounds (tileX, tileY) == true then
         return self.envGrid[tileX][tileY].paint
-
     else
+        assert ("nil happend")
         return nil
     end
 end
@@ -452,29 +427,38 @@ end
 --- Sets the value of the paint tile at the provided position
 --- @param tileX integer The horizontal map position
 --- @param tileY integer The vertical map position
---- @param value number The new value of the paint tile
-function map:setPaintTile (tileX, tileY, value)
-    assert (type (value) == "number", "Provided value is not a number")
+--- @param colorTable table The new color table for the paint tile
+function map:setPaintTile (tileX, tileY, colorTable)
+    assert (type (colorTable) == "table", "Provided colorTable is not a table")
 
     if self:inBounds (tileX, tileY) == true then
-        self.envGrid[tileX][tileY].paint = clamp (value, self.paintBounds.min, self.paintBounds.max)
+        self.envGrid[tileX][tileY].paint = {
+            colorTable[1],
+            colorTable[2],
+            colorTable[3]
+        }
     end
 end
 
---- Increments the value of the paint tile at the provided position
---- @param tileX integer The horizontal map position
---- @param tileY integer The vertical map position
---- @param value number The amount to increment the paint value by
-function map:adjustPaintTile (tileX, tileY, value)
-    assert (type (value) == "number", "Provided value is not a number")
+-- --- Increments the value of the paint tile at the provided position
+-- --- @param tileX integer The horizontal map position
+-- --- @param tileY integer The vertical map position
+-- --- @param value number The amount to increment the paint value by
+-- function map:adjustPaintTile (tileX, tileY, value)
+--     assert (type (value) == "number", "Provided value is not a number")
 
-    if self:inBounds (tileX, tileY) == true then
-        self.envGrid[tileX][tileY].paint = clamp (self.envGrid[tileX][tileY].paint + value, self.paintBounds.min, self.paintBounds.max)
-    end
-end
+--     if self:inBounds (tileX, tileY) == true then
+--         self.envGrid[tileX][tileY].paint = clamp (self.envGrid[tileX][tileY].paint + value, self.paintBounds.min, self.paintBounds.max)
+--     end
+-- end
 
 function map:cellPaintMatchesTile (tileX, tileY, cellObj)
-    return (cellObj.paint == "red" and map:getPaintTile (tileX, tileY) > 0) or (cellObj.paint == "blue" and map:getPaintTile (tileX, tileY) < 0)
+    if self:inBounds (tileX, tileY) == true then
+        local paintTable = self:getPaintTile (tileX, tileY)
+        return paintTable[1] == cellObj.color[1] and paintTable[2] == cellObj.color[2] and paintTable[3] == cellObj.color[3]
+    else
+        return false
+    end
 end
 
 --- Checks if the provided position is clear of any cells or barriers.
@@ -553,8 +537,6 @@ function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
         self.cellGrid[tileX][tileY] = newCellObj
         self.stats.cells = self.stats.cells + 1
 
-        assert (newCellObj.paint ~= nil, "Cell spawned without a paint value")
-        
         return true
     else
         return false

@@ -3,18 +3,18 @@ local scriptPrefixes = {
 }
 
 local actionDefs = {
-    readPaint = {
-        desc = "Reads the paint value from the input tile below the cell",
-        type = "assign",
-        params = {
-            assignTo = "variable",
-        },
-        hyperparams = {},
-        funcString = 
-[[
-$assignTo = map:getPaintTile (tileX, tileY)
-]]
-    },
+--     readPaint = {
+--         desc = "Reads the paint value from the input tile below the cell",
+--         type = "assign",
+--         params = {
+--             assignTo = "variable",
+--         },
+--         hyperparams = {},
+--         funcString = 
+-- [[
+-- $assignTo = map:getPaintTile (tileX, tileY)
+-- ]]
+--     },
     paintMatches = {
         desc = "Determines if the color below the cell matches the cell's color",
         type = "control",
@@ -34,13 +34,7 @@ if map:cellPaintMatchesTile (tileX, tileY, cellObj) == true then
         },
         funcString = 
 [[
-if cellObj.paint == "red" then
-    map:adjustPaintTile (tileX, tileY, $amount)
-elseif cellObj.paint == "blue" then
-    map:adjustPaintTile (tileX, tileY, -$amount)
-else
-    error ("Invalid cell paint color: " .. tostring (cellObj.paint))
-end
+map:setPaintTile (tileX, tileY, cellObj.color)
 ]]
     },
     readInput = {
