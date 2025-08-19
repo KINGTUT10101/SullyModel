@@ -22,7 +22,7 @@ local captures = {} -- Holds the last 10 captures
 
 local cyclesSinceLastFail = 0
 
-local failsafeSpawns = 200
+local failsafeSpawns = 1
 local failsafeActivations = -1
 local lastCell = nil
 
@@ -255,8 +255,8 @@ end
 
 function thisScene:load (...)
     cell:init (map, cellActions.actionDefs, cellActions.scriptPrefixes, {
-        maxCells = 200,
-        maxActions = 80,
+        maxCells = 500,
+        maxActions = 15,
         dropEnergy = false,
         scriptVars = 3,
         memVars = 2,
@@ -477,7 +477,7 @@ function thisScene:update (dt)
             -- cell:printCellScriptList (newCell)
 
             -- Attempt to spawn the cell
-            while map:spawnCell (math.random (1, map.width), math.random (1, map.height), cell.maxHealth, cell.maxEnergy, newCell) == true do
+            while map:spawnCell (math.random (1, map.width), math.random (1, map.height), cell.maxHealth, cell.maxEnergy, newCell) == false do
                 
             end
             cellsSpawned = cellsSpawned + 1
