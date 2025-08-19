@@ -282,7 +282,7 @@ local function randomAction (childVars)
 end
 
 function cell:mutate (childCellObj, parentCellObj)
-    if math.random () < 0.01 then
+    if math.random () < 0.10 then
         -- Mutate color slightly
         local colorIndex = math.random (1, 3)
         local newColor = copyTable (parentCellObj.color)
