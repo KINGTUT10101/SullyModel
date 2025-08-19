@@ -280,7 +280,7 @@ function map:draw (mode, subMode)
 
             elseif envTile.type ~= "blank" then
                 -- Render barrier (assume this is the only other tile type right now)
-                love.graphics.setColor ({1, 1, 0, 1})
+                love.graphics.setColor ({1, 0.5, 0, 1})
                 love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
 
             else
@@ -297,7 +297,7 @@ function map:draw (mode, subMode)
                 elseif subMode == "combined" then
                     local scaledColor = mapToScale (envTile.input, self.drawBounds.min, self.drawBounds.max, 0, 1)
                     local paintTable = envTile.paint
-                    love.graphics.setColor (paintTable[1] * scaledColor, paintTable[2] * scaledColor, paintTable[3] * scaledColor, 1)
+                    love.graphics.setColor (paintTable[1] * scaledColor * 0.85, paintTable[2] * scaledColor * 0.85, paintTable[3] * scaledColor * 0.85, 1)
                     love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
                 end
             end
