@@ -360,6 +360,10 @@ function thisScene:keypressed (key, scancode, isrepeat)
         else
             renderModeIndex = cycleValue (renderModeIndex, 1, #validModes)
         end
+    
+    -- Resets the camera
+    elseif key == "n" then
+        map:setCamera (-110, -10, 5.8)
     end
 end
 
