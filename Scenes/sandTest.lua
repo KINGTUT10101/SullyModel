@@ -386,6 +386,10 @@ function thisScene:update (dt)
             attemptPreds.neg = 0
             attemptPreds.total = 0
 
+            -- Clear cell lists for the new prediction cycle
+            posCellList = {}
+            negCellList = {}
+
             predTimer = cyclesPerPred
 
             local totalPreds = confusionMatrix.fn + confusionMatrix.fp + confusionMatrix.tn + confusionMatrix.tp
