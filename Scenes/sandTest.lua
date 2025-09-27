@@ -1,5 +1,4 @@
 local thisScene = {}
-local sceneMan = require ("Libraries.sceneMan")
 local map = require ("Managers.map")
 local cell = require ("Managers.cell")
 local mapToScale = require ("Helpers.mapToScale")
@@ -12,8 +11,6 @@ local mapSize = 25
 
 local camVelocity = 15
 local zoomVelocity = 25
-
-local testCell = cell:new (100, 100)
 
 local maxCaptures = 500
 local maxCaptureCycles = 10000
@@ -319,23 +316,6 @@ function thisScene:load (...)
 end
 
 function thisScene:update (dt)
-    if love.keyboard.isDown ("lshift") and love.keyboard.isDown ("b") then
-        local newCell = cell:new (cell.maxEnergy, cell.maxHealth)
-        cell:mutate (newCell, testCell)
-        cell:compileScript (newCell)
-        testCell = newCell
-
-        for k, v in pairs (testCell) do
-            print (k, v)
-            if type (v) == "table" then
-                for k, v in pairs (v) do
-                    print ("    ", k, v)
-                end
-            end
-        end
-        print ()
-    end
-
     local camX, camY, zoom = map:getCamera ()
     local speedMult = (love.keyboard.isDown ("lshift") == true) and 5 or 1
 
