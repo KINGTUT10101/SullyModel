@@ -215,6 +215,7 @@ function cell:new (health, energy)
         positivePreds = 0,
         lastContribution = 0,
         lastCorrect = true,
+        controlHits = {}, -- Stores pairs of nums that indicate the action line of a control action and the number of times it was used
     }
 
     for i = 1, self.scriptVars + self.memVars do
@@ -308,7 +309,14 @@ function cell:mutate (childCellObj, parentCellObj)
         end
 
         local changeType = weightedchoice (weightedChoices)
-        local actionIndex = math.random (1, #childScriptList)
+
+        -- local actionIndex = weightedchoice (parentCellObj.controlHits) or math.random (1, #childScriptList)
+
+        local success, actionIndex = pcall (weightedchoice, parentCellObj.controlHits)
+
+        if success ~= true or actionIndex == nil then
+            actionIndex = math.random (1, #childScriptList)
+        end
 
         if changeType == "add" or #childScriptList <= 0 then
             local newAction, newActionDef = randomAction (childVars)
@@ -503,9 +511,12 @@ function cell:compileScript (cellObj, stringOnly)
 
             local indent = string.rep ("    ", scope)
             scriptLines[#scriptLines+1] = string.gsub(filledFuncString, "([^\n]+)", indent .. "%1")
+            scriptLines[#scriptLines+1] = indent .. "cellObj.controlHits[" .. i .. "] = (cellObj.controlHits[" .. i .. "] or 0) + 1\n"
 
             if actionDef.type == "control" then
                 scope = scope + 1
+
+                -- scriptLines[#scriptLines+1] = indent .. "cellObj.controlHits[" .. i .. "] = (cellObj.controlHits[" .. i .. "] or 0) + 1\n"
             end
         end
     end
