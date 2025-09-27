@@ -58,7 +58,7 @@ $assignTo = $assignTo $op 1
         hyperparams = {},
         funcString = 
 [[
-$assignTo = map:getInputTile (map:getForwardPos (tileX, tileY, 1)) or 0
+$assignTo = map:getInputTile (map:getForwardViewPos (viewX, viewY, cellObj.direction, 1)) or 0
 ]]
     },
 --     consumeInput = {
@@ -88,7 +88,7 @@ $assignTo = map:getInputTile (map:getForwardPos (tileX, tileY, 1)) or 0
         hyperparams = {},
         funcString =
 [[
-otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
+otherTileX, otherTileY = map:getForwardViewPos (viewX, viewY, cellObj.direction, 1)
 if map:isTaken (otherTileX, otherTileY) == true then
     $assignTo = map.cellGrid[otherTileX][otherTileY].displayVars[$displayIndex]
 end
@@ -107,38 +107,63 @@ end
 cellObj.displayVars[$displayIndex] = $copyFrom
 ]]
     },
-    moveForward = {
-        desc = "Moves the cell in the direction it's facing",
+--     moveForward = {
+--         desc = "Moves the cell in the direction it's facing",
+--         type = "action",
+--         params = {},
+--         hyperparams = {
+--             energyCost = 3,
+--         },
+--         funcString = 
+-- [[
+-- tileX, tileY, result = map:moveForward (tileX, tileY)
+-- if result == true then
+--     map:adjustCellEnergy (tileX, tileY, -$energyCost)
+--     if map:isTaken(tileX, tileY) == false then
+--         -- print ("Cell death: Move forward", tileX, tileY)
+--         return
+--     end
+-- end
+-- ]]
+--     },
+--     turn = {
+--         desc = "Turns the cell either left or right",
+--         type = "action",
+--         params = {
+--             turnMethod = {
+--                 "turnLeft",
+--                 "turnRight"
+--             }
+--         },
+--         hyperparams = {},
+--         funcString = 
+-- [[
+-- map:$turnMethod (tileX, tileY)
+-- ]]
+--     },
+    moveViewForward = {
+        desc = "Moves the cell's view in the direction it's view is facing",
         type = "action",
         params = {},
-        hyperparams = {
-            energyCost = 3,
-        },
+        hyperparams = {},
         funcString = 
 [[
-tileX, tileY, result = map:moveForward (tileX, tileY)
-if result == true then
-    map:adjustCellEnergy (tileX, tileY, -$energyCost)
-    if map:isTaken(tileX, tileY) == false then
-        -- print ("Cell death: Move forward", tileX, tileY)
-        return
-    end
-end
+viewX, viewY, result = map:moveViewForward (viewX, viewY, cellObj.direction)
 ]]
     },
-    turn = {
+    turnView = {
         desc = "Turns the cell either left or right",
         type = "action",
         params = {
             turnMethod = {
-                "turnLeft",
-                "turnRight"
+                "turnViewLeft",
+                "turnViewRight"
             }
         },
         hyperparams = {},
         funcString = 
 [[
-map:$turnMethod (tileX, tileY)
+cellObj.direction = map:$turnMethod (cellObj.direction)
 ]]
     },
 --     applyDamage = {
@@ -237,7 +262,7 @@ if $term $op 0 then
         hyperparams = {},
         funcString =
 [[
-if map:isTaken (map:getForwardPos (tileX, tileY, 1)) then
+if map:isTaken (map:getForwardViewPos (viewX, viewY, cellObj.direction, 1)) then
 ]]
     },
     isSimilar = {
@@ -255,7 +280,7 @@ if map:isTaken (map:getForwardPos (tileX, tileY, 1)) then
         hyperparams = {},
         funcString =
 [[
-otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
+otherTileX, otherTileY = map:getForwardViewPos (viewX, viewY, cellObj.direction, 1)
 allSimilar = false
 if map:isTaken (otherTileX, otherTileY) == true then
     currCellColor = cellObj.color
@@ -510,6 +535,18 @@ $assignTo = cellObj.lastContribution
         funcString =
 [[
 $assignTo1, $assignTo2 = tileX, tileY
+]]
+    },
+    getViewDistance = {
+        desc = "Saves the view distance of the cell to a variable",
+        type = "assign",
+        params = {
+            assignTo = "variable",
+        },
+        hyperparams = {},
+        funcString =
+[[
+$assignTo = math.sqrt((tileX - viewX)^2 + (tileY - viewY)^2)
 ]]
     },
     earlyStop = {

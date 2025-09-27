@@ -492,6 +492,26 @@ function map:turnRight (tileX, tileY)
     end
 end
 
+function map:getForwardViewPos (tileX, tileY, cellDirection, amount)
+    local vect = directionVects[cellDirection]
+
+    return tileX + vect[1] * amount, tileY + vect[2] * amount
+end
+
+function map:moveViewForward (tileX, tileY, cellDirection)
+    local vect = directionVects[cellDirection]
+
+    return tileX + vect[1], tileY + vect[2], self:inBounds (tileX + vect[1], tileY + vect[2])
+end
+
+function map:turnViewLeft (cellDirection)
+    return cycleValue (cellDirection, -1, 4)
+end
+
+function map:turnViewRight (cellDirection)
+    return cycleValue (cellDirection, 1, 4)
+end
+
 function map:transferInputToCell (tileX, tileY, amount, cost)
     if self:isTaken (tileX, tileY) == true then
         local cellObj = self.cellGrid[tileX][tileY]

@@ -471,7 +471,8 @@ function cell:compileScript (cellObj, stringOnly)
         "local bound1, bound2 = 0, 0\n",
         "local inf = math.huge\n", -- Bandaid fix to prevent crashes when a variable equals infinity
         "local result = false\n",
-        "local lastVote = 0",
+        "local lastVote = 0\n",
+        "local viewX, viewY = tileX, tileY\n",
         "\n",
     }
     
