@@ -654,11 +654,4 @@ function thisScene:keypressed (key, scancode, isrepeat)
     end
 end
 
-function thisScene:mousereleased (x, y, button)
-    local tileX, tileY = map:screenToMap (x, y)
-
-    map:adjustInputTile (tileX, tileY, (button == 1) and 100 or -100)
-    print (map:getInputTile (tileX, tileY))
-end
-
 return thisScene
