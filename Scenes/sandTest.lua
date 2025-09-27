@@ -1,5 +1,4 @@
 local thisScene = {}
-local sceneMan = require ("Libraries.sceneMan")
 local map = require ("Managers.map")
 local cell = require ("Managers.cell")
 local mapToScale = require ("Helpers.mapToScale")
