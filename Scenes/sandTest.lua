@@ -17,16 +17,19 @@ local maxCaptureCycles = 10000
 local captureTimer = maxCaptureCycles
 local captures = {} -- Holds the last 10 captures
 
+local maxFailMutations = 500
+local cellsMutatedThisRound = 0
+
+-- TODO: Try random sampling so some cells predictions are ignored each round
+
 local cyclesSinceLastFail = 0
 
-local failsafeSpawns = 625
+local failsafeSpawns = 200
 local failsafeActivations = -1
 local lastCell = nil
 
 local renderMap = true
 
-local newPercent = 0.00
-local replacementPercent = 0.15
 local datasetRatio = 0.5
 local predRatio = 0.5
 local shuffles = 4
@@ -38,10 +41,10 @@ local attemptPreds = {
     total = 0,
 }
 
-local rewardEnergy = 100
-local punishHealth = 250
+-- local rewardEnergy = 100
+-- local punishHealth = 250
 local predRetries = 0
-local cyclesPerPred = 750
+local cyclesPerPred = 200
 local predTimer = cyclesPerPred
 local confusionMatrix = {
     tp = 0,
@@ -108,9 +111,9 @@ local function rewardCell (tileX, tileY, cellObj)
     cellObj.lastCorrect = true
 end
 local function punishCell (tileX, tileY, cellObj)
-    if confusionMatrix.fn + confusionMatrix.fp > predRetries then
+    -- if confusionMatrix.fn + confusionMatrix.fp > predRetries then
         -- map:adjustCellEnergy (tileX, tileY, -punishHealth * -mapToScale (1 - calcAccuracy (), 0, 1, 0, 2))
-    end
+    -- end
 
     cellObj.lastCorrect = false
 end
@@ -118,33 +121,58 @@ end
 local cellList = {}
 local posCellList = {}
 local negCellList = {}
+
+-- Treats cells in a partial cell list
 local function replaceCells(list)
-    local endIndex = math.ceil(#list * (replacementPercent + newPercent))
     local listLength = #list
 
-    for i = 1, endIndex do
-        if i < math.ceil (#list * newPercent) then
-            local newCellObj = cell:new(cell.maxEnergy, cell.maxHealth)
+    for i = 1, listLength do
+        -- if i < math.ceil (#list * newPercent) then
+        --     local newCellObj = cell:new(cell.maxEnergy, cell.maxHealth)
 
-            -- Heavily mutate cell
-            for i = 1, round(mapToScale(love.math.randomNormal(), -0.5, 3, 0, 500)) do
-                local mutCell = cell:new(cell.maxEnergy, cell.maxHealth)
-                cell:mutate(mutCell, newCellObj)
+        --     -- Heavily mutate cell
+        --     for i = 1, round(mapToScale(love.math.randomNormal(), -0.5, 3, 0, 500)) do
+        --         local mutCell = cell:new(cell.maxEnergy, cell.maxHealth)
+        --         cell:mutate(mutCell, newCellObj)
+        --         newCellObj = mutCell
+        --     end
+
+        --     while map:spawnCell(math.random(1, map.width), math.random(1, map.height), cell.maxHealth, cell.maxEnergy, newCellObj) do end
+        -- else
+        --     local cellDataGood = list[listLength - (i - 1)]
+        --     local cellDataBad = list[i]
+
+        --     map:deleteCell(cellDataBad.tileX, cellDataBad.tileY)
+        --     while map:spawnCell(math.random(1, map.width), math.random(1, map.height), cell.maxHealth, cell.maxEnergy, cellDataGood.cellObj) do end
+        -- end
+
+        -- Increased chance to mutate cells that are closer to the end of the list
+        local mutateChance = mapToScale (1 - (i / listLength), 0, 1, 0.01, 0.65)
+
+        if math.random () < mutateChance then
+            local cellData = list[i]
+            local newCellObj = copyTable (cellData.cellObj)
+
+            -- Mutate cell
+            for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, maxFailMutations)) do
+                local mutCell = cell:new (cell.maxEnergy, cell.maxHealth)
+                cell:mutate (mutCell, newCellObj)
                 newCellObj = mutCell
             end
 
-            while map:spawnCell(math.random(1, map.width), math.random(1, map.height), cell.maxHealth, cell.maxEnergy, newCellObj) do end
-        else
-            local cellDataGood = list[listLength - (i - 1)]
-            local cellDataBad = list[i]
+            cell:compileScript (newCellObj)
 
-            map:deleteCell(cellDataBad.tileX, cellDataBad.tileY)
-            while map:spawnCell(math.random(1, map.width), math.random(1, map.height), cell.maxHealth, cell.maxEnergy, cellDataGood.cellObj) do end
+            map:deleteCell (cellData.tileX, cellData.tileY)
+            map:spawnCell (cellData.tileX, cellData.tileY, cell.maxHealth, cell.maxEnergy, newCellObj)
+            cellsMutatedThisRound = cellsMutatedThisRound + 1
         end
     end
 end
 
+-- Treats cells that made an incorrect prediction this round
 local function replaceCellInList (list)
+    cellsMutatedThisRound = 0
+
     for i = 1, shuffles do
         local partialCellList = {}
 
@@ -152,6 +180,8 @@ local function replaceCellInList (list)
         for i = 1, iters do
             table.insert (partialCellList, table.remove (list, math.random (1, #list)))
         end
+
+        -- Sorts the cells in the partial cell list by important model metrics
         table.sort(partialCellList, function(cellData1, cellData2)
             local cellObj1 = cellData1.cellObj
             local cellObj2 = cellData2.cellObj
@@ -180,11 +210,12 @@ local function replaceCellInList (list)
 end
 
 local function treatCell (tileX, tileY, cellObj)
-    if math.random () >= 0.20 then
-        local multi = math.random (0, 5)
-        map.currPred = map.currPred - cellObj.contributions + cellObj.contributions * multi
-        cellObj.contributions = cellObj.contributions * multi
-    end
+    -- -- Random chance to scale the cell's contribution
+    -- if math.random () >= 0.20 then
+    --     local multi = math.random (0, 5)
+    --     map.currPred = map.currPred - cellObj.contributions + cellObj.contributions * multi
+    --     cellObj.contributions = cellObj.contributions * multi
+    -- end
 
     attemptPreds.total = attemptPreds.total + 1
 
@@ -234,6 +265,7 @@ local function treatCell (tileX, tileY, cellObj)
     })
 end
 
+-- TODO: Remove
 local baseXInput = 1000000 * love.math.random()
 local baseYInput = 1000000 * love.math.random()
 local function mapInput (tileX, tileY)
@@ -253,7 +285,7 @@ end
 function thisScene:load (...)
     cell:init (map, cellActions.actionDefs, cellActions.scriptPrefixes, {
         maxCells = 500,
-        maxActions = 15,
+        maxActions = 200,
         dropEnergy = false,
         scriptVars = 3,
         memVars = 2,
@@ -340,15 +372,14 @@ function thisScene:update (dt)
     -- Update map and camera
     map:setCamera (camX, camY, zoom)
     local capture = map:update (dt)
-
+    
+    -- Runs if there are still cells alive
     if capture ~= nil then
         cyclesSinceLastFail = cyclesSinceLastFail + 1
         predTimer = predTimer - 1
 
-        -- End the current prediction
+        -- Ends the current prediction and treats the cells
         if predTimer <= 0 then
-            -- currLabel = currLabel * -1
-
             local origAccuracy = calcAccuracy ()
             local correctPred = false
             attemptPreds.pos = 0
@@ -361,12 +392,15 @@ function thisScene:update (dt)
 
             print("============= Prediction #" .. totalPreds .. " =============")
 
-            -- Positive predition
+            -- Positive prediction
             if map.currPred > 0 then
+                -- Correct prediction
                 if currLabel > 0 then
                     correctPred = true
                     confusionMatrix.tp = confusionMatrix.tp + 1
                     print ("(TP) True positive prediction (O)")
+
+                -- Incorrect prediction
                 else
                     confusionMatrix.fp = confusionMatrix.fp + 1
                     print ("(FP) False positive prediction (X)")
@@ -374,10 +408,13 @@ function thisScene:update (dt)
 
             -- Negative prediction
             else
+                -- Correct prediction
                 if currLabel < 0 then
                     correctPred = true
                     confusionMatrix.tn = confusionMatrix.tn + 1
                     print ("(TN) True negative prediction (O)")
+
+                -- Incorrect prediction
                 else
                     confusionMatrix.fn = confusionMatrix.fn + 1
                     print ("(FN) False negative prediction (X)")
@@ -385,12 +422,15 @@ function thisScene:update (dt)
             end
 
             local origPred = map.currPred
-            map:getCells (treatCell)
+            map:getCells (treatCell) -- Preps cells for the next prediction and places them into the pos/neg cell list
 
             predsSinceLastReset = predsSinceLastReset + 1
 
+            -- Mutates and replaces cells if enough predictions have been made to match the prediction batch size
             if predsSinceLastReset >= batchSize then
                 predsSinceLastReset = 0
+
+                -- Replace cells that made incorrect predictions
                 if currLabel > 0 then
                     replaceCellInList (negCellList)
                 else
@@ -404,7 +444,13 @@ function thisScene:update (dt)
             print ("Change: " .. calcAccuracy () - origAccuracy)
             print ("Dataset Ratio: " .. datasetRatio)
             print("Prediction Ratio: " .. predRatio)
-            print("Cell Prediction Ratio: " .. (attemptPreds.pos / attemptPreds.total))
+            print("Attempt Cell Prediction Ratio: " .. (attemptPreds.pos / attemptPreds.total))
+            print ("Total Cells This Attempt: " .. map.stats.cells)
+            print ("Positive Cells This Attempt: " .. #posCellList .. ", " .. attemptPreds.pos)
+            print ("Negative Cells This Attempt: " .. #negCellList .. ", " .. attemptPreds.neg)
+            -- TODO: Figure out why this stat goes over 100% sometimes
+            print("Number of Correct Cells This Attempt: " .. (currLabel > 0 and #negCellList or #posCellList) .. "/" .. map.stats.cells .. " (" .. round(((currLabel > 0 and #negCellList or #posCellList) / map.stats.cells) * 10000) / 100 .. "%)")
+            print("Bad Cells Mutated and Replaced: " .. cellsMutatedThisRound .. "/" .. (currLabel > 0 and #negCellList or #posCellList) .. " (" .. round((cellsMutatedThisRound / map.stats.cells) * 10000) / 100 .. "%)")
             print ("-------------------")
             print ("TP: " .. confusionMatrix.tp .. " | FP: " .. confusionMatrix.fp)
             print ("-------------------")

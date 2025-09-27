@@ -207,6 +207,9 @@ function map:update (dt)
     return capture
 end
 
+-- TODO: Reimplement rendering modes
+-- Rendering modes: normal, disabled, votes, vote ratio, lastCorrect, accuracy
+-- Sub-rendering modes: normal, disabled
 function map:draw ()
     love.graphics.push ()
     love.graphics.translate (-self.camera.x, -self.camera.y)
