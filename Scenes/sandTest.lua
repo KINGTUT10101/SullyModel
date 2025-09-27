@@ -8,7 +8,7 @@ local copyTable = require ("Helpers.copyTable")
 local cellActions = require ("Data.cellActions")
 local shortenNumber = require ("Helpers.shortenNumber")
 
-local mapSize = 20
+local mapSize = 25
 
 local camVelocity = 15
 local zoomVelocity = 25
@@ -22,7 +22,7 @@ local captures = {} -- Holds the last 10 captures
 
 local cyclesSinceLastFail = 0
 
-local failsafeSpawns = 1
+local failsafeSpawns = 625
 local failsafeActivations = -1
 local lastCell = nil
 
@@ -33,7 +33,7 @@ local replacementPercent = 0.15
 local datasetRatio = 0.5
 local predRatio = 0.5
 local shuffles = 4
-local batchSize = 10
+local batchSize = 1
 local predsSinceLastReset = 0
 local attemptPreds = {
     pos = 0,
@@ -411,8 +411,11 @@ function thisScene:update (dt)
 
             if predsSinceLastReset >= batchSize then
                 predsSinceLastReset = 0
-                replaceCellInList (posCellList)
-                replaceCellInList (negCellList)
+                if currLabel > 0 then
+                    replaceCellInList (negCellList)
+                else
+                    replaceCellInList (posCellList)
+                end
             end
             cellList = {}
 
