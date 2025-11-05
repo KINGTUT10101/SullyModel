@@ -215,6 +215,9 @@ function cell:new (health, energy)
         positivePreds = 0,
         lastContribution = 0,
         lastCorrect = true,
+        recentHistory = {}, -- Tracks last 10 prediction results for consistency measurement
+        successCheckpoint = nil, -- Stores last successful state for rollback
+        storedEnergy = 0, -- Energy extracted from environment for communication/cooperation
         controlHits = {}, -- Stores pairs of nums that indicate the action line of a control action and the number of times it was used
     }
 

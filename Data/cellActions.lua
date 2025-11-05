@@ -61,6 +61,87 @@ $assignTo = $assignTo $op 1
 $assignTo = map:getInputTile (map:getForwardViewPos (viewX, viewY, cellObj.direction, 1)) or 0
 ]]
     },
+    extractEnergy = {
+        desc = "Extracts energy from the current view position and stores it in the cell",
+        type = "assign",
+        params = {
+            assignTo = "variable",
+            amount = {
+                "1",
+                "-1"
+            },
+        },
+        hyperparams = {},
+        funcString = 
+[[
+local extractX, extractY = map:getForwardViewPos (viewX, viewY, cellObj.direction, 1)
+local currentInput = map:getInputTile(extractX, extractY) or 0
+local extractAmount = $amount
+if currentInput > 0 then
+    extractAmount = math.min(extractAmount, currentInput)
+    map:setInputTile(extractX, extractY, currentInput - extractAmount)
+    cellObj.storedEnergy = (cellObj.storedEnergy or 0) + extractAmount
+    $assignTo = extractAmount
+else
+    $assignTo = 0
+end
+]]
+    },
+    depositEnergy = {
+        desc = "Deposits stored energy into the map at current view position",
+        type = "assign",
+        params = {
+            assignTo = "variable",
+            amount = {
+                "1",
+                "-1"
+            },
+        },
+        hyperparams = {},
+        funcString = 
+[[
+local depositX, depositY = map:getForwardViewPos (viewX, viewY, cellObj.direction, 1)
+local depositAmount = $amount
+if depositAmount > 0 then
+    local currentInput = map:getInputTile(depositX, depositY) or 0
+    map:setInputTile(depositX, depositY, currentInput + depositAmount)
+    cellObj.storedEnergy = (cellObj.storedEnergy or 0) - depositAmount
+    $assignTo = depositAmount
+else
+    $assignTo = 0
+end
+]]
+    },
+    getStoredEnergy = {
+        desc = "Gets the amount of energy currently stored in the cell",
+        type = "assign",
+        params = {
+            assignTo = "variable",
+        },
+        hyperparams = {},
+        funcString = 
+[[
+$assignTo = cellObj.storedEnergy or 0
+]]
+    },
+    readEnergyDifference = {
+        desc = "Reads the difference between current position and forward position energy levels",
+        type = "control",
+        params = {
+            op = {
+                ">",
+                "<",
+            }
+        },
+        hyperparams = {},
+        funcString = 
+[[
+local currentEnergy = map:getInputTile(viewX, viewY) or 0
+local forwardX, forwardY = map:getForwardViewPos(viewX, viewY, cellObj.direction, 1)
+local forwardEnergy = map:getInputTile(forwardX, forwardY) or 0
+if forwardEnergy $op currentEnergy then
+]]
+    },
 --     consumeInput = {
 --         desc = "Takes some of the input value to increase the energy level of the cell",
 --         type = "action",

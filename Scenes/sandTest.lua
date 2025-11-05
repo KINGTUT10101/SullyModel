@@ -33,7 +33,7 @@ local renderMap = true
 local datasetRatio = 0.5
 local predRatio = 0.5
 local shuffles = 4
-local batchSize = 1
+local batchSize = 3  -- Faster feedback for easier task
 local predsSinceLastReset = 0
 local attemptPreds = {
     pos = 0,
@@ -44,7 +44,7 @@ local attemptPreds = {
 -- local rewardEnergy = 100
 -- local punishHealth = 250
 local predRetries = 0
-local cyclesPerPred = 200
+local cyclesPerPred = 100  -- Reasonable time to explore simple rectangles
 local predTimer = cyclesPerPred
 local confusionMatrix = {
     tp = 0,
@@ -54,29 +54,42 @@ local confusionMatrix = {
 }
 local currLabel = 1 -- 1 = wide, -1 = tall
 
+-- Keep track of recent predictions to force balance
+local recentLabels = {}
 local function createInputMapper ()
-    local rectX1, rectY1 = math.random (1, math.floor (mapSize / 2)), math.random (1, math.floor (mapSize / 2))
-    local rectX2, rectY2 = mapSize - math.random (0, math.floor (mapSize / 2)), mapSize - math.random (0, math.floor (mapSize / 2))
-
-    -- Adjust tall/wide chance based on predRatio
-    -- predRatio is the fraction of positive predictions
-    -- So, chance of negative label = predRatio, chance of positive label = 1 - predRatio
-    if math.random() < predRatio then
-        -- Make tall rectangle (negative label)
-        if rectX2 - rectX1 > rectY2 - rectY1 then
-            -- Swap to make tall
-            local mid = math.floor((rectX1 + rectX2) / 2)
-            rectX2 = mid
-        end
+    -- Force exactly 50/50 balance to prevent statistical exploitation
+    local rectX1, rectY1, rectX2, rectY2
+    
+    -- Count recent labels to enforce balance
+    local recentTallCount = 0
+    for _, label in ipairs(recentLabels) do
+        if label == -1 then recentTallCount = recentTallCount + 1 end
+    end
+    
+    local shouldMakeTall
+    if #recentLabels < 10 then
+        shouldMakeTall = math.random() < 0.5  -- Random for first few
+    else
+        local tallRatio = recentTallCount / #recentLabels
+        shouldMakeTall = tallRatio < 0.5  -- Force toward 50/50 balance
+    end
+    
+    if shouldMakeTall then
+        -- Create clearly TALL rectangle (negative label)
+        rectX1, rectY1 = 8, 5
+        rectX2, rectY2 = 12, 20  -- 4 wide, 15 tall - very obviously tall
         currLabel = -1
     else
-        -- Make wide rectangle (positive label)
-        if rectY2 - rectY1 > rectX2 - rectX1 then
-            -- Swap to make wide
-            local mid = math.floor((rectY1 + rectY2) / 2)
-            rectY2 = mid
-        end
+        -- Create clearly WIDE rectangle (positive label)  
+        rectX1, rectY1 = 5, 8
+        rectX2, rectY2 = 20, 12  -- 15 wide, 4 tall - very obviously wide
         currLabel = 1
+    end
+    
+    -- Track this label
+    table.insert(recentLabels, currLabel)
+    if #recentLabels > 20 then
+        table.remove(recentLabels, 1)
     end
 
     local function mapInputRect (tileX, tileY)
@@ -106,16 +119,33 @@ end
 
 -- Rewards/punishes each cell after a prediction
 local function rewardCell (tileX, tileY, cellObj)
-    -- map:adjustCellEnergy (tileX, tileY, rewardEnergy * mapToScale (calcAccuracy (), 0, 1, 0, 2))
     cellObj.correct = cellObj.correct + 1
     cellObj.lastCorrect = true
+    
+    -- Save checkpoint of successful state
+    cellObj.successCheckpoint = {
+        scriptList = copyTable(cellObj.scriptList),
+        vars = copyTable(cellObj.vars),
+        mutationRates = copyTable(cellObj.mutationRates),
+        color = copyTable(cellObj.color)
+    }
+    
+    -- Track recent history for consistency measurement
+    cellObj.recentHistory = cellObj.recentHistory or {}
+    table.insert(cellObj.recentHistory, true)
+    if #cellObj.recentHistory > 10 then
+        table.remove(cellObj.recentHistory, 1)
+    end
 end
 local function punishCell (tileX, tileY, cellObj)
-    -- if confusionMatrix.fn + confusionMatrix.fp > predRetries then
-        -- map:adjustCellEnergy (tileX, tileY, -punishHealth * -mapToScale (1 - calcAccuracy (), 0, 1, 0, 2))
-    -- end
-
     cellObj.lastCorrect = false
+    
+    -- Track recent history for consistency measurement
+    cellObj.recentHistory = cellObj.recentHistory or {}
+    table.insert(cellObj.recentHistory, false)
+    if #cellObj.recentHistory > 10 then
+        table.remove(cellObj.recentHistory, 1)
+    end
 end
 
 local cellList = {}
@@ -151,19 +181,44 @@ local function replaceCells(list)
 
         if math.random () < mutateChance then
             local cellData = list[i]
-            local newCellObj = copyTable (cellData.cellObj)
-
-            -- Mutate cell
-            for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, maxFailMutations)) do
-                local mutCell = cell:new (cell.maxEnergy, cell.maxHealth)
-                cell:mutate (mutCell, newCellObj)
-                newCellObj = mutCell
+            local cellObj = cellData.cellObj
+            local newCellObj
+            
+            -- Calculate rollback chance based on performance history
+            local accuracy = cellObj.total > 0 and cellObj.correct / cellObj.total or 0
+            local rollbackChance = mapToScale(1 - accuracy, 0, 1, 0.1, 0.8)  -- Poor performers more likely to rollback
+            
+            -- Try to rollback to checkpoint if available and performance is poor
+            if cellObj.successCheckpoint and math.random() < rollbackChance then
+                -- Rollback to last successful state
+                newCellObj = copyTable(cellObj)
+                newCellObj.scriptList = copyTable(cellObj.successCheckpoint.scriptList)
+                newCellObj.vars = copyTable(cellObj.successCheckpoint.vars)
+                newCellObj.mutationRates = copyTable(cellObj.successCheckpoint.mutationRates)
+                newCellObj.color = copyTable(cellObj.successCheckpoint.color)
+                
+                -- Apply lighter mutations from the checkpoint
+                for i = 1, round(mapToScale(love.math.randomNormal(), -0.5, 3, 1, 10)) do
+                    local mutCell = cell:new(cell.maxEnergy, cell.maxHealth)
+                    cell:mutate(mutCell, newCellObj)
+                    newCellObj = mutCell
+                end
+            else
+                -- Standard mutation path
+                newCellObj = copyTable(cellObj)
+                
+                -- Mutate cell
+                for i = 1, round(mapToScale(love.math.randomNormal(), -0.5, 3, 0, maxFailMutations)) do
+                    local mutCell = cell:new(cell.maxEnergy, cell.maxHealth)
+                    cell:mutate(mutCell, newCellObj)
+                    newCellObj = mutCell
+                end
             end
 
-            cell:compileScript (newCellObj)
+            cell:compileScript(newCellObj)
 
-            map:deleteCell (cellData.tileX, cellData.tileY)
-            map:spawnCell (cellData.tileX, cellData.tileY, cell.maxHealth, cell.maxEnergy, newCellObj)
+            map:deleteCell(cellData.tileX, cellData.tileY)
+            map:spawnCell(cellData.tileX, cellData.tileY, cell.maxHealth, cell.maxEnergy, newCellObj)
             cellsMutatedThisRound = cellsMutatedThisRound + 1
         end
     end
@@ -186,21 +241,65 @@ local function replaceCellInList (list)
             local cellObj1 = cellData1.cellObj
             local cellObj2 = cellData2.cellObj
 
-            local accuracy1 = cellObj1.correct / cellObj1.total
-            local accuracy2 = cellObj2.correct / cellObj2.total
+            local accuracy1 = cellObj1.total > 0 and cellObj1.correct / cellObj1.total or 0
+            local accuracy2 = cellObj2.total > 0 and cellObj2.correct / cellObj2.total or 0
+            
+            -- Heavily penalize cells with extreme prediction bias (they're not looking at the environment)
+            local predBias1 = cellObj1.total > 0 and math.abs((cellObj1.positivePreds / cellObj1.total) - 0.5) or 0
+            local predBias2 = cellObj2.total > 0 and math.abs((cellObj2.positivePreds / cellObj2.total) - 0.5) or 0
+            local adjustedAccuracy1 = accuracy1 - (predBias1 * 2)  -- Penalize bias heavily
+            local adjustedAccuracy2 = accuracy2 - (predBias2 * 2)
 
-            local predRatioDiff1 = math.abs (datasetRatio - (cellObj1.positivePreds / cellObj1.total))
-            local predRatioDiff2 = math.abs (datasetRatio - (cellObj2.positivePreds / cellObj2.total))
+            -- Calculate consistency score - reward cells that maintain performance over time
+            local consistency1 = 0
+            local consistency2 = 0
+            
+            -- Calculate recent accuracy from actual history
+            if cellObj1.recentHistory and #cellObj1.recentHistory >= 3 then
+                local recentCorrect1 = 0
+                for _, wasCorrect in ipairs(cellObj1.recentHistory) do
+                    if wasCorrect then recentCorrect1 = recentCorrect1 + 1 end
+                end
+                local recentAccuracy1 = recentCorrect1 / #cellObj1.recentHistory
+                
+                -- Add accuracy improvement bonus - cells that contribute to overall progress get extra credit
+                local improvementBonus1 = (cellObj1.accuracyContribution or 0) > 0 and 0.1 or 0
+                
+                -- Consistency = recent accuracy * stability bonus + improvement bonus
+                consistency1 = recentAccuracy1 * math.min(#cellObj1.recentHistory / 5, 1.0) + improvementBonus1
+            end
+            
+            if cellObj2.recentHistory and #cellObj2.recentHistory >= 3 then
+                local recentCorrect2 = 0
+                for _, wasCorrect in ipairs(cellObj2.recentHistory) do
+                    if wasCorrect then recentCorrect2 = recentCorrect2 + 1 end
+                end
+                local recentAccuracy2 = recentCorrect2 / #cellObj2.recentHistory
+                
+                -- Add accuracy improvement bonus
+                local improvementBonus2 = (cellObj2.accuracyContribution or 0) > 0 and 0.1 or 0
+                
+                consistency2 = recentAccuracy2 * math.min(#cellObj2.recentHistory / 5, 1.0) + improvementBonus2
+            end
+
+            -- Penalize cells that ALWAYS predict the same way (0% or 100% prediction rates)
+            local predVariance1 = cellObj1.total > 0 and (cellObj1.positivePreds / cellObj1.total) or 0.5
+            local predVariance2 = cellObj2.total > 0 and (cellObj2.positivePreds / cellObj2.total) or 0.5
+            local isAlwaysSame1 = (predVariance1 == 0 or predVariance1 == 1)
+            local isAlwaysSame2 = (predVariance2 == 0 or predVariance2 == 1)
 
             local total1 = cellObj1.total
             local total2 = cellObj2.total
 
-            if cellObj2.lastCorrect ~= cellObj1.lastCorrect then
-                return cellObj2 == true
-            elseif accuracy2 ~= accuracy1 then
-                return accuracy2 > accuracy1
-            elseif predRatioDiff2 ~= predRatioDiff1 then
-                return predRatioDiff2 < predRatioDiff1
+            -- Simple selection: prioritize bias-adjusted accuracy above all else
+            if math.abs(adjustedAccuracy2 - adjustedAccuracy1) > 0.01 then
+                return adjustedAccuracy2 > adjustedAccuracy1
+            -- Penalize cells that never vary their predictions
+            elseif isAlwaysSame1 and not isAlwaysSame2 then
+                return false  -- cellObj1 is worse (always same)
+            elseif isAlwaysSame2 and not isAlwaysSame1 then
+                return true   -- cellObj2 is worse (always same)
+            -- Finally, more experience
             else
                 return total2 > total1
             end
@@ -209,13 +308,17 @@ local function replaceCellInList (list)
     end
 end
 
-local function treatCell (tileX, tileY, cellObj)
+local function treatCell (tileX, tileY, cellObj, accuracyChange)
     -- -- Random chance to scale the cell's contribution
     -- if math.random () >= 0.20 then
     --     local multi = math.random (0, 5)
     --     map.currPred = map.currPred - cellObj.contributions + cellObj.contributions * multi
     --     cellObj.contributions = cellObj.contributions * multi
     -- end
+
+    -- Track accuracy improvement contribution
+    accuracyChange = accuracyChange or 0
+    cellObj.accuracyContribution = accuracyChange
 
     attemptPreds.total = attemptPreds.total + 1
 
@@ -296,7 +399,7 @@ function thisScene:load (...)
             max = math.huge,
         },
         tickCost = 0,
-        maxEnergy = 10000,
+        maxEnergy = math.huge,
         hyperargs = {
             moveForward = {
                 energyCost = 0,
@@ -329,10 +432,10 @@ function thisScene:load (...)
     for i = 1, maxCaptures do
         local newCellObj = cell:new (cell.maxEnergy, cell.maxHealth)
 
-        newCellObj.mutationRates.major = 0.35
-        newCellObj.mutationRates.moderate = 0.30
-        newCellObj.mutationRates.minor = 0.20
-        newCellObj.mutationRates.meta = 0.15
+        newCellObj.mutationRates.major = 0.25
+        newCellObj.mutationRates.moderate = 0.20
+        newCellObj.mutationRates.minor = 0.15
+        newCellObj.mutationRates.meta = 0.10
 
         -- Heavily mutate cell
         for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, 500)) do
@@ -426,7 +529,14 @@ function thisScene:update (dt)
             end
 
             local origPred = map.currPred
-            map:getCells (treatCell) -- Preps cells for the next prediction and places them into the pos/neg cell list
+            local accuracyChange = calcAccuracy() - origAccuracy
+            
+            -- Create a closure to pass accuracy change to treatCell
+            local function treatCellWithAccuracyChange(tileX, tileY, cellObj)
+                treatCell(tileX, tileY, cellObj, accuracyChange)
+            end
+            
+            map:getCells (treatCellWithAccuracyChange) -- Preps cells for the next prediction and places them into the pos/neg cell list
 
             predsSinceLastReset = predsSinceLastReset + 1
 
@@ -434,11 +544,20 @@ function thisScene:update (dt)
             if predsSinceLastReset >= batchSize then
                 predsSinceLastReset = 0
 
-                -- Replace cells that made incorrect predictions
-                if currLabel > 0 then
-                    replaceCellInList (negCellList)
-                else
-                    replaceCellInList (posCellList)
+                print ("BATCH SIZE MET. CELLS WILL BE TREATED!")
+
+                -- Always mutate worst performers from both prediction groups
+                -- This prevents cells from just learning to always predict one way
+                local allCells = {}
+                for _, cellData in ipairs(posCellList) do
+                    table.insert(allCells, cellData)
+                end
+                for _, cellData in ipairs(negCellList) do
+                    table.insert(allCells, cellData)
+                end
+                
+                if #allCells > 0 then
+                    replaceCellInList(allCells)
                 end
             end
             cellList = {}
@@ -452,9 +571,17 @@ function thisScene:update (dt)
             print ("Total Cells This Attempt: " .. map.stats.cells)
             print ("Positive Cells This Attempt: " .. #posCellList .. ", " .. attemptPreds.pos)
             print ("Negative Cells This Attempt: " .. #negCellList .. ", " .. attemptPreds.neg)
-            -- TODO: Figure out why this stat goes over 100% sometimes
             print("Number of Correct Cells This Attempt: " .. (currLabel > 0 and #negCellList or #posCellList) .. "/" .. map.stats.cells .. " (" .. round(((currLabel > 0 and #negCellList or #posCellList) / map.stats.cells) * 10000) / 100 .. "%)")
             print("Bad Cells Mutated and Replaced: " .. cellsMutatedThisRound .. "/" .. (currLabel > 0 and #negCellList or #posCellList) .. " (" .. round((cellsMutatedThisRound / map.stats.cells) * 10000) / 100 .. "%)")
+            
+            -- Count cells with checkpoints
+            local cellsWithCheckpoints = 0
+            map:getCells(function(tileX, tileY, cellObj)
+                if cellObj.successCheckpoint then
+                    cellsWithCheckpoints = cellsWithCheckpoints + 1
+                end
+            end)
+            print("Cells with Success Checkpoints: " .. cellsWithCheckpoints .. "/" .. map.stats.cells .. " (" .. round((cellsWithCheckpoints / map.stats.cells) * 100) .. "%)")
             print ("-------------------")
             print ("TP: " .. confusionMatrix.tp .. " | FP: " .. confusionMatrix.fp)
             print ("-------------------")
@@ -662,15 +789,17 @@ function thisScene:keypressed (key, scancode, isrepeat)
             end)
             print ("Total:", totalContributions)
             print("Current:", map.currPred)
-        elseif love.keypressed.isDown ("rshift") then
+        elseif love.keyboard.isDown ("rshift") then
             local cellObj = map:getCell(map:screenToMap(love.mouse.getPosition()))
 
-            print("==========Cell Stats==========")
-            print("Vote: " .. cellObj.contributions)
-            print("Total votes: " .. cellObj.total)
-            print("Accuracy: " .. cellObj.correct / cellObj.total)
-            print("Pred. ratio: " .. cellObj.positivePreds / cellObj.total)
-            print("Last pred correct: " .. cellObj.lastCorrect)
+            if cellObj then
+                print("==========Cell Stats==========")
+                print("Vote: " .. cellObj.contributions)
+                print("Total votes: " .. cellObj.total)
+                print("Accuracy: " .. (cellObj.total > 0 and cellObj.correct / cellObj.total or 0))
+                print("Pred. ratio: " .. (cellObj.total > 0 and cellObj.positivePreds / cellObj.total or 0))
+                print("Last pred correct: " .. tostring(cellObj.lastCorrect))
+            end
         else
             print ("==========Cell Global Variables==========")
             for i = 1, cell.globalVars do
