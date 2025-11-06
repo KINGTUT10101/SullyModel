@@ -49,11 +49,35 @@ function Neuron:addInput (id, neuron, weight)
 end
 
 
+function Neuron:removeInput (id)
+    assert (self.weights:exists (id, "key"), "Weight ID does not exist")
+
+    self.inputs:delete(id, "key")
+    self.weights:delete(id, "key")
+end
+
+
+function Neuron:getWeight (id)
+    assert (self.weights:exists (id, "key"), "Weight ID does not exist")
+
+    return self.weights:get(id, "key")
+end
+
+
 function Neuron:setWeight (id, weight)
     assert (self.weights:exists (id, "key"), "Weight ID does not exist")
 
     self.weights:replace (id, weight, "key")
 end
+
+
+function Neuron:adjustWeight (id, amount)
+    assert (self.weights:exists (id, "key"), "Weight ID does not exist")
+
+    local currentWeight = self.weights:get(id, "key")
+    self.weights:replace(id, currentWeight + amount, "key")
+end
+
 
 function Neuron:getInputIDs ()
     local keys = {}
