@@ -7,7 +7,7 @@ function NeuralNet:new (layers)
     assert (layers >= 1, "Neural network must have at least one hidden layer")
 
     local newObj = {
-        layers = {}, -- Each layer contains an array of neurons
+        layers = {}, -- Each layer contains a keyed array of neurons
     }
 
     -- Create arrays for network layers (+2 for input and output layers)
@@ -35,6 +35,26 @@ function NeuralNet:addHidden (id, neuron, layerIndex)
 end
 
 
+function NeuralNet:copy ()
+    local copyObj = NeuralNet:new(#self.layers - 2)
+
+    for i = 1, #self.layers do
+        for pos, id, neuron in self.layers[i]:pairs() do
+            local neuronInputIDs = neuron:getInputIDs()
+            local neuronInputRefs = {}
+
+            for index, id in ipairs (neuronInputIDs) do
+                neuronInputRefs[index] = self.layers[i - 1]:get(id, "key")
+            end
+
+            copyObj:addHidden (id, neuron:copy (neuronInputRefs))
+        end
+    end
+
+    return copyObj
+end
+
+
 --- Makes a prediction using the provided input values
 --- @param networkInputs table<string, number> A table mapping input IDs to their values
 --- @return table<string, number> networkOutputs A table mapping output IDs to their predicted values
@@ -58,7 +78,7 @@ function NeuralNet:predict (networkInputs)
     end
 
     -- Collect output neuron values
-    for pos, key, outputNeuron in self.layers[#self.layers]:iterate() do
+    for pos, key, outputNeuron in self.layers[#self.layers]:pairs() do
         networkOutputs[key] = outputNeuron.lastOutput
     end
 

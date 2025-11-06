@@ -1,3 +1,4 @@
+local copyTable = require ("Helpers.copyTable")
 local KeyedArray = require("Helpers.keyedArray")
 
 local Neuron = {}
@@ -26,10 +27,42 @@ function Neuron:new (actFunc)
 end
 
 
-function Neuron:addInput (neuron, weight)
+function Neuron:copy (inputNeurons)
+    local copyObj = Neuron:new(self.actFunc)
+
+    -- Copy weights and inputs
+    copyObj:setWeight ("bias", self.weights:get("bias", "key"))
+    for id, neuron in pairs (inputNeurons) do
+        copyObj:addInput (id, neuron, self.weights:get(id, "key"))
+    end
+
+    copyObj.lastOutput = self.lastOutput
+
+    return copyObj
+end
+
+function Neuron:addInput (id, neuron, weight)
     weight = weight or 0
 
+    self.inputs:insert(id, neuron)
+    self.weights:insert(id, weight)
+end
 
+
+function Neuron:setWeight (id, weight)
+    assert (self.weights:exists (id, "key"), "Weight ID does not exist")
+
+    self.weights:replace (id, weight, "key")
+end
+
+function Neuron:getInputIDs ()
+    local keys = {}
+
+    for _, id, _ in self.inputs:pairs() do
+        table.insert(keys, id)
+    end
+
+    return keys
 end
 
 

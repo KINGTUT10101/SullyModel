@@ -44,6 +44,36 @@ function KeyedArray:insert (key, value, position)
     end
 end
 
+--- Replaces an item in the keyed array.
+-- It will fail if the item does not already exist at the given key
+-- @param key (table key) The key of the new item
+-- @param value (any) The value of the new item
+-- @param position (int) The position of the item in the array. Defaults to the current size of the array + 1 and will fix values outside the array bounds
+-- @return (bool) True if the operation was successful, otherwise false
+function KeyedArray:replace (key, value, indexType)
+    indexType = indexType or "key"
+
+    if indexType == "key" then
+        if self.table[key] ~= nil then
+            local container = self.table[key]
+            container.value = value
+            return true
+        else
+            return false
+        end
+    elseif indexType == "array" then
+        if self.array[key] ~= nil then
+            local container = self.array[key]
+            container.value = value
+            return true
+        else
+            return false
+        end
+    else
+        error("KeyedArray: undefined key type")
+    end
+end
+
 --- Removes an item from the keyed array.
 -- @raise When the provided keyType is invalid
 -- @param key (table key) The key or position of the item
@@ -85,6 +115,20 @@ function KeyedArray:get (key, indexType)
         end
     else
         error ("KeyedArray: undefined key type")
+    end
+end
+
+--- Determines if a key exists in the keyed array.
+-- @raise When the provided keyType is invalid
+-- @param key (table key) The key or position of the item
+-- @param indexType (string) The type of index being used (either "array" or "key")
+function KeyedArray:exists (key, indexType)
+    if indexType == "array" then
+        return self.array[key] ~= nil
+    elseif indexType == "key" then
+        return self.table[key] ~= nil
+    else
+        error("KeyedArray: undefined key type")
     end
 end
 
