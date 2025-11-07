@@ -26,6 +26,7 @@ local cell = {
     minMutRate = 0,
     network = {
         layers = 0,
+        maxNeurons = 0,
     },
     mutsPerChild = {
         min = 0,
@@ -64,6 +65,7 @@ function cell:init (map, inputs, actions, options)
     options.network = options.network or {}
     self.network.layers = options.network.layers or 3
     self.network.maxNeurons = options.network.maxNeurons or 10
+    self.network.weightAdjust = options.network.weightAdjust or 0.1
 
     self.maxHealth = options.maxHealth or 500
     self.maxEnergy = options.maxEnergy or 500
@@ -198,7 +200,7 @@ function cell:mutate (cellObj)
     -- Pick a mutation type based on mutation rates
     local mutationType = weightedchoice (cellObj.mutationRates)
 
-
+    mutationHandlers[mutationType](cellObj)
 end
 
 

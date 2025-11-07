@@ -42,20 +42,26 @@ function Neuron:copy (inputNeurons)
 end
 
 function Neuron:addInput (id, neuron, weight)
+    assert (type(id) == "string", "Input ID must be a string")
+    assert (neuron ~= nil, "Neuron reference must be provided")
+    -- assert (self.weights:exists (id, "key") == false, "ID already exists")
+
     weight = weight or 0
 
-    self.inputs:insert(id, neuron)
-    self.weights:insert(id, weight)
+    if self.weights:exists (id, "key") == false then
+        self.inputs:insert(id, neuron)
+        self.weights:insert(id, weight)
+    end
 end
-
 
 function Neuron:removeInput (id)
-    assert (self.weights:exists (id, "key"), "Weight ID does not exist")
+    -- assert (self.weights:exists (id, "key"), "Weight ID does not exist")
 
-    self.inputs:delete(id, "key")
-    self.weights:delete(id, "key")
+    if self.weights:exists (id, "key") then
+        self.inputs:delete(id, "key")
+        self.weights:delete(id, "key")
+    end
 end
-
 
 function Neuron:getWeight (id)
     assert (self.weights:exists (id, "key"), "Weight ID does not exist")
@@ -71,11 +77,31 @@ function Neuron:setWeight (id, weight)
 end
 
 
+function Neuron:setWeightIndexed (index, weight)
+    assert (index >= 1 and index <= self.weights:size(), "Weight index is out of bounds")
+
+    self.weights:replace(index, weight, "array")
+end
+
+
 function Neuron:adjustWeight (id, amount)
     assert (self.weights:exists (id, "key"), "Weight ID does not exist")
 
     local currentWeight = self.weights:get(id, "key")
     self.weights:replace(id, currentWeight + amount, "key")
+end
+
+
+function Neuron:adjustWeightIndexed (index, amount)
+    assert (index >= 1 and index <= self.weights:size(), "Weight index is out of bounds")
+
+    local currentWeight = self.weights:get(index, "array")
+    self.weights:replace(index, currentWeight + amount, "array")
+end
+
+
+function Neuron:getWeightCount ()
+    return self.weights:size()
 end
 
 

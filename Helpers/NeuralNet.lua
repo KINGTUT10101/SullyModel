@@ -63,6 +63,14 @@ function NeuralNet:removeHidden (id, layerIndex)
 end
 
 
+function NeuralNet:removeHiddenIndexed (index, layerIndex)
+    assert (layerIndex >= 1 and layerIndex <= #self.layers, "Layer index must be between 1 and the number of layers")
+    assert (index >= 1 and index <= self.layers[layerIndex]:size(), "Index is out of bounds")
+
+    self.layers[layerIndex]:delete(index, "array")
+end
+
+
 function NeuralNet:addConnection (fromID, toID, layerIndex, weight)
     assert (layerIndex > 1 and layerIndex <= #self.layers, "Layer index must be between 2 and the number of layers")
     assert (self.layers[layerIndex - 1]:exists(fromID, "key") == true, "Source neuron with this ID does not exist in the previous layer")
@@ -70,6 +78,18 @@ function NeuralNet:addConnection (fromID, toID, layerIndex, weight)
 
     local fromNeuron = self.layers[layerIndex - 1]:get(fromID, "key")
     local toNeuron = self.layers[layerIndex]:get(toID, "key")
+
+    toNeuron:addInput(fromNeuron, weight)
+end
+
+
+function NeuralNet:addConnectionIndexed (fromIndex, toIndex, layerIndex, weight)
+    assert (layerIndex > 1 and layerIndex <= #self.layers, "Layer index must be between 2 and the number of layers")
+    assert (self.layers[layerIndex - 1]:exists(fromIndex, "array") == true, "Source neuron with this index does not exist in the previous layer")
+    assert (self.layers[layerIndex]:exists(toIndex, "array") == true, "Target neuron with this index does not exist in the specified layer")
+
+    local fromNeuron = self.layers[layerIndex - 1]:get(fromIndex, "array")
+    local toNeuron = self.layers[layerIndex]:get(toIndex, "array")
 
     toNeuron:addInput(fromNeuron, weight)
 end
@@ -85,6 +105,16 @@ function NeuralNet:removeConnection (fromID, toID, layerIndex)
 end
 
 
+function NeuralNet:removeConnectionIndexed (fromIndex, toIndex, layerIndex)
+    assert (layerIndex > 1 and layerIndex <= #self.layers, "Layer index must be between 2 and the number of layers")
+    assert (self.layers[layerIndex - 1]:exists(fromIndex, "array") == true, "Source neuron with this index does not exist in the previous layer")
+    assert (self.layers[layerIndex]:exists(toIndex, "array") == true, "Target neuron with this index does not exist in the specified layer")
+
+    local toNeuron = self.layers[layerIndex]:get(toIndex, "array")
+    toNeuron:removeInput(fromIndex)
+end
+
+
 function NeuralNet:getWeight (id, layerIndex)
     assert (layerIndex >= 1 and layerIndex <= #self.layers, "Layer index must be between 1 and the number of layers")
     assert (self.layers[layerIndex]:exists(id, "key") == true, "Neuron with this ID does not exist in the layer")
@@ -95,21 +125,51 @@ function NeuralNet:getWeight (id, layerIndex)
 end
 
 
-function NeuralNet:setWeight (id, layerIndex, weight)
+function NeuralNet:setWeight (id, layerIndex, weightIndex, weight)
     assert (layerIndex >= 1 and layerIndex <= #self.layers, "Layer index must be between 1 and the number of layers")
     assert (self.layers[layerIndex]:exists(id, "key") == true, "Neuron with this ID does not exist in the layer")
 
     local neuron = self.layers[layerIndex]:get(id, "key")
-    neuron:setWeight(id, weight)
+    neuron:setWeightIndexed (weightIndex, weight)
 end
 
 
-function NeuralNet:adjustWeight (id, layerIndex, amount)
+function NeuralNet:adjustWeight (id, layerIndex, weightIndex, amount)
     assert (layerIndex >= 1 and layerIndex <= #self.layers, "Layer index must be between 1 and the number of layers")
     assert (self.layers[layerIndex]:exists(id, "key") == true, "Neuron with this ID does not exist in the layer")
 
     local neuron = self.layers[layerIndex]:get(id, "key")
-    neuron:adjustWeight(id, amount)
+    neuron:adjustWeightIndexed (weightIndex, amount)
+end
+
+
+function NeuralNet:getWeightCount (id, layerIndex)
+    assert (layerIndex >= 1 and layerIndex <= #self.layers, "Layer index must be between 1 and the number of layers")
+    assert (self.layers[layerIndex]:exists(id, "key") == true, "Neuron with this ID does not exist in the layer")
+
+    local neuron = self.layers[layerIndex]:get(id, "key")
+    return neuron:getWeightCount()
+end
+
+
+function NeuralNet:getWeightCountIndexed (index, layerIndex)
+    assert (layerIndex >= 1 and layerIndex <= #self.layers, "Layer index must be between 1 and the number of layers")
+    assert (self.layers[layerIndex]:exists(index, "array") == true, "Neuron with this index does not exist in the layer")
+
+    local neuron = self.layers[layerIndex]:get(index, "array")
+    return neuron:getWeightCount()
+end
+
+
+function NeuralNet:getLayerSize (layerIndex)
+    assert (layerIndex >= 1 and layerIndex <= #self.layers, "Layer index must be between 1 and the number of layers")
+
+    return self.layers[layerIndex]:size()
+end
+
+
+function NeuralNet:getLayerCount ()
+    return #self.layers
 end
 
 
