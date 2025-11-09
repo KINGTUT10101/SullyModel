@@ -1,4 +1,3 @@
-local copyTable = require ("Helpers.copyTable")
 local KeyedArray = require("Helpers.keyedArray")
 
 local Neuron = {}

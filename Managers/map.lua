@@ -1,5 +1,6 @@
 local bitser = require ("Libraries.bitser")
 local clamp = require ("Libraries.lume").clamp
+local round = require ("Libraries.lume").round
 local cycleValue = require ("Helpers.cycleValue")
 local mapToScale = require ("Helpers.mapToScale")
 local copyTable  = require("Helpers.copyTable")
@@ -41,33 +42,33 @@ local map = {
 }
 
 function map:quickSave ()
-    local cellGridCopy = {}
+    -- local cellGridCopy = {}
 
-    for i = 1, self.width do
-        local cellRow = {}
-        cellGridCopy[i] = cellRow -- Add row to cell grid
+    -- for i = 1, self.width do
+    --     local cellRow = {}
+    --     cellGridCopy[i] = cellRow -- Add row to cell grid
 
-        for j = 1, self.height do
-            if self.cellGrid[i][j] ~= nil then
-                cellRow[j] = copyTable (self.cellGrid[i][j])
-                cellRow[j].scriptFunc = nil
-                if cellRow[j].childCell ~= nil then
-                    cellRow[j].childCell.scriptFunc = nil
-                end
-            end
-        end
-    end
+    --     for j = 1, self.height do
+    --         if self.cellGrid[i][j] ~= nil then
+    --             cellRow[j] = copyTable (self.cellGrid[i][j])
+    --             cellRow[j].scriptFunc = nil
+    --             if cellRow[j].childCell ~= nil then
+    --                 cellRow[j].childCell.scriptFunc = nil
+    --             end
+    --         end
+    --     end
+    -- end
     
-    local fileName = "quickSave_" .. os.date("%Y-%m-%d_%H-%M-%S") .. ".slf"
-    bitser.dumpLoveFile (fileName, {
-        envGrid = self.envGrid,
-        cellGrid = cellGridCopy,
-        stats = self.stats,
-        lastSave = self.lastSave,
-        resets = self.resets,
-        lastTick = self.lastTick,
-    })
-    print ("QUICK SAVE: " .. fileName)
+    -- local fileName = "quickSave_" .. os.date("%Y-%m-%d_%H-%M-%S") .. ".slf"
+    -- bitser.dumpLoveFile (fileName, {
+    --     envGrid = self.envGrid,
+    --     cellGrid = cellGridCopy,
+    --     stats = self.stats,
+    --     lastSave = self.lastSave,
+    --     resets = self.resets,
+    --     lastTick = self.lastTick,
+    -- })
+    -- print ("QUICK SAVE: " .. fileName)
 end
 
 --- Initializes the map manager and prepares it for processing.
@@ -165,13 +166,13 @@ function map:update (dt)
 
                         local result, errorStr = pcall (self.cellManager.update, self.cellManager, i, j, cellObj, self) -- Call cell update function
                     
-                        if result == false then
-                            self.cellManager:printCellScriptString (cellObj)
-                            self.cellManager:printCellInfo (cellObj)
-                            love.system.setClipboardText (self.cellManager:compileScript (cellObj, true))
-                            print ("Cell located at (" .. i .. ", " .. j .. ")")
-                            error (errorStr)
-                        end
+                        -- if result == false then
+                        --     self.cellManager:printCellScriptString (cellObj)
+                        --     self.cellManager:printCellInfo (cellObj)
+                        --     love.system.setClipboardText (self.cellManager:compileScript (cellObj, true))
+                        --     print ("Cell located at (" .. i .. ", " .. j .. ")")
+                        --     error (errorStr)
+                        -- end
                     end
 
                     capture = cellObj
@@ -388,7 +389,7 @@ end
 --- @return table|nil cellObj The cell object at the given position or nil if a cell object doesn't exist there.
 function map:getCell (tileX, tileY)
     if self:isTaken (tileX, tileY) == true then
-        return copyTable (self.cellGrid[tileX][tileY])
+        return self.cellGrid[tileX][tileY]
     end
 end
 
@@ -402,16 +403,17 @@ end
 --- @return boolean success True if a cell object was spawned successfully.
 function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
     if self.stats.cells < self.cellManager.maxCells and self:isClear (tileX, tileY) == true then
-        local newCellObj = self.cellManager:new (health, energy) -- Create default cell object
+        local newCellObj
 
         -- Mutate cell if a parent is given
         if parentCellObj ~= nil then
-            -- TODO: Mutate the child cell multiple times
-            local mutSuccess, mutErr = pcall (self.cellManager.mutate, self.cellManager, newCellObj, parentCellObj)
-            local compSuccess, compErr = pcall (self.cellManager.compileScript, self.cellManager, newCellObj)
-
-            assert (mutSuccess == true, "ERROR: Problem with mutation:" .. tostring (mutErr))
-            assert (compSuccess == true, "ERROR: Problem with script compilation:" .. tostring (compErr))
+            newCellObj = self.cellManager:newChild (parentCellObj)
+            
+            for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, 25)) do
+                self.cellManager:mutate (newCellObj)
+            end
+        else
+            newCellObj = self.cellManager:new (health, energy) -- Create default cell object
         end
 
         self.cellGrid[tileX][tileY] = newCellObj
@@ -432,6 +434,7 @@ end
 --- @param parentCellObj? table The parent cell object object.
 --- @return boolean success True if a cell object was spawned successfully.
 function map:spawnEgg (tileX, tileY, health, energy, parentCellObj)
+    error ("TODO: map:spawnEgg")
     if self.stats.cells < self.cellManager.maxCells and self:isClear (tileX, tileY) == true then
         local newCellObj = self.cellManager:new (math.huge, math.huge) -- Create default cell object
 

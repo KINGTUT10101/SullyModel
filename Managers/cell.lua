@@ -22,7 +22,6 @@ local cell = {
     maxEnergy = 0, -- The maximum energy of a cell object
     tickCost = 0,
     maxCells = 0,
-    maxActions = 0,
     minMutRate = 0,
     network = {
         layers = 0,
@@ -34,10 +33,10 @@ local cell = {
         mean = 0,
     },
     initialMutRates = {
-        major = 0,
-        moderate = 0,
-        minor = 0,
-        meta = 0,
+        -- major = 0,
+        -- moderate = 0,
+        -- minor = 0,
+        -- meta = 0,
     },
     cellAge = {
         min = 0,
@@ -72,7 +71,6 @@ function cell:init (map, inputs, actions, options)
     self.eggTimer = options.eggTimer or 350
     self.tickCost = options.tickCost or 1
     self.maxCells = options.maxCells or math.huge
-    self.maxActions = options.maxActions or 1000
     self.minMutRate = options.minMutRate or 1
 
     options.mutsPerChild = options.mutsPerChild or {}
@@ -199,7 +197,6 @@ function cell:mutate (cellObj)
 
     -- Pick a mutation type based on mutation rates
     local mutationType = weightedchoice (cellObj.mutationRates)
-
     mutationHandlers[mutationType](cellObj)
 end
 
@@ -255,9 +252,10 @@ end
 
 
 function cell:printCellScriptString (cellObj)
-    print ("==========" .. "Cell Script List - " .. tostring (cellObj) .. "==========")
-    print (addLineNumbers (self:compileScript (cellObj, true)))
-    print ()
+    -- print ("==========" .. "Cell Script List - " .. tostring (cellObj) .. "==========")
+    -- print (addLineNumbers (self:compileScript (cellObj, true)))
+    -- print ()
+    print ("TODO")
 end
 
 return cell

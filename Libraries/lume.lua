@@ -148,7 +148,10 @@ function lume.weightedchoice(t)
     assert(v >= 0, "weight value less than zero")
     sum = sum + v
   end
-  assert(sum ~= 0, "all weights are zero")
+  -- assert(sum ~= 0, "all weights are zero")
+  if sum == 0 then
+    return nil
+  end
   local rnd = lume.random(sum)
   for k, v in pairs(t) do
     if rnd < v then return k end

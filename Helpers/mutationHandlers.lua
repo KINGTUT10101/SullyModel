@@ -17,10 +17,10 @@ function mutationHandlers.addNeuron(cellObj)
         weightedChoices[i] = cellObj.network:getLayerSize(i)
     end
 
-    if #weightedChoices == 0 then
+    local chosenLayer = lume.weightedchoice(weightedChoices)
+    if not chosenLayer then
         return
     end
-    local chosenLayer = lume.weightedchoice(weightedChoices)
     if cellObj.network:getLayerSize(chosenLayer) < cell.network.maxNeurons then
         local newNeuron = Neuron:new(actFuncs.relu)
         cellObj.network:addHidden (newNeuron, newNeuron, chosenLayer)
@@ -33,10 +33,10 @@ function mutationHandlers.removeNeuron(cellObj)
         weightedChoices[i] = cellObj.network:getLayerSize(i)
     end
 
-    if #weightedChoices == 0 then
+    local chosenLayer = lume.weightedchoice(weightedChoices)
+    if not chosenLayer then
         return
     end
-    local chosenLayer = lume.weightedchoice(weightedChoices)
     if cellObj.network:getLayerSize(chosenLayer) > 0 then
         cellObj.network:removeHiddenIndexed (math.random (1, cellObj.network:getLayerSize(chosenLayer)), chosenLayer)
     end
@@ -48,16 +48,15 @@ function mutationHandlers.increaseWeight(cellObj)
         weightedChoices[i] = cellObj.network:getLayerSize(i)
     end
 
-    if #weightedChoices == 0 then
-        return
-    end
     local chosenLayer = lume.weightedchoice(weightedChoices)
-    local chosenNeuronIndex = math.random (1, cellObj.network:getLayerSize(chosenLayer))
-    local weightCount = cellObj.network:getWeightCountIndexed (chosenNeuronIndex, chosenLayer)
-    
-    if weightCount > 0 then
-        local chosenWeightIndex = math.random(1, weightCount)
-        cellObj.network:adjustWeight(chosenNeuronIndex, chosenLayer, chosenWeightIndex, cell.network.weightAdjust)
+    if chosenLayer then
+        local chosenNeuronIndex = math.random (1, cellObj.network:getLayerSize(chosenLayer))
+        local weightCount = cellObj.network:getWeightCountIndexed (chosenNeuronIndex, chosenLayer)
+        
+        if weightCount > 0 then
+            local chosenWeightIndex = math.random(1, weightCount)
+            cellObj.network:adjustWeight(chosenNeuronIndex, chosenLayer, chosenWeightIndex, cell.network.weightAdjust)
+        end
     end
 end
 
@@ -67,16 +66,15 @@ function mutationHandlers.decreaseWeight(cellObj)
         weightedChoices[i] = cellObj.network:getLayerSize(i)
     end
 
-    if #weightedChoices == 0 then
-        return
-    end
     local chosenLayer = lume.weightedchoice(weightedChoices)
-    local chosenNeuronIndex = math.random (1, cellObj.network:getLayerSize(chosenLayer))
-    local weightCount = cellObj.network:getWeightCountIndexed (chosenNeuronIndex, chosenLayer)
-    
-    if weightCount > 0 then
-        local chosenWeightIndex = math.random(1, weightCount)
-        cellObj.network:adjustWeight(chosenNeuronIndex, chosenLayer, chosenWeightIndex, -cell.network.weightAdjust)
+    if chosenLayer then
+        local chosenNeuronIndex = math.random (1, cellObj.network:getLayerSize(chosenLayer))
+        local weightCount = cellObj.network:getWeightCountIndexed (chosenNeuronIndex, chosenLayer)
+        
+        if weightCount > 0 then
+            local chosenWeightIndex = math.random(1, weightCount)
+            cellObj.network:adjustWeight(chosenNeuronIndex, chosenLayer, chosenWeightIndex, -cell.network.weightAdjust)
+        end
     end
 end
 
@@ -86,17 +84,16 @@ function mutationHandlers.randomizeWeight(cellObj)
         weightedChoices[i] = cellObj.network:getLayerSize(i)
     end
 
-    if #weightedChoices == 0 then
-        return
-    end
     local chosenLayer = lume.weightedchoice(weightedChoices)
-    local chosenNeuronIndex = math.random (1, cellObj.network:getLayerSize(chosenLayer))
-    local weightCount = cellObj.network:getWeightCountIndexed (chosenNeuronIndex, chosenLayer)
-    
-    if weightCount > 0 then
-        local chosenWeightIndex = math.random(1, weightCount)
-        local newWeight = mapToScale (math.random (), 0, 1, -1, 1)
-        cellObj.network:setWeight(chosenNeuronIndex, chosenLayer, chosenWeightIndex, newWeight)
+    if chosenLayer then
+        local chosenNeuronIndex = math.random (1, cellObj.network:getLayerSize(chosenLayer))
+        local weightCount = cellObj.network:getWeightCountIndexed (chosenNeuronIndex, chosenLayer)
+        
+        if weightCount > 0 then
+            local chosenWeightIndex = math.random(1, weightCount)
+            local newWeight = mapToScale (math.random (), 0, 1, -1, 1)
+            cellObj.network:setWeight(chosenNeuronIndex, chosenLayer, chosenWeightIndex, newWeight)
+        end
     end
 end
 
@@ -106,53 +103,50 @@ function mutationHandlers.zeroWeight(cellObj)
         weightedChoices[i] = cellObj.network:getLayerSize(i)
     end
 
-    if #weightedChoices == 0 then
-        return
-    end
     local chosenLayer = lume.weightedchoice(weightedChoices)
-    local chosenNeuronIndex = math.random (1, cellObj.network:getLayerSize(chosenLayer))
-    local weightCount = cellObj.network:getWeightCountIndexed (chosenNeuronIndex, chosenLayer)
-    
-    if weightCount > 0 then
-        local chosenWeightIndex = math.random(1, weightCount)
-        cellObj.network:setWeight(chosenNeuronIndex, chosenLayer, chosenWeightIndex, 0)
+    if chosenLayer then
+        local chosenNeuronIndex = math.random (1, cellObj.network:getLayerSize(chosenLayer))
+        local weightCount = cellObj.network:getWeightCountIndexed (chosenNeuronIndex, chosenLayer)
+        
+        if weightCount > 0 then
+            local chosenWeightIndex = math.random(1, weightCount)
+            cellObj.network:setWeight(chosenNeuronIndex, chosenLayer, chosenWeightIndex, 0)
+        end
     end
 end
 
-function mutationHandlers.addNeuronConnection(cellObj)
+function mutationHandlers.addConnection(cellObj)
     local weightedChoices = {}
     for i = 2, cellObj.network:getLayerCount() - 2 do
         weightedChoices[i] = cellObj.network:getLayerSize(i)
     end
 
-    if #weightedChoices == 0 then
-        return
-    end
     local chosenLayer = lume.weightedchoice(weightedChoices)
-    local chosenNeuronIndex = math.random (1, cellObj.network:getLayerSize(chosenLayer))
+    if chosenLayer then
+        local chosenNeuronIndex = math.random (1, cellObj.network:getLayerSize(chosenLayer))
 
-    if cellObj.network:getLayerSize(chosenLayer - 1) > 0 then
-        local inputIndex = math.random(1, cellObj.network:getLayerSize(chosenLayer - 1))
-        local initialWeight = mapToScale(math.random(), 0, 1, -1, 1)
-        cellObj.network:addConnectionIndexed(inputIndex, chosenNeuronIndex, chosenLayer, initialWeight)
+        if cellObj.network:getLayerSize(chosenLayer - 1) > 0 then
+            local inputIndex = math.random(1, cellObj.network:getLayerSize(chosenLayer - 1))
+            local initialWeight = mapToScale(math.random(), 0, 1, -1, 1)
+            cellObj.network:addConnectionIndexed(inputIndex, chosenNeuronIndex, chosenLayer, initialWeight)
+        end
     end
 end
 
-function mutationHandlers.removeNeuronConnection(cellObj)
+function mutationHandlers.removeConnection(cellObj)
     local weightedChoices = {}
     for i = 2, cellObj.network:getLayerCount() - 2 do
         weightedChoices[i] = cellObj.network:getLayerSize(i)
     end
 
-    if #weightedChoices == 0 then
-        return
-    end
     local chosenLayer = lume.weightedchoice(weightedChoices)
-    local chosenNeuronIndex = math.random (1, cellObj.network:getLayerSize(chosenLayer))
-    local inputIndex = math.random(1, cellObj.network:getWeightCountIndexed(chosenNeuronIndex, chosenLayer))
+    if chosenLayer then
+        local chosenNeuronIndex = math.random (1, cellObj.network:getLayerSize(chosenLayer))
+        local inputIndex = math.random(1, cellObj.network:getWeightCountIndexed(chosenNeuronIndex, chosenLayer))
 
-    if inputIndex then
-        cellObj.network:removeConnectionIndexed(inputIndex, chosenNeuronIndex, chosenLayer)
+        if inputIndex then
+            cellObj.network:removeConnectionIndexed(inputIndex, chosenNeuronIndex, chosenLayer)
+        end
     end
 end
 
