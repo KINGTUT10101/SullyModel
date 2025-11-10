@@ -20,12 +20,12 @@ local captures = {}
 
 local cyclesSinceLastFail = 0
 
-local failsafeSpawns = 200
+local failsafeSpawns = 350
 local failsafeActivations = -1
 local lastCell = nil
 local failsafeMutations = {
     min = 10,
-    max = 100,
+    max = 5000,
 }
 
 local renderMap = true
@@ -54,8 +54,8 @@ function thisScene:load (...)
     cell:init (map, cellInputs, cellActions, {
         maxCells = math.huge,
         network = {
-            layers = 1,
-            maxNeurons = 1,
+            layers = 3,
+            maxNeurons = 12,
         }
     })
     map:init (cell, {
