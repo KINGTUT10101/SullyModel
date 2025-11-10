@@ -6,7 +6,9 @@ local copyTable = require ("Helpers.copyTable")
 local mapToScale = require ("Helpers.mapToScale")
 local addLineNumbers = require ("Helpers.addLineNumbers")
 local NeuralNet = require ("Helpers.NeuralNet")
+local Neuron = require ("Helpers.Neuron")
 local mutationHandlers = require ("Helpers.mutationHandlers")
+local actFuncs = require ("Helpers.actFuncs")
 
 local cell = {
     map = nil, -- A reference to the map manager
@@ -114,6 +116,16 @@ function cell:new (health, energy, type)
         network = NeuralNet:new(self.network.layers),
     }
 
+    -- Initializes the cell's network
+    for inputID, inputFunc in pairs (self.inputs) do
+        newCell.network:addHidden (inputID, Neuron:new (actFuncs.relu), 1)
+    end
+    for actionID, actionFunc in pairs (self.actions) do
+        newCell.network:addHidden (actionID, Neuron:new (actFuncs.relu), newCell.network:getLayerCount ())
+    end
+
+    -- newCell.network:addHidden ("test", Neuron:new (actFuncs.relu), 2) -- TEMP
+
     -- Initialize memory variables
     for i = 1, self.memVars do
         newCell.vars[i] = 0
@@ -169,7 +181,9 @@ function cell:update (tileX, tileY, cellObj, map)
         end
 
         -- Trigger the action associated with the highest output
-        self.actions[maxOutputKey] (tileX, tileY, cellObj, self.map)
+        if maxOutputValue > 0 then
+            self.actions[maxOutputKey] (tileX, tileY, cellObj, self.map)
+        end
 
     elseif cellObj.type == "egg" then
         error ("TODO: cell eggs in cell:update ()")
@@ -189,7 +203,7 @@ end
 
 function cell:mutate (cellObj)
     -- Mutate color slightly
-    if math.random () < 0.75 then
+    if math.random () < 0.01 then
         local colorIndex = math.random (1, 3)
         local colorTbl = cellObj.color
         colorTbl[colorIndex] = clamp (colorTbl[colorIndex] + (math.random () < 0.50 and -10 or 10) / 100, 0.10, 0.85)
@@ -197,6 +211,7 @@ function cell:mutate (cellObj)
 
     -- Pick a mutation type based on mutation rates
     local mutationType = weightedchoice (cellObj.mutationRates)
+    -- print (mutationType)
     mutationHandlers[mutationType](cellObj)
 end
 
@@ -215,18 +230,26 @@ end
 function cell:printCellInfo (cellObj)
     print ("==========" .. "Cell Info - " .. tostring (cellObj) .. "==========")
     for k, v in pairs (cellObj) do
-        if k == "scriptList" then
-            print (tostring(k) .. ": " .. #v .. " actions")
-        else
-            print (tostring(k) .. ": " .. tostring(v))
-            if type (v) == "table" then
-                for k, v in pairs (v) do
-                    print ("  " .. tostring(k) .. ": " .. tostring(v))
+        if k ~= "network" then
+            if k == "scriptList" then
+                print (tostring(k) .. ": " .. #v .. " actions")
+            else
+                print (tostring(k) .. ": " .. tostring(v))
+                if type (v) == "table" then
+                    for k, v in pairs (v) do
+                        print ("  " .. tostring(k) .. ": " .. tostring(v))
+                    end
                 end
             end
         end
     end
     print ()
+end
+
+
+function cell:printNetwork (cellObj)
+    -- print ("==========" .. "Cell Network - " .. tostring (cellObj) .. "==========")
+    cellObj.network:print ()
 end
 
 

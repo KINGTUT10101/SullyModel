@@ -1,3 +1,4 @@
+local printTable = require ("Helpers.printTable")
 local KeyedArray = require("Helpers.keyedArray")
 
 local Neuron = {}
@@ -41,8 +42,8 @@ function Neuron:copy (inputNeurons)
 end
 
 function Neuron:addInput (id, neuron, weight)
-    assert (type(id) == "string", "Input ID must be a string")
     assert (neuron ~= nil, "Neuron reference must be provided")
+    assert (type (neuron) == "table", "Neuron reference must be a table (got " .. type(neuron) .. ": " .. tostring(neuron) .. ")")
     -- assert (self.weights:exists (id, "key") == false, "ID already exists")
 
     weight = weight or 0
@@ -124,6 +125,19 @@ function Neuron:predict ()
     end
 
     self.lastOutput = self.actFunc(sum)
+end
+
+
+function Neuron:print ()
+    print ("-Neuron " .. tostring (self) .. "-")
+    print ("Last output: " .. tostring(self.lastOutput))
+    for index, id, weight in self.weights:pairs() do
+        local input = self.inputs:get(id, "key")
+        print ("Input ID: " .. tostring (id))
+        print ("  Weight: " .. tostring (weight))
+        print ("  Ref: " .. tostring (input))
+    end
+    print ()
 end
 
 return Neuron

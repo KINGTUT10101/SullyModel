@@ -5,6 +5,7 @@ local cell = require ("Managers.cell")
 local mapToScale = require ("Helpers.mapToScale")
 local round = require ("Libraries.lume").round
 local cellActions = require ("Data.cellActions")
+local cellInputs = require ("Data.cellInputs")
 local cycleValue = require ("Helpers.cycleValue")
 
 local mapSize = 50
@@ -19,9 +20,13 @@ local captures = {}
 
 local cyclesSinceLastFail = 0
 
-local failsafeSpawns = 1
+local failsafeSpawns = 200
 local failsafeActivations = -1
 local lastCell = nil
+local failsafeMutations = {
+    min = 10,
+    max = 100,
+}
 
 local renderMap = true
 local renderModeIndex = 1
@@ -46,8 +51,12 @@ local function mapBarriers (tileX, tileY)
 end
 
 function thisScene:load (...)
-    cell:init (map, cellActions.actionDefs, cellActions.scriptPrefixes, {
+    cell:init (map, cellInputs, cellActions, {
         maxCells = math.huge,
+        network = {
+            layers = 1,
+            maxNeurons = 1,
+        }
     })
     map:init (cell, {
         inputBounds = {
@@ -68,7 +77,7 @@ function thisScene:load (...)
         local newCellObj = cell:new (250, 250)
 
         -- Heavily mutate cell
-        for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, 100)) do
+        for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, failsafeMutations.min, failsafeMutations.max)) do
             cell:mutate (newCellObj)
         end
 
@@ -134,7 +143,7 @@ function thisScene:update (dt)
                 local newCell = cell:newChild (captures[i])
 
                 -- Heavily mutate cell
-                for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, 80)) do
+                for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, failsafeMutations.min, failsafeMutations.max)) do
                     cell:mutate (newCell)
                 end
 
@@ -229,7 +238,7 @@ function thisScene:keypressed (key, scancode, isrepeat)
 
             if cellToPrint ~= nil then
                 if love.keyboard.isDown ("lctrl") == true then
-                    cell:printCellScriptList (map:getCell (tileX, tileY))
+                    cell:printNetwork (map:getCell (tileX, tileY))
                 else
                     cell:printCellInfo (map:getCell (tileX, tileY))
                 end
@@ -243,6 +252,20 @@ function thisScene:keypressed (key, scancode, isrepeat)
     -- Toggle rendering
     elseif key == "z" then
         renderMap = not renderMap
+
+    -- Mutate cell
+    elseif key == "o" then
+        if love.keyboard.isDown ("lctrl") then
+            local tileX, tileY = map:screenToMap (love.mouse.getPosition ())
+            local cellObj = map:getCell (tileX, tileY)
+
+            if cellObj then
+                for i = 1, 5000 do
+                    cell:mutate (cellObj)
+                end
+                print ("(" .. tostring (cellObj) .. ") Cell mutated!")
+            end
+        end
     
     -- Toggles superspeed
     elseif key == "tab" then
