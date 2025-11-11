@@ -175,7 +175,9 @@ function map:update (dt)
                         -- end
                     end
 
-                    capture = cellObj
+                    if cellObj.type == "normal" then
+                        capture = cellObj
+                    end
                 end
             end
         end
@@ -419,9 +421,8 @@ function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
         self.cellGrid[tileX][tileY] = newCellObj
         
         -- Only count normal and egg cells
-        if newCellObj.type == "normal" or newCellObj.type == "egg" then
-            self.stats.cells = self.stats.cells + 1
-        end
+        assert (newCellObj.type ~= "wall", "Error: Attempted to count a wall cell as a normal or egg cell.")
+        self.stats.cells = self.stats.cells + 1
         
         return true
     else
