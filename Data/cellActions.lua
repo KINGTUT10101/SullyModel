@@ -43,7 +43,11 @@ end
 
 function cellActions.consume (tileX, tileY, cellObj, map)
     local itx, ity = map:getForwardPos (tileX, tileY, 1)
-    map:transferInputToCell (itx, ity, hyperArgs.consume.energyFromTile, hyperArgs.consume.energyCost)
+    local origEnergy = cellObj.energy
+    map:transferInputToCell (itx, ity, cellObj, hyperArgs.consume.energyFromTile, hyperArgs.consume.energyCost)
+    -- if cellObj.energy - origEnergy > 0 then
+    --     print ("Energy change: " .. (cellObj.energy - origEnergy))
+    -- end
 end
 
 function cellActions.applyDamage (tileX, tileY, cellObj, map)

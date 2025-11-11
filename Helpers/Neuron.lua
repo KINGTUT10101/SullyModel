@@ -48,6 +48,11 @@ function Neuron:addInput (id, neuron, weight)
 
     weight = weight or 0
 
+    if id == 1 then
+        error ()
+
+    end
+
     if self.weights:exists (id, "key") == false then
         self.inputs:insert(id, neuron)
         self.weights:insert(id, weight)

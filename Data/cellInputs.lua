@@ -14,6 +14,26 @@ function cellInputs.age (tileX, tileY, cellObj, map)
     return cellObj.age
 end
 
+function cellInputs.verticalDir (tileX, tileY, cellObj, map)
+    if cellObj.direction == 1 then
+        return 1
+    elseif cellObj.direction == 3 then
+        return -1
+    else
+        return 0
+    end
+end
+
+function cellInputs.horizontalDir (tileX, tileY, cellObj, map)
+    if cellObj.direction == 2 then
+        return 1
+    elseif cellObj.direction == 4 then
+        return -1
+    else
+        return 0
+    end
+end
+
 function cellInputs.otherCellResources (tileX, tileY, cellObj, map)
     return map:getCellTotalResources (map:getForwardPos (tileX, tileY, 1)) or 0
 end

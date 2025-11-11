@@ -33,8 +33,32 @@ function NeuralNet:copy ()
             local neuronInputIDs = neuron:getInputIDs()
             local neuronInputRefs = {}
 
-            for index, id in ipairs (neuronInputIDs) do
-                neuronInputRefs[index] = self.layers[i - 1]:get(id, "key")
+            -- Only get input references for layers after the input layer
+            if i > 1 then
+                -- for index, inputID in ipairs (neuronInputIDs) do
+                --     -- Get the array position of the input neuron in the old network
+                --     local inputPosition = self.layers[i - 1]:getKey(inputID, "key")
+                    
+                --     if inputPosition then
+                --         -- Get the neuron at that same position in the new network
+                --         local newInputNeuron = copyObj.layers[i - 1]:get(inputPosition, "array")
+                --         -- Get the key for that neuron in the new network
+                --         local newInputID = copyObj.layers[i - 1]:getKey(inputPosition, "array")
+                --         -- Map the new ID to the new neuron reference
+                --         neuronInputRefs[newInputID] = newInputNeuron
+                --     else
+                --         -- Input ID doesn't exist in the previous layer - this is a stale reference
+                --         -- Skip it rather than crashing
+                --         -- print("Warning: Skipping stale input reference in layer " .. i)
+                --     end
+                -- end
+
+                for index, inputID in ipairs (neuronInputIDs) do
+                    local inputPos = self.layers[i - 1]:getKey (inputID, "key") -- Get position of the input neuron in original network layer
+                    local newInputNeuronKey = copyObj.layers[i - 1]:getKey (inputPos, "array") -- Get the key of the input neuron in the new network by its position
+                    assert (newInputNeuronKey, "Failed to find new input neuron position with " .. tostring (inputID) .. " - " .. tostring (inputPos) .. ".\nPrevious orig layer size: " .. tostring (self.layers[i - 1]:size ()) .. ".\nPrevious new layer size: " .. tostring (copyObj.layers[i - 1]:size ()) .. ".")
+                    neuronInputRefs[newInputNeuronKey] = copyObj.layers[i - 1]:get(newInputNeuronKey, "key")
+                end
             end
 
             copyObj:addHidden (id, neuron:copy (neuronInputRefs), i)
@@ -94,7 +118,8 @@ function NeuralNet:addConnection (fromID, toID, layerIndex, weight)
     local fromNeuron = self.layers[layerIndex - 1]:get(fromID, "key")
     local toNeuron = self.layers[layerIndex]:get(toID, "key")
 
-    toNeuron:addInput(fromNeuron, weight)
+    -- Use the from neuron ID as the weight/input key, not the neuron table itself
+    toNeuron:addInput(fromID, fromNeuron, weight)
 end
 
 
@@ -103,10 +128,11 @@ function NeuralNet:addConnectionIndexed (fromIndex, toIndex, layerIndex, weight)
     assert (self.layers[layerIndex - 1]:exists(fromIndex, "array") == true, "From neuron with this index (" .. tostring (fromIndex) .. ") does not exist in the previous layer")
     assert (self.layers[layerIndex]:exists(toIndex, "array") == true, "To neuron with this index (" .. tostring (toIndex) .. ") does not exist in the specified layer")
 
+    local fromNeuronID = self.layers[layerIndex - 1]:getKey(fromIndex, "array")
     local fromNeuron = self.layers[layerIndex - 1]:get(fromIndex, "array")
     local toNeuron = self.layers[layerIndex]:get(toIndex, "array")
 
-    toNeuron:addInput(fromNeuron, fromNeuron, weight)
+    toNeuron:addInput(fromNeuronID, fromNeuron, weight)
 end
 
 
@@ -122,11 +148,12 @@ end
 
 function NeuralNet:removeConnectionIndexed (fromIndex, toIndex, layerIndex)
     assert (layerIndex and layerIndex > 1 and layerIndex <= #self.layers, "Layer index must be between 2 and the number of layers (current value: " .. layerIndex .. ")")
-    -- assert (self.layers[layerIndex - 1]:exists(fromIndex, "array") == true, "From neuron with this index (" .. tostring(fromIndex) .. ") does not exist in the previous layer")
+    assert (self.layers[layerIndex - 1]:exists(fromIndex, "array") == true, "From neuron with this index (" .. tostring(fromIndex) .. ") does not exist in the previous layer")
     assert (self.layers[layerIndex]:exists(toIndex, "array") == true, "To neuron with this index (" .. tostring(toIndex) .. ") does not exist in the specified layer")
 
+    local fromNeuronID = self.layers[layerIndex - 1]:getKey(fromIndex, "array")
     local toNeuron = self.layers[layerIndex]:get(toIndex, "array")
-    toNeuron:removeInput(fromIndex)
+    toNeuron:removeInput(fromNeuronID)
 end
 
 

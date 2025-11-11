@@ -45,6 +45,11 @@ local cell = {
         max = 0,
         mean = 0,
     },
+    decision = {
+        useSoftmax = false,   -- If true, turn output logits into probabilities
+        temperature = 1.0,    -- Softmax temperature (>0). Lower is peakier; higher is flatter
+        sample = false,       -- If true, sample an action by probability; else pick argmax
+    },
 }
 
 --- Initializes the cell class
@@ -67,6 +72,9 @@ function cell:init (map, inputs, actions, options)
     self.network.layers = options.network.layers or 3
     self.network.maxNeurons = options.network.maxNeurons or 10
     self.network.weightAdjust = options.network.weightAdjust or 0.1
+    self.decision.useSoftmax = (options.decision and options.decision.useSoftmax) or false
+    self.decision.temperature = (options.decision and options.decision.temperature) or 1.0
+    self.decision.sample = (options.decision and options.decision.sample) or false
 
     self.maxHealth = options.maxHealth or 500
     self.maxEnergy = options.maxEnergy or 500
@@ -117,14 +125,17 @@ function cell:new (health, energy, type)
     }
 
     -- Initializes the cell's network
-    for inputID, inputFunc in pairs (self.inputs) do
-        newCell.network:addHidden (inputID, Neuron:new (actFuncs.relu), 1)
+    for inputID, _ in pairs (self.inputs) do
+        -- Input layer: identity activation (raw sensor value after normalization)
+        newCell.network:addHidden (inputID, Neuron:new (actFuncs.identity), 1)
     end
-    for actionID, actionFunc in pairs (self.actions) do
-        newCell.network:addHidden (actionID, Neuron:new (actFuncs.relu), newCell.network:getLayerCount ())
+    for actionID, _ in pairs (self.actions) do
+        -- Output layer: identity activation produces logits for softmax (or raw scores)
+        newCell.network:addHidden (actionID, Neuron:new (actFuncs.identity), newCell.network:getLayerCount ())
     end
 
     -- newCell.network:addHidden ("test", Neuron:new (actFuncs.relu), 2) -- TEMP
+    -- newCell.network:addHidden ("test", Neuron:new (actFuncs.relu), 3) -- TEMP
 
     -- Initialize memory variables
     for i = 1, self.memVars do
@@ -168,21 +179,76 @@ function cell:update (tileX, tileY, cellObj, map)
             inputs[key] = inputFunc(tileX, tileY, cellObj, self.map)
         end
 
+        -- Optional: light input normalization to stabilize ranges
+        -- Keep as simple scaling to [0,1] using known maxima; other inputs are already bounded
+        if inputs.energy ~= nil and self.maxEnergy and self.maxEnergy > 0 then
+            inputs.energy = clamp(inputs.energy / self.maxEnergy, 0, 1)
+        end
+        if inputs.health ~= nil and self.maxHealth and self.maxHealth > 0 then
+            inputs.health = clamp(inputs.health / self.maxHealth, 0, 1)
+        end
+        if inputs.age ~= nil and self.cellAge and self.cellAge.max and self.cellAge.max > 0 then
+            inputs.age = clamp(inputs.age / self.cellAge.max, 0, 1)
+        end
+
         -- Run the NN and get outputs
         local outputs = cellObj.network:predict(inputs)
 
-        -- Select the output with the highest value
-        -- TODO: If multiple outputs have the same max value, choose one at random instead of the last one found
-        local maxOutputKey, maxOutputValue = nil, -math.huge
-        for key, value in pairs(outputs) do
-            if value > maxOutputValue then
-                maxOutputKey, maxOutputValue = key, value
-            end
-        end
+        -- Decide action from outputs: either softmax-based or raw argmax
+        if self.decision.useSoftmax == true then
+            local T = (self.decision.temperature and self.decision.temperature > 0) and self.decision.temperature or 1.0
 
-        -- Trigger the action associated with the highest output
-        if maxOutputValue > 0 then
-            self.actions[maxOutputKey] (tileX, tileY, cellObj, self.map)
+            -- Compute numerically stable softmax probabilities over outputs
+            local maxLogit = -math.huge
+            for _, v in pairs(outputs) do
+                if v > maxLogit then maxLogit = v end
+            end
+
+            local expSum = 0
+            local probs = {}
+            for k, v in pairs(outputs) do
+                local z = (v - maxLogit) / T
+                local ev = math.exp(z)
+                probs[k] = ev
+                expSum = expSum + ev
+            end
+            if expSum <= 0 then
+                -- Degenerate case; fall back to uniform distribution
+                local n = 0
+                for _ in pairs(outputs) do n = n + 1 end
+                for k, _ in pairs(outputs) do probs[k] = 1 / n end
+            else
+                for k, v in pairs(probs) do probs[k] = v / expSum end
+            end
+
+            local chosenKey
+            if self.decision.sample == true then
+                -- Sample by probability
+                chosenKey = weightedchoice(probs)
+            else
+                -- Argmax over probabilities
+                local bestK, bestP = nil, -math.huge
+                for k, p in pairs(probs) do
+                    if p > bestP then bestK, bestP = k, p end
+                end
+                chosenKey = bestK
+            end
+
+            if chosenKey ~= nil then
+                self.actions[chosenKey](tileX, tileY, cellObj, self.map)
+            end
+        else
+            -- Previous behavior: choose argmax over raw outputs and act only if positive
+            local maxOutputKey, maxOutputValue = nil, -math.huge
+            for key, value in pairs(outputs) do
+                if value > maxOutputValue then
+                    maxOutputKey, maxOutputValue = key, value
+                end
+            end
+
+            if maxOutputValue > 0 and maxOutputKey ~= nil then
+                self.actions[maxOutputKey](tileX, tileY, cellObj, self.map)
+            end
         end
 
     elseif cellObj.type == "egg" then
@@ -212,7 +278,9 @@ function cell:mutate (cellObj)
     -- Pick a mutation type based on mutation rates
     local mutationType = weightedchoice (cellObj.mutationRates)
     -- print (mutationType)
-    mutationHandlers[mutationType](cellObj)
+    if mutationHandlers[mutationType] then
+        mutationHandlers[mutationType](cellObj)
+    end
 end
 
 

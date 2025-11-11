@@ -54,8 +54,8 @@ function thisScene:load (...)
     cell:init (map, cellInputs, cellActions, {
         maxCells = math.huge,
         network = {
-            layers = 3,
-            maxNeurons = 12,
+            layers = 2,
+            maxNeurons = 5,
         }
     })
     map:init (cell, {

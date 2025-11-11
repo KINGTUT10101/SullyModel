@@ -22,8 +22,12 @@ function mutationHandlers.addNeuron(cellObj)
         return
     end
     if cellObj.network:getLayerSize(chosenLayer) < cell.network.maxNeurons then
+        -- Use a stable unique string key instead of the neuron table itself.
+        -- Using the neuron table as the key caused stale position/index mapping issues
+        -- inside KeyedArray after insert/delete operations, eventually breaking copies.
         local newNeuron = Neuron:new(actFuncs.relu)
-        cellObj.network:addHidden (newNeuron, newNeuron, chosenLayer)
+        local newID = lume.uuid() -- stable unique key
+        cellObj.network:addHidden (newID, newNeuron, chosenLayer)
     end
 end
 
@@ -159,14 +163,14 @@ function mutationHandlers.removeConnection(cellObj)
     local chosenLayer = lume.weightedchoice(weightedChoices)
     if chosenLayer then
         local toLayerSize = cellObj.network:getLayerSize(chosenLayer)
-        if toLayerSize > 0 then
-            local chosenNeuronIndex = math.random (1, toLayerSize)
-            local weightCount = cellObj.network:getWeightCountIndexed(chosenNeuronIndex, chosenLayer) - 1
-            local weightIndex = math.random(2, weightCount)
-
-            if weightCount > 1 and weightIndex then
-                cellObj.network:removeConnectionIndexed(weightIndex, chosenNeuronIndex, chosenLayer)
-            end
+        local fromLayerSize = cellObj.network:getLayerSize(chosenLayer - 1)
+        
+        if toLayerSize > 0 and fromLayerSize > 0 then
+            local chosenNeuronIndex = math.random(1, toLayerSize)
+            local fromNeuronIndex = math.random(1, fromLayerSize)
+            
+            -- Remove the connection from the randomly chosen neurons
+            cellObj.network:removeConnectionIndexed(fromNeuronIndex, chosenNeuronIndex, chosenLayer)
         end
     end
 end

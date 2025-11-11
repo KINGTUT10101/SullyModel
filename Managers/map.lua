@@ -552,9 +552,8 @@ function map:turnRight (tileX, tileY)
     end
 end
 
-function map:transferInputToCell (tileX, tileY, amount, cost)
+function map:transferInputToCell (tileX, tileY, cellObj, amount, cost)
     if self:isTaken (tileX, tileY) == true then
-        local cellObj = self.cellGrid[tileX][tileY]
         local inputVal = self:getInputTile (tileX, tileY)
         local maxEnergy = self.cellManager.maxEnergy
         

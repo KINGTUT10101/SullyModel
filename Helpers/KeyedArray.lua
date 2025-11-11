@@ -34,10 +34,10 @@ function KeyedArray:insert (key, value, position)
     position = math.min (math.max (position, 1), #self.array + 1)
     
     if self.table[key] == nil then
-        local container = {key = key, position = position, value = value} -- Values are placed in a container to avoid duplication
-        
+        local container = { key = key, value = value } -- Values are placed in a container to avoid duplication
+
         self.table[key] = container
-        table.insert (self.array, position, container)
+        table.insert(self.array, position, container)
         return true
     else
         return false
@@ -80,16 +80,22 @@ end
 -- @param indexType (string) The type of index being used (either "array" or "key")
 function KeyedArray:delete (key, indexType)
     if indexType == "array" then
-        if self.array[key] ~= nil then
-            local container = self.array[key]
-            table.remove (self.array, container.position)
+        local container = self.array[key]
+        if container ~= nil then
+            table.remove(self.array, key)
             self.table[container.key] = nil
         end
     elseif indexType == "key" then
-        if self.table[key] ~= nil then
-            local container = self.table[key]
-            table.remove (self.array, container.position)
-            self.table[container.key] = nil
+        local container = self.table[key]
+        if container ~= nil then
+            -- Find current index of the container in the array and remove it
+            for i = 1, #self.array do
+                if self.array[i] == container then
+                    table.remove(self.array, i)
+                    break
+                end
+            end
+            self.table[key] = nil
         end
     else
         error ("KeyedArray: undefined key type")
@@ -143,15 +149,16 @@ end
 -- @usage for pos, key, value in KeyedArrayObj:pairs () do print (value) end
 -- @return (function) An iterator function
 function KeyedArray:pairs ()
-   local index = 0
-	
-   return function ()
-      index = index + 1
-		
-      if index <= #self.array then
-         return self.array[index].position, self.array[index].key, self.array[index].value
-      end
-   end
+    local index = 0
+
+    return function ()
+        index = index + 1
+
+        if index <= #self.array then
+            local container = self.array[index]
+            return index, container.key, container.value
+        end
+    end
 end
 
 --- Gets the corresponding key or array index for a value.
@@ -159,16 +166,20 @@ end
 -- @param indexType (string) The type of index being used (either "array" or "key")
 function KeyedArray:getKey(key, indexType)
     if indexType == "array" then
-        if self.array[key] ~= nil then
-            local container = self.array[key]
-
+        local container = self.array[key]
+        if container ~= nil then
             return container.key
         end
     elseif indexType == "key" then
-        if self.table[key] ~= nil then
-            local container = self.table[key]
-
-            return container.position
+        local container = self.table[key]
+        if container ~= nil then
+            -- Determine the current array index of this container
+            for i = 1, #self.array do
+                if self.array[i] == container then
+                    return i
+                end
+            end
+            return nil
         end
     else
         error("KeyedArray: undefined key type")
