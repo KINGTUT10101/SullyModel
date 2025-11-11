@@ -129,7 +129,6 @@ end
 
 
 function Neuron:print ()
-    print ("-Neuron " .. tostring (self) .. "-")
     print ("Last output: " .. tostring(self.lastOutput))
     for index, id, weight in self.weights:pairs() do
         local input = self.inputs:get(id, "key")

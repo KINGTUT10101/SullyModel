@@ -269,6 +269,8 @@ function NeuralNet:print ()
     for i, layer in ipairs(self.layers) do
         print ("==Layer " .. i .. ": (size=" .. layer:size() .. ")==")
         for pos, id, neuron in layer:pairs() do
+            print ("-Neuron " .. tostring (neuron) .. "-")
+            print ("ID: " .. tostring (id))
             neuron:print()
         end
         print ()
