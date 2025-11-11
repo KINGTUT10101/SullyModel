@@ -80,15 +80,15 @@ function cellActions.reproduce (tileX, tileY, cellObj, map)
     end
 end
 
--- function cellActions.createWall (tileX, tileY, cellObj, map)
---     local babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
---     if map.stats.cells < map.cellManager.maxCells and map:isClear (babyTileX, babyTileY) == true then
---         if cellObj.energy + cellObj.health > hyperArgs.createWall.energyCost then
---             map:adjustCellEnergy (tileX, tileY, -hyperArgs.createWall.energyCost)
---             map:spawnWall (babyTileX, babyTileY, hyperArgs.createWall.energyCost / 2)
---         end
---     end
--- end
+function cellActions.createWall (tileX, tileY, cellObj, map)
+    local babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
+    if map.stats.cells < map.cellManager.maxCells and map:isClear (babyTileX, babyTileY) == true then
+        if cellObj.energy + cellObj.health > hyperArgs.createWall.energyCost then
+            map:adjustCellEnergy (tileX, tileY, -hyperArgs.createWall.energyCost)
+            map:spawnWall (babyTileX, babyTileY, hyperArgs.createWall.energyCost / 2)
+        end
+    end
+end
 
 function cellActions.shareEnergy (tileX, tileY, cellObj, map)
     local otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)

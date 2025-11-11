@@ -417,7 +417,11 @@ function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
         end
 
         self.cellGrid[tileX][tileY] = newCellObj
-        self.stats.cells = self.stats.cells + 1
+        
+        -- Only count normal and egg cells
+        if newCellObj.type == "normal" or newCellObj.type == "egg" then
+            self.stats.cells = self.stats.cells + 1
+        end
         
         return true
     else
@@ -455,7 +459,11 @@ function map:spawnEgg (tileX, tileY, health, energy, parentCellObj)
         eggCellObj.color = {0, 0, 1, 1}
 
         self.cellGrid[tileX][tileY] = eggCellObj
-        self.stats.cells = self.stats.cells + 1
+        
+        -- Only count normal and egg cells
+        if eggCellObj.type == "normal" or eggCellObj.type == "egg" then
+            self.stats.cells = self.stats.cells + 1
+        end
         
         return true
     else
