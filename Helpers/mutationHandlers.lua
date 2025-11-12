@@ -9,6 +9,7 @@ local cell = nil
 
 function mutationHandlers.init(cellRef)
     cell = cellRef
+    assert (type (cell) == "table", "Invalid cell reference")
 end
 
 function mutationHandlers.addNeuron(cellObj)
@@ -21,7 +22,8 @@ function mutationHandlers.addNeuron(cellObj)
     if not chosenLayer then
         return
     end
-    if cellObj.network:getLayerSize(chosenLayer) < cell.network.maxNeurons then
+
+    if cellObj.network:getLayerSize(chosenLayer) < cell.network.neuronsPerLayer[chosenLayer - 1] then
         -- Use a stable unique string key instead of the neuron table itself.
         -- Using the neuron table as the key caused stale position/index mapping issues
         -- inside KeyedArray after insert/delete operations, eventually breaking copies.

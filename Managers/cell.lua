@@ -27,7 +27,6 @@ local cell = {
     minMutRate = 0,
     network = {
         layers = 0,
-        maxNeurons = 0,
     },
     mutsPerChild = {
         min = 0,
@@ -70,14 +69,27 @@ function cell:init (map, inputs, actions, options)
 
     options.network = options.network or {}
     self.network.layers = options.network.layers or 3
-    self.network.maxNeurons = options.network.maxNeurons or 10
     self.network.weightAdjust = options.network.weightAdjust or 0.1
     self.decision.useSoftmax = (options.decision and options.decision.useSoftmax) or false
     self.decision.temperature = (options.decision and options.decision.temperature) or 1.0
     self.decision.sample = (options.decision and options.decision.sample) or false
 
+    if type(self.network.neuronsPerLayer) ~= "table" then
+        assert (type (self.network.neuronsPerLayer) == "number" or self.network.neuronsPerLayer == nil, "Invalid neuronsPerLayer value")
+
+        local singularValue = self.network.neuronsPerLayer or 10
+        self.network.neuronsPerLayer = {}
+        for i = 1, self.network.layers do
+            self.network.neuronsPerLayer[i] = singularValue
+            print (i)
+        end
+
+    else
+        assert (self.network.layers == #self.network.neuronsPerLayer, "Mismatch between layers and neuronsPerLayer length")
+    end
+
     self.maxHealth = options.maxHealth or 500
-    self.maxHealth = options.maxEnergy or 500
+    self.maxEnergy = options.maxEnergy or 500
     self.eggTimer = options.eggTimer or 350
     self.tickCost = options.tickCost or 1
     self.maxCells = options.maxCells or math.huge

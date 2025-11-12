@@ -42,8 +42,9 @@ local validModes = {
 
 local baseXInput = 1000000 * love.math.random()
 local baseYInput = 1000000 * love.math.random()
+local maxInput = 5
 local function mapInput (tileX, tileY)
-    return mapToScale (love.math.noise(baseXInput+.05*tileX, baseYInput+.02*tileY), 0, 1, 0, 50)
+    return mapToScale (love.math.noise(baseXInput+.05*tileX, baseYInput+.02*tileY), 0, 1, 0, maxInput)
 end
 
 local baseXBarriers = 1000 * love.math.random()
@@ -54,10 +55,15 @@ end
 
 function thisScene:load (...)
     cell:init (map, cellInputs, cellActions, {
-        maxCells = 25,
+        maxCells = math.huge,
         network = {
             layers = 5,
-            maxNeurons = 25,
+            -- neuronsPerLayer = 26,
+            neuronsPerLayer = {
+                5, 10, 20, 40, 80
+            }
+        },
+        decision = {
             -- useSoftmax = true,
         },
         maxHealth = 1500,
@@ -74,7 +80,7 @@ function thisScene:load (...)
         },
         drawBounds = {
             min = 0,
-            max = 2000,
+            max = 500,
         }
     })
 
