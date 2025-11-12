@@ -29,6 +29,10 @@ local hyperArgs = {
     }
 }
 
+function cellActions.nothing (tileX, tileY, cellObj, map)
+    return
+end
+
 function cellActions.moveForward (tileX, tileY, cellObj, map)
     map:moveForward (tileX, tileY)
 end
