@@ -77,7 +77,7 @@ function cell:init (map, inputs, actions, options)
     self.decision.sample = (options.decision and options.decision.sample) or false
 
     self.maxHealth = options.maxHealth or 500
-    self.maxEnergy = options.maxEnergy or 500
+    self.maxHealth = options.maxEnergy or 500
     self.eggTimer = options.eggTimer or 350
     self.tickCost = options.tickCost or 1
     self.maxCells = options.maxCells or math.huge
