@@ -129,9 +129,20 @@ function cell:new (health, energy, type)
         -- Input layer: identity activation (raw sensor value after normalization)
         newCell.network:addHidden (inputID, Neuron:new (actFuncs.identity), 1)
     end
+
+    local finalLayerIndex = self.network.layers + 2
+    for i = 1, self.memVars do
+        newCell.network:addHidden ("getMem" .. i, Neuron:new (actFuncs.identity), 1)
+        newCell.network:addHidden ("memIncr" .. i, Neuron:new (actFuncs.identity), finalLayerIndex)
+        newCell.network:addHidden ("memDecr" .. i, Neuron:new (actFuncs.identity), finalLayerIndex)
+    end
+    for i = 1, self.displayVars do
+        newCell.network:addHidden ("disIncr" .. i, Neuron:new (actFuncs.identity), finalLayerIndex)
+        newCell.network:addHidden ("disDecr" .. i, Neuron:new (actFuncs.identity), finalLayerIndex)
+    end
     for actionID, _ in pairs (self.actions) do
         -- Output layer: identity activation produces logits for softmax (or raw scores)
-        newCell.network:addHidden (actionID, Neuron:new (actFuncs.identity), newCell.network:getLayerCount ())
+        newCell.network:addHidden (actionID, Neuron:new (actFuncs.identity), finalLayerIndex)
     end
 
     -- newCell.network:addHidden ("test", Neuron:new (actFuncs.relu), 2) -- TEMP
@@ -177,6 +188,9 @@ function cell:update (tileX, tileY, cellObj, map)
         -- Execute the input functions and add their keys/values to the input table
         for key, inputFunc in pairs(self.inputs) do
             inputs[key] = inputFunc(tileX, tileY, cellObj, self.map)
+        end
+        for i = 1, self.memVars do
+            inputs["getMem" .. i] = cellObj.vars[i]
         end
 
         -- Optional: light input normalization to stabilize ranges
@@ -235,19 +249,49 @@ function cell:update (tileX, tileY, cellObj, map)
             end
 
             if chosenKey ~= nil then
-                self.actions[chosenKey](tileX, tileY, cellObj, self.map)
+                -- Check if chosenKey is for memory vars or display vars
+                if string.sub (chosenKey, 1, 3) == "mem" then
+                    local actionType = string.sub(chosenKey, 4, 7)
+                    local varIndex = tonumber(string.sub(chosenKey, 8))
+                    cellObj.vars[varIndex] = (actionType == "Incr") and cellObj.vars[varIndex] + 1 or cellObj.vars[varIndex] - 1
+
+                elseif string.sub (chosenKey, 1, 3) == "dis" then
+                    local actionType = string.sub(chosenKey, 4, 7)
+                    local varIndex = tonumber(string.sub(chosenKey, 8))
+                    cellObj.displayVars[varIndex] = (actionType == "Incr") and cellObj.displayVars[varIndex] + 1 or cellObj.displayVars[varIndex] - 1
+
+                else
+                    self.actions[chosenKey](tileX, tileY, cellObj, self.map)
+                end
             end
         else
             -- Previous behavior: choose argmax over raw outputs and act only if positive
             local maxOutputKey, maxOutputValue = nil, -math.huge
             for key, value in pairs(outputs) do
+                -- print (key, value)
                 if value > maxOutputValue then
                     maxOutputKey, maxOutputValue = key, value
                 end
             end
 
+            -- print (maxOutputKey)
+
             if maxOutputValue > 0 and maxOutputKey ~= nil then
-                self.actions[maxOutputKey](tileX, tileY, cellObj, self.map)
+                local chosenKey = maxOutputKey
+                -- Check if chosenKey is for memory vars or display vars
+                if string.sub (chosenKey, 1, 3) == "mem" then
+                    local actionType = string.sub(chosenKey, 4, 7)
+                    local varIndex = tonumber(string.sub(chosenKey, 8))
+                    cellObj.vars[varIndex] = (actionType == "Incr") and cellObj.vars[varIndex] + 1 or cellObj.vars[varIndex] - 1
+
+                elseif string.sub (chosenKey, 1, 3) == "dis" then
+                    local actionType = string.sub(chosenKey, 4, 7)
+                    local varIndex = tonumber(string.sub(chosenKey, 8))
+                    cellObj.displayVars[varIndex] = (actionType == "Incr") and cellObj.displayVars[varIndex] + 1 or cellObj.displayVars[varIndex] - 1
+
+                else
+                    self.actions[chosenKey](tileX, tileY, cellObj, self.map)
+                end
             end
         end
 
@@ -290,6 +334,7 @@ function cell:newChild (parentCellObj)
     childCellObj.color = copyTable(parentCellObj.color)
     childCellObj.mutationRates = copyTable(parentCellObj.mutationRates)
     childCellObj.network = parentCellObj.network:copy()
+    childCellObj.direction = parentCellObj.direction
 
     return childCellObj
 end

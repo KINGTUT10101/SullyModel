@@ -8,10 +8,12 @@ local cellActions = require ("Data.cellActions")
 local cellInputs = require ("Data.cellInputs")
 local cycleValue = require ("Helpers.cycleValue")
 
-local mapSize = 50
+local mapSize = 150
 
 local camVelocity = 15
 local zoomVelocity = 25
+
+local cellStartEnergy, cellStartHealth = 100, 100
 
 local maxCaptures = 50
 local maxCaptureCycles = 10000
@@ -41,7 +43,7 @@ local validModes = {
 local baseXInput = 1000000 * love.math.random()
 local baseYInput = 1000000 * love.math.random()
 local function mapInput (tileX, tileY)
-    return mapToScale (love.math.noise(baseXInput+.05*tileX, baseYInput+.02*tileY), 0, 1, 0, 500)
+    return mapToScale (love.math.noise(baseXInput+.05*tileX, baseYInput+.02*tileY), 0, 1, 0, 50)
 end
 
 local baseXBarriers = 1000 * love.math.random()
@@ -52,10 +54,17 @@ end
 
 function thisScene:load (...)
     cell:init (map, cellInputs, cellActions, {
-        maxCells = math.huge,
+        maxCells = 25,
         network = {
-            layers = 2,
-            maxNeurons = 5,
+            layers = 5,
+            maxNeurons = 25,
+            -- useSoftmax = true,
+        },
+        maxHealth = 1500,
+        maxEnergy = 1500,
+        cellAge = {
+            min = math.huge,
+            max = math.huge,
         }
     })
     map:init (cell, {
@@ -65,16 +74,17 @@ function thisScene:load (...)
         },
         drawBounds = {
             min = 0,
-            max = 2500,
+            max = 2000,
         }
     })
+
     map:reset (mapSize, mapSize, mapInput, mapBarriers)
     map:setCamera (-110, -10, 5.8)
     map:setTickSpeed (1/8)
 
     -- Adds a few heavily mutated cells to the initial captures list
     for i = 1, maxCaptures do
-        local newCellObj = cell:new (250, 250)
+        local newCellObj = cell:new (cellStartHealth, cellStartEnergy)
 
         -- Heavily mutate cell
         for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, failsafeMutations.min, failsafeMutations.max)) do
@@ -152,7 +162,7 @@ function thisScene:update (dt)
                 -- cell:printCellScriptList (newCell)
 
                 -- Attempt to spawn the cell
-                if map:spawnCell (math.random (1, map.width), math.random (1, map.height), 250, 250, newCell) == true then
+                if map:spawnCell (math.random (1, map.width), math.random (1, map.height), cellStartHealth, cellStartEnergy, newCell) == true then
                     cellsSpawned = cellsSpawned + 1
 
                     if cellsSpawned >= math.min (failsafeSpawns, cell.maxCells) then
