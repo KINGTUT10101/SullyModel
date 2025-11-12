@@ -166,13 +166,11 @@ function map:update (dt)
 
                         local result, errorStr = pcall (self.cellManager.update, self.cellManager, i, j, cellObj, self) -- Call cell update function
                     
-                        -- if result == false then
-                        --     self.cellManager:printCellScriptString (cellObj)
-                        --     self.cellManager:printCellInfo (cellObj)
-                        --     love.system.setClipboardText (self.cellManager:compileScript (cellObj, true))
-                        --     print ("Cell located at (" .. i .. ", " .. j .. ")")
-                        --     error (errorStr)
-                        -- end
+                        if result == false then
+                            self.cellManager:printCellInfo (cellObj)
+                            print ("Cell located at (" .. i .. ", " .. j .. ")")
+                            error (errorStr)
+                        end
                     end
 
                     if cellObj.type == "normal" then
