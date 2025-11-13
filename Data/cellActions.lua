@@ -2,7 +2,7 @@ local cellActions = {}
 
 local hyperArgs = {
     consume = {
-        energyFromTile = 25,
+        energyFromTile = 100,
         energyCost = 2,
     },
     applyDamage = {
@@ -19,13 +19,14 @@ local hyperArgs = {
     },
     reproduce = {
         energyCost = 500,
+        extraEnergy = 0
     },
     createWall = {
         energyCost = 100,
     },
     shareEnergy = {
-        sharedEnergy = 25,
-        energyCost = 3,
+        sharedEnergy = 100,
+        energyCost = 0,
     }
 }
 
@@ -41,14 +42,13 @@ function cellActions.turnRight (tileX, tileY, cellObj, map)
     map:turnRight (tileX, tileY)
 end
 
-function cellActions.consume (tileX, tileY, cellObj, map)
-    local itx, ity = map:getForwardPos (tileX, tileY, 1)
-    local origEnergy = cellObj.energy
-    map:transferInputToCell (itx, ity, cellObj, hyperArgs.consume.energyFromTile, hyperArgs.consume.energyCost)
-    -- if cellObj.energy - origEnergy > 0 then
-    --     print ("Energy change: " .. (cellObj.energy - origEnergy))
-    -- end
-end
+-- function cellActions.consume (tileX, tileY, cellObj, map)
+    -- local itx, ity = map:getForwardPos (tileX, tileY, 1)
+    -- local origEnergy = cellObj.energy
+--     -- if cellObj.energy - origEnergy > 0 then
+--     --     print ("Energy change: " .. (cellObj.energy - origEnergy))
+--     -- end
+-- end
 
 function cellActions.applyDamage (tileX, tileY, cellObj, map)
     local enemyTileX, enemyTileY = map:getForwardPos (tileX, tileY, 1)
@@ -74,8 +74,13 @@ function cellActions.reproduce (tileX, tileY, cellObj, map)
     local babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
     if map.stats.cells < map.cellManager.maxCells and map:isClear (babyTileX, babyTileY) == true then
         if cellObj.energy + cellObj.health > hyperArgs.reproduce.energyCost then
-            map:adjustCellEnergy (tileX, tileY, -hyperArgs.reproduce.energyCost)
-            map:spawnCell (babyTileX, babyTileY, hyperArgs.reproduce.energyCost / 2, hyperArgs.reproduce.energyCost / 2, cellObj)
+            local cost = hyperArgs.reproduce.energyCost
+
+            -- Add as much extra energy as possible
+            cost = cost + math.min(hyperArgs.reproduce.extraEnergy, cellObj.energy + cellObj.health - cost)
+
+            map:adjustCellEnergy (tileX, tileY, -cost)
+            map:spawnCell (babyTileX, babyTileY, cost / 2, cost / 2, cellObj)
         end
     end
 end

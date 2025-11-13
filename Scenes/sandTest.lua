@@ -56,7 +56,8 @@ function thisScene:load (...)
         network = {
             layers = 2,
             maxNeurons = 5,
-        }
+        },
+        tickCost = 1,
     })
     map:init (cell, {
         inputBounds = {
@@ -65,7 +66,7 @@ function thisScene:load (...)
         },
         drawBounds = {
             min = 0,
-            max = 2500,
+            max = 500,
         }
     })
     map:reset (mapSize, mapSize, mapInput, mapBarriers)

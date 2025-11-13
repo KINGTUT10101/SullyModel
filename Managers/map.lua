@@ -164,13 +164,15 @@ function map:update (dt)
                     if cellObj.lastUpdate < updateStartTime then
                         cellObj.lastUpdate = updateStartTime
 
-                        local result, errorStr = pcall (self.cellManager.update, self.cellManager, i, j, cellObj, self) -- Call cell update function
+                        self.cellManager.update(self.cellManager, i, j, cellObj, self)
+
+                        -- local result, errorStr = pcall (self.cellManager.update, self.cellManager, i, j, cellObj, self) -- Call cell update function
                     
-                        if result == false then
-                            self.cellManager:printCellInfo (cellObj)
-                            print ("Cell located at (" .. i .. ", " .. j .. ")")
-                            error (errorStr)
-                        end
+                        -- if result == false then
+                        --     self.cellManager:printCellInfo (cellObj)
+                        --     print ("Cell located at (" .. i .. ", " .. j .. ")")
+                        --     error (errorStr)
+                        -- end
                     end
 
                     if cellObj.type == "normal" then
@@ -408,6 +410,8 @@ function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
         -- Mutate cell if a parent is given
         if parentCellObj ~= nil then
             newCellObj = self.cellManager:newChild (parentCellObj)
+            newCellObj.energy = energy
+            newCellObj.health = health
             
             for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, 25)) do
                 self.cellManager:mutate (newCellObj)
@@ -421,7 +425,6 @@ function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
         -- Only count normal and egg cells
         assert (newCellObj.type ~= "wall", "Error: Attempted to count a wall cell as a normal or egg cell.")
         self.stats.cells = self.stats.cells + 1
-        
         return true
     else
         return false
@@ -560,7 +563,7 @@ function map:turnRight (tileX, tileY)
 end
 
 function map:transferInputToCell (tileX, tileY, cellObj, amount, cost)
-    if self:isTaken (tileX, tileY) == true then
+    if self:inBounds (tileX, tileY) == true then
         local inputVal = self:getInputTile (tileX, tileY)
         local maxEnergy = self.cellManager.maxEnergy
         

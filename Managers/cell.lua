@@ -102,6 +102,9 @@ function cell:init (map, inputs, actions, options)
     self.cellAge.min = options.cellAge.min or 3000
     self.cellAge.max = options.cellAge.max or 6500
 
+    self.actionThreshold = options.actionThreshold or 0.5
+    self.actionsPerTurn = options.actionsPerTurn or 3
+
     mutationHandlers.init (self)
 end
 
@@ -118,7 +121,7 @@ function cell:new (health, energy, type)
         health = clamp (health or self.maxHealth, 0, self.maxHealth),
         energy = clamp (energy or self.maxEnergy, 0, self.maxEnergy),
         totalEnergy = 0,
-        ticksLeft = round (mapToScale (love.math.randomNormal () / 10, -3, 3, self.cellAge.min, self.cellAge.max)),
+        ticksLeft = clamp (round (mapToScale (love.math.randomNormal () / 10, -3, 3, self.cellAge.min, self.cellAge.max)), self.cellAge.min, self.cellAge.max),
         direction = 1,
         mutationRates = {},
         network = NeuralNet:new(self.network.layers),
@@ -246,9 +249,31 @@ function cell:update (tileX, tileY, cellObj, map)
                 end
             end
 
+            -- Consume energy whenever possible
+            local itx, ity = map:getForwardPos (tileX, tileY, 1)
+            -- local origCellEnergy = cellObj.energy
+            -- print ("INPUT TILE", map:getInputTile (tileX, tileY), tileX, tileY, itx, ity)
+            map:transferInputToCell (itx, ity, cellObj, 10, 0)
+            -- print (origCellEnergy .. "->" .. cellObj.energy)
+            -- print (self.maxEnergy + self.maxHealth)
+
             if maxOutputValue > 0 and maxOutputKey ~= nil then
                 self.actions[maxOutputKey](tileX, tileY, cellObj, self.map)
             end
+
+            -- -- Create a sorted list from outputs with the highest key/value pairs at the top of the list
+            -- local outputPairs = {}
+            -- for key, value in pairs (outputs) do
+            --     table.insert(outputPairs, {key = key, value = value})
+            -- end
+            -- table.sort(outputPairs, function(a, b) return a.value > b.value end)
+
+            -- for i = 1, math.min(self.actionsPerTurn, #outputPairs) do
+            --     local pair = outputPairs[i]
+            --     if pair.value > self.actionThreshold then
+            --         self.actions[pair.key](tileX, tileY, cellObj, self.map)
+            --     end
+            -- end
         end
 
     elseif cellObj.type == "egg" then
