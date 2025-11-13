@@ -151,6 +151,7 @@ function cell:new (health, energy, type)
     for i = 1, self.displayVars do
         newCell.network:addHidden ("disIncr" .. i, Neuron:new (actFuncs.identity), finalLayerIndex)
         newCell.network:addHidden ("disDecr" .. i, Neuron:new (actFuncs.identity), finalLayerIndex)
+        newCell.network:addHidden ("getDis" .. i, Neuron:new (actFuncs.identity), 1)
     end
     for actionID, _ in pairs (self.actions) do
         -- Output layer: identity activation produces logits for softmax (or raw scores)
@@ -202,7 +203,14 @@ function cell:update (tileX, tileY, cellObj, map)
             inputs[key] = inputFunc(tileX, tileY, cellObj, self.map)
         end
         for i = 1, self.memVars do
-            inputs["getMem" .. i] = cellObj.vars[i]
+            inputs["getMem" .. i] = mapToScale (cellObj.vars[i], -100, 100, -1, 1)
+        end
+        for i = 1, self.displayVars do
+            local otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
+
+            if map:isTaken (otherTileX, otherTileY) == true then
+                inputs["getDis" .. i] = map.cellGrid[otherTileX][otherTileY].displayVars[i]
+            end
         end
 
         -- Optional: light input normalization to stabilize ranges
