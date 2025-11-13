@@ -253,7 +253,7 @@ function cell:update (tileX, tileY, cellObj, map)
             local itx, ity = map:getForwardPos (tileX, tileY, 1)
             -- local origCellEnergy = cellObj.energy
             -- print ("INPUT TILE", map:getInputTile (tileX, tileY), tileX, tileY, itx, ity)
-            map:transferInputToCell (itx, ity, cellObj, 10, 0)
+            map:transferInputToCell (itx, ity, cellObj, 25, 1)
             -- print (origCellEnergy .. "->" .. cellObj.energy)
             -- print (self.maxEnergy + self.maxHealth)
 
