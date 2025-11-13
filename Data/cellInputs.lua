@@ -70,15 +70,4 @@ function cellInputs.randomNumber (tileX, tileY, cellObj, map)
     return mapToScale (math.random (), 0, 1, -1, 1)
 end
 
--- TODO
--- function cellInputs:getOtherDisplayVar (tileX, tileY, cellObj, map)
---     local otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
-
---     if map:isTaken (otherTileX, otherTileY) == true then
---         return map.cellGrid[otherTileX][otherTileY].displayVars[1]
---     end
--- end
-
--- TODO: variables
-
 return cellInputs

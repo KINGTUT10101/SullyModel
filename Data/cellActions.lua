@@ -2,31 +2,35 @@ local cellActions = {}
 
 local hyperArgs = {
     consume = {
-        energyFromTile = 25,
-        energyCost = 2,
+        energyFromTile = 50,
+        energyCost = 5,
     },
     applyDamage = {
-        damage = 5,
-        energyCost = 2,
+        damage = 50,
+        energyCost = 5,
     },
     healSelf = {
-        healing = 10,
-        energyCost = 12,
+        healing = 25,
+        energyCost = 25,
     },
     energizeSelf = {
-        energyTransferred = 12,
-        healthCost = 12,
+        energyTransferred = 25,
+        healthCost = 25,
     },
     reproduce = {
         energyCost = 500,
     },
     createWall = {
-        energyCost = 100,
+        energyCost = 25,
     },
     shareEnergy = {
-        sharedEnergy = 25,
-        energyCost = 3,
-    }
+        sharedEnergy = 100,
+        energyCost = 0,
+    },
+    placeEnergy = {
+        sharedEnergy = 100,
+        energyCost = 0,
+    },
 }
 
 function cellActions.nothing (tileX, tileY, cellObj, map)
@@ -99,6 +103,12 @@ function cellActions.shareEnergy (tileX, tileY, cellObj, map)
     map:shareInputToCell (tileX, tileY, otherTileX, otherTileY, hyperArgs.shareEnergy.sharedEnergy, hyperArgs.shareEnergy.energyCost)
 end
 
--- TODO Set display var
+function cellActions.placeEnergy (tileX, tileY, cellObj, map)
+    local otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
+    
+    if hyperArgs.placeEnergy.energyCost < map:getCellTotalResources (tileX, tileY) then
+        map:adjustInputTile (otherTileX, otherTileY, hyperArgs.placeEnergy.sharedEnergy)
+    end
+end
 
 return cellActions
