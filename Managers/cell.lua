@@ -81,7 +81,6 @@ function cell:init (map, inputs, actions, options)
         self.network.neuronsPerLayer = {}
         for i = 1, self.network.layers do
             self.network.neuronsPerLayer[i] = singularValue
-            print (i)
         end
 
     else

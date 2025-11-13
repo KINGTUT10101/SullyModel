@@ -56,12 +56,6 @@ local biomeYBarriers = 1000000 * love.math.random()
 local bmultXBarrier = 0.05
 local bmultYBarrier = 0.02
 local function mapBarriers (tileX, tileY)
-    -- if love.math.noise(biomeXBarriers+bmultXBarrier*tileX, biomeYBarriers+bmultYBarrier*tileY) > 0.50 then
-    --     return (love.math.noise(baseXBarriers+multXBarrier*tileX, baseYBarriers+multYBarrier*tileY) > 0.70) and "barrier" or "blank"
-    -- else
-    --     return "blank"
-    -- end
-
     if love.math.noise(baseXBarriers+0.03*tileX, baseYBarriers+0.03*tileY) >= 0.25 then
         return (love.math.noise(baseXBarriers+multXBarrier*tileX, baseYBarriers+multYBarrier*tileY) > 0.50) and "barrier" or "blank"
     else
@@ -71,19 +65,17 @@ end
 
 function thisScene:load (...)
     cell:init (map, cellInputs, cellActions, {
-        maxCells = math.huge,
+        maxCells = 1000,
         network = {
-            layers = 3,
+            layers = 4,
             -- neuronsPerLayer = 26,
-            neuronsPerLayer = {
-                4, 8, 16
-            }
+            neuronsPerLayer = 20
         },
         decision = {
             -- useSoftmax = true,
         },
-        maxHealth = 500,
-        maxEnergy = 500,
+        maxHealth = 1500,
+        maxEnergy = 1500,
         tickCost = 1,
         -- cellAge = {
         --     min = math.huge,
