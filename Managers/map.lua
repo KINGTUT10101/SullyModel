@@ -408,6 +408,12 @@ function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
         -- Mutate cell if a parent is given
         if parentCellObj ~= nil then
             newCellObj = self.cellManager:newChild (parentCellObj)
+            if health ~= nil then
+                newCellObj.health = health
+            end
+            if energy ~= nil then
+                newCellObj.energy = energy
+            end
             
             for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, 25)) do
                 self.cellManager:mutate (newCellObj)
