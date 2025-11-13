@@ -13,7 +13,7 @@ local mapSize = 150
 local camVelocity = 15
 local zoomVelocity = 25
 
-local cellStartEnergy, cellStartHealth = 100, 100
+local cellStartHealth, cellStartEnergy = 250, 250
 
 local maxCaptures = 50
 local maxCaptureCycles = 10000
@@ -42,7 +42,7 @@ local validModes = {
 
 local baseXInput = 1000000 * love.math.random()
 local baseYInput = 1000000 * love.math.random()
-local maxInput = 5
+local maxInput = 500
 local function mapInput (tileX, tileY)
     return mapToScale (love.math.noise(baseXInput+.05*tileX, baseYInput+.02*tileY), 0, 1, 0, maxInput)
 end
@@ -57,21 +57,22 @@ function thisScene:load (...)
     cell:init (map, cellInputs, cellActions, {
         maxCells = math.huge,
         network = {
-            layers = 5,
+            layers = 3,
             -- neuronsPerLayer = 26,
             neuronsPerLayer = {
-                5, 10, 20, 40, 80
+                4, 8, 16
             }
         },
         decision = {
             -- useSoftmax = true,
         },
-        maxHealth = 1500,
-        maxEnergy = 1500,
-        cellAge = {
-            min = math.huge,
-            max = math.huge,
-        }
+        maxHealth = 500,
+        maxEnergy = 500,
+        tickCost = 1,
+        -- cellAge = {
+        --     min = math.huge,
+        --     max = math.huge,
+        -- }
     })
     map:init (cell, {
         inputBounds = {
@@ -80,7 +81,7 @@ function thisScene:load (...)
         },
         drawBounds = {
             min = 0,
-            max = 500,
+            max = 5000,
         }
     })
 
@@ -166,6 +167,10 @@ function thisScene:update (dt)
                 -- print ("INFO:", i)
                 -- cell:printCellInfo (newCell)
                 -- cell:printCellScriptList (newCell)
+
+                -- Set the starting health and energy
+                newCell.health = cellStartHealth
+                newCell.energy = cellStartEnergy
 
                 -- Attempt to spawn the cell
                 if map:spawnCell (math.random (1, map.width), math.random (1, map.height), cellStartHealth, cellStartEnergy, newCell) == true then
