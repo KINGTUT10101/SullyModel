@@ -47,10 +47,26 @@ local function mapInput (tileX, tileY)
     return mapToScale (love.math.noise(baseXInput+.05*tileX, baseYInput+.02*tileY), 0, 1, 0, maxInput)
 end
 
-local baseXBarriers = 1000 * love.math.random()
-local baseYBarriers = 1000 * love.math.random()
+local baseXBarriers = 1000000000 * love.math.random()
+local baseYBarriers = 1000000000 * love.math.random()
+local multXBarrier = 0.15 -- 0.03
+local multYBarrier = 0.25 -- 0.1
+local biomeXBarriers = 1000000 * love.math.random()
+local biomeYBarriers = 1000000 * love.math.random()
+local bmultXBarrier = 0.05
+local bmultYBarrier = 0.02
 local function mapBarriers (tileX, tileY)
-    return (love.math.noise(baseXBarriers+.03*tileX, baseYBarriers+.1*tileY) > 0.70) and "barrier" or "blank"
+    -- if love.math.noise(biomeXBarriers+bmultXBarrier*tileX, biomeYBarriers+bmultYBarrier*tileY) > 0.50 then
+    --     return (love.math.noise(baseXBarriers+multXBarrier*tileX, baseYBarriers+multYBarrier*tileY) > 0.70) and "barrier" or "blank"
+    -- else
+    --     return "blank"
+    -- end
+
+    if love.math.noise(baseXBarriers+0.03*tileX, baseYBarriers+0.03*tileY) >= 0.25 then
+        return (love.math.noise(baseXBarriers+multXBarrier*tileX, baseYBarriers+multYBarrier*tileY) > 0.50) and "barrier" or "blank"
+    else
+        return "blank"
+    end
 end
 
 function thisScene:load (...)
@@ -151,6 +167,8 @@ function thisScene:update (dt)
         baseYInput = 1000000 * love.math.random()
         baseXBarriers = 1000000 * love.math.random()
         baseYBarriers = 1000000 * love.math.random()
+        biomeXBarriers = 1000000000 * love.math.random()
+        biomeYBarriers = 1000000000 * love.math.random()
         map:reset (mapSize, mapSize, mapInput, mapBarriers)
 
         local cellsSpawned = 0
