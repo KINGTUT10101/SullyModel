@@ -18,21 +18,21 @@ local hyperArgs = {
         healthCost = 50,
     },
     reproduce = {
-        energyCost = 500,
+        energyCost = 100,
     },
     reproduceExtra = {
-        energyCost = 750,
+        energyCost = 600,
     },
     createWall = {
-        energyCost = 50,
+        energyCost = 25,
     },
     shareEnergy = {
         sharedEnergy = 100,
-        energyCost = 0,
+        energyCost = 5,
     },
     placeEnergy = {
         sharedEnergy = 100,
-        energyCost = 0,
+        energyCost = 5,
     },
 }
 
@@ -146,8 +146,9 @@ end
 function cellActions.placeEnergy (tileX, tileY, cellObj, map)
     local otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
     
-    if hyperArgs.placeEnergy.energyCost < map:getCellTotalResources (tileX, tileY) then
+    if hyperArgs.placeEnergy.energyCost + hyperArgs.placeEnergy.sharedEnergy < map:getCellTotalResources (tileX, tileY) then
         map:adjustCellEnergy (tileX, tileY, -(hyperArgs.placeEnergy.energyCost + hyperArgs.placeEnergy.sharedEnergy))
+        cellObj.totalEnergy = cellObj.totalEnergy - hyperArgs.placeEnergy.sharedEnergy
         map:adjustInputTile (otherTileX, otherTileY, hyperArgs.placeEnergy.sharedEnergy)
     end
 end

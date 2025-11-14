@@ -20,11 +20,11 @@ local maxCaptureCycles = 10000
 local captureTimer = maxCaptureCycles
 local captures = {}
 
-local superparents = 3
+local superparents = 4
 
 local cyclesSinceLastFail = 0
 
-local failsafeSpawns = 50
+local failsafeSpawns = 200
 local failsafeActivations = {}
 for superparent = 1, superparents do
     failsafeActivations[superparent] = -1
@@ -81,9 +81,11 @@ end
 function thisScene:load (...)
     cell:init (map, cellInputs, cellActions, {
         network = {
-            layers = 2,
+            layers = 3,
             -- neuronsPerLayer = 26,
-            neuronsPerLayer = 5
+            neuronsPerLayer = {
+                4, 8, 16
+            }
         },
         decision = {
             -- useSoftmax = true,
@@ -98,11 +100,11 @@ function thisScene:load (...)
             --     max = math.huge,
             -- },
         -- maxCells = 1000,
-        maxCells = 650,
+        maxCells = 450,
         superparents = superparents,
         consumeOnTick = {
             amount = 25,
-            cost = 3,
+            cost = 2,
         }
     })
     map:init (cell, {
@@ -291,6 +293,15 @@ function thisScene:draw ()
         love.graphics.printf ("FSs (" .. superparent .. "): " .. failsafeActivations[superparent], 725, 50 + (superparent - 1) * 35, 100, "left")
     end
 
+    -- Show number of cells for each superparent (rendered below the failsafe boxes)
+    local cellsBaseY = 45 + superparents * 35
+    for superparent = 1, superparents do
+        love.graphics.setColor (0, 0, 0, 0.75)
+        love.graphics.rectangle ("fill", 705, cellsBaseY + (superparent - 1) * 35, 90, 25)
+        love.graphics.setColor (1, 1, 1, 1)
+        love.graphics.printf ("Cells (" .. superparent .. "): " .. map.stats.cells[superparent], 710, cellsBaseY + 5 + (superparent - 1) * 35, 85, "left")
+    end
+
     -- Shows the rendering mode
     love.graphics.setColor (0, 0, 0, 0.75)
     love.graphics.rectangle ("fill", 10, 540, 100, 25)
@@ -364,6 +375,14 @@ function thisScene:keypressed (key, scancode, isrepeat)
             map:setTickSpeed (1/8)
         else
             map:setTickSpeed (math.huge)
+        end
+
+    -- Print cell colors
+    elseif key == "b" then
+        print ("======== Cell Colors ========")
+        for superparent = 1, superparents do
+            local color = map.superparentColors[superparent]
+            print (superparent .. ": " .. color[1] .. ", " .. color[2] .. ", " .. color[3])
         end
 
     -- Changes the sub rendering mode
