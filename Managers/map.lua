@@ -250,8 +250,13 @@ function map:draw (mode, subMode)
                     love.graphics.setColor (cellObj.color)
                     love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
                 elseif mode == "superparents" then
-                    love.graphics.setColor (self.superparentColors[cellObj.superparent])
-                    love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
+                    if cellObj.type == "normal" then
+                        love.graphics.setColor (self.superparentColors[cellObj.superparent])
+                        love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
+                    else
+                        love.graphics.setColor (cellObj.color)
+                        love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
+                    end
                 elseif mode == "energy" then
                     local cellEnergyPercent = cellObj.energy / maxEnergy
                     love.graphics.setColor (0, cellEnergyPercent, 0, 1)
