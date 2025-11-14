@@ -33,12 +33,13 @@ local map = {
     title = "Untitled Map", -- The title of the map. Mostly used in menus
     cellManager = nil,
     stats = {
-        cells = 0,
+        cells = {},
     },
     ticksBetweenSaves = 0,
     lastSave = 0,
     resets = 0,
     lastLogMsg = "",
+    superparentColors = {}
 }
 
 function map:quickSave ()
@@ -91,6 +92,11 @@ function map:init (cellManager, options)
     self.drawBounds.max = options.drawBounds.max or self.inputBounds.max
 
     self.tickSpeed = math.huge
+
+    for i = 1, self.cellManager.superparents do
+        self.stats.cells[i] = 0
+        self.superparentColors[i] = {math.random(), math.random(), math.random()}
+    end
 end
 
 --- Resets the map with a new size and input data.
@@ -131,9 +137,12 @@ function map:reset (width, height, mapEnvInputs, mapEnvTypes)
 
     self.envGrid = envGrid
     self.cellGrid = cellGrid
-    self.stats.cells = 0
     self.resets = self.resets + 1
     self.lastLogMsg = ""
+
+    for i = 1, self.cellManager.superparents do
+        self.stats.cells[i] = 0
+    end
     -- self.inputRender = love.graphics.newImage (inputRender)
     -- self.inputRender:setFilter ("nearest", "nearest")
 end
@@ -143,12 +152,14 @@ end
 function map:update (dt)
     self.lastTick = self.lastTick + dt -- Update last tick
 
-    local capture = nil
+    local captures = {}
+    local tickOccured = false
 
     -- Check if enough time has passed since the last tick
     local cellGrid = self.cellGrid
     if self.lastTick >= self.tickSpeed then
         local updateStartTime = love.timer.getTime()
+        tickOccured = true
 
         -- Iterate over active grid and update cells
         -- TODO: Optimize this system so it doesn't have to iterate over the entire grid
@@ -164,7 +175,7 @@ function map:update (dt)
                     if cellObj.lastUpdate < updateStartTime then
                         cellObj.lastUpdate = updateStartTime
 
-                        local result, errorStr = pcall (self.cellManager.update, self.cellManager, i, j, cellObj, self) -- Call cell update function
+                        local result, errorStr = xpcall (self.cellManager.update, debug.traceback, self.cellManager, i, j, cellObj, self) -- Call cell update function
                     
                         if result == false then
                             self.cellManager:printCellInfo (cellObj)
@@ -173,8 +184,8 @@ function map:update (dt)
                         end
                     end
 
-                    if cellObj.type == "normal" then
-                        capture = cellObj
+                    if cellObj.type == "normal" and captures[cellObj.superparent] == nil then
+                        captures[cellObj.superparent] = cellObj
                     end
                 end
             end
@@ -191,11 +202,12 @@ function map:update (dt)
         end
     end
 
-    return capture
+    return captures, tickOccured
 end
 
 local validModes = {
     normal = true,
+    superparents = true,
     energy = true,
     health = true,
     total = true,
@@ -229,6 +241,9 @@ function map:draw (mode)
                 -- Render cell
                 if mode == "normal" then
                     love.graphics.setColor (cellObj.color)
+                    love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
+                elseif mode == "superparents" then
+                    love.graphics.setColor (self.superparentColors[cellObj.superparent])
                     love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
                 elseif mode == "energy" then
                     local cellEnergyPercent = cellObj.energy / maxEnergy
@@ -401,8 +416,8 @@ end
 --- @param energy number The energy value of the new cell object.
 --- @param parentCellObj? table The parent cell object object.
 --- @return boolean success True if a cell object was spawned successfully.
-function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
-    if self.stats.cells < self.cellManager.maxCells and self:isClear (tileX, tileY) == true then
+function map:spawnCell (tileX, tileY, health, energy, superparent, parentCellObj)
+    if self.stats.cells[superparent] < self.cellManager.maxCells[superparent] and self:isClear (tileX, tileY) == true then
         local newCellObj
 
         -- Mutate cell if a parent is given
@@ -419,14 +434,14 @@ function map:spawnCell (tileX, tileY, health, energy, parentCellObj)
                 self.cellManager:mutate (newCellObj)
             end
         else
-            newCellObj = self.cellManager:new (health, energy) -- Create default cell object
+            newCellObj = self.cellManager:new (health, energy, superparent) -- Create default cell object
         end
 
         self.cellGrid[tileX][tileY] = newCellObj
         
         -- Only count normal and egg cells
         assert (newCellObj.type ~= "wall", "Error: Attempted to count a wall cell as a normal or egg cell.")
-        self.stats.cells = self.stats.cells + 1
+        self.stats.cells[superparent] = self.stats.cells[superparent] + 1
         
         return true
     else
@@ -442,10 +457,10 @@ end
 --- @param energy number The energy value of the new cell object.
 --- @param parentCellObj? table The parent cell object object.
 --- @return boolean success True if a cell object was spawned successfully.
-function map:spawnEgg (tileX, tileY, health, energy, parentCellObj)
+function map:spawnEgg (tileX, tileY, health, energy, superparent, parentCellObj)
     error ("TODO: map:spawnEgg")
-    if self.stats.cells < self.cellManager.maxCells and self:isClear (tileX, tileY) == true then
-        local newCellObj = self.cellManager:new (math.huge, math.huge) -- Create default cell object
+    if self.stats.cells[superparent] < self.cellManager.maxCells[superparent] and self:isClear (tileX, tileY) == true then
+        local newCellObj = self.cellManager:new (math.huge, math.huge, superparent) -- Create default cell object
 
         -- Mutate cell if a parent is given
         if parentCellObj ~= nil then
@@ -457,7 +472,7 @@ function map:spawnEgg (tileX, tileY, health, energy, parentCellObj)
             assert (compSuccess == true, "ERROR: Problem with script compilation:" .. tostring (compErr))
         end
 
-        local eggCellObj = self.cellManager:new (health, energy, "egg") -- Create default cell object
+        local eggCellObj = self.cellManager:new (health, energy, superparent, "egg") -- Create default cell object
         eggCellObj.childCell = newCellObj
         eggCellObj.tickTimer = self.cellManager.eggTimer
         eggCellObj.ticksLeft = math.huge
@@ -467,7 +482,7 @@ function map:spawnEgg (tileX, tileY, health, energy, parentCellObj)
         
         -- Only count normal and egg cells
         if eggCellObj.type == "normal" or eggCellObj.type == "egg" then
-            self.stats.cells = self.stats.cells + 1
+            self.stats.cells[superparent] = self.stats.cells[superparent] + 1
         end
         
         return true
@@ -481,14 +496,14 @@ end
 --- @param tileY integer The vertical map position.
 --- @param health number The health value of the new cell object.
 --- @return boolean success True if a cell object was spawned successfully.
-function map:spawnWall (tileX, tileY, health)
-    if self.stats.cells < self.cellManager.maxCells and self:isClear (tileX, tileY) == true then
-        local newCellObj = self.cellManager:new (health, 0, "wall") -- Create default cell object
+function map:spawnWall (tileX, tileY, health, superparent)
+    if self.stats.cells[superparent] < self.cellManager.maxCells[superparent] and self:isClear (tileX, tileY) == true then
+        local newCellObj = self.cellManager:new (health, 0, superparent, "wall") -- Create default cell object
 
         newCellObj.color = {1, 1, 0, 1}
 
         self.cellGrid[tileX][tileY] = newCellObj
-        -- self.stats.cells = self.stats.cells + 1
+        -- self.stats.cells[superparent] = self.stats.cells[superparent] + 1
         
         return true
     else
@@ -512,7 +527,7 @@ function map:deleteCell (tileX, tileY, dropEnergy)
         self.cellGrid[tileX][tileY] = nil
 
         if cellObj.type == "normal" or cellObj.type == "egg" then
-            self.stats.cells = self.stats.cells - 1
+            self.stats.cells[cellObj.superparent] = self.stats.cells[cellObj.superparent] - 1
         end
     end
 end
@@ -566,7 +581,7 @@ function map:turnRight (tileX, tileY)
 end
 
 function map:transferInputToCell (tileX, tileY, cellObj, amount, cost)
-    if self:isTaken (tileX, tileY) == true then
+    if self:inBounds (tileX, tileY) == true then
         local inputVal = self:getInputTile (tileX, tileY)
         local maxEnergy = self.cellManager.maxEnergy
         

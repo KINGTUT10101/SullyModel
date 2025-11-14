@@ -11,20 +11,25 @@ local cycleValue = require ("Helpers.cycleValue")
 local mapSize = 150
 
 local camVelocity = 15
-local zoomVelocity = 25
+local zoomVelocity = 2
 
-local cellStartHealth, cellStartEnergy = 250, 250
+local cellStartHealth, cellStartEnergy = 500, 500
 
 local maxCaptures = 50
 local maxCaptureCycles = 10000
 local captureTimer = maxCaptureCycles
 local captures = {}
 
+local superparents = 3
+
 local cyclesSinceLastFail = 0
 
-local failsafeSpawns = 350
-local failsafeActivations = -1
-local lastCell = nil
+local failsafeSpawns = 50
+local failsafeActivations = {}
+for superparent = 1, superparents do
+    failsafeActivations[superparent] = -1
+end
+local lastCells = {}
 local failsafeMutations = {
     min = 10,
     max = 5000,
@@ -34,29 +39,32 @@ local renderMap = true
 local renderModeIndex = 1
 local validModes = {
     "normal",
+    "superparents",
     "energy",
     "health",
     "total",
     "none"
 }
 
-local baseXInput = 1000000 * love.math.random()
-local baseYInput = 1000000 * love.math.random()
-local maxInput = 500
+local baseXInput = 10000 * love.math.random()
+local baseYInput = 10000 * love.math.random()
+local maxInput = 50
 local function mapInput (tileX, tileY)
     return mapToScale (love.math.noise(baseXInput+.05*tileX, baseYInput+.02*tileY), 0, 1, 0, maxInput)
 end
 
-local baseXBarriers = 1000000000 * love.math.random()
-local baseYBarriers = 1000000000 * love.math.random()
+local baseXBarriers = 10000 * love.math.random()
+local baseYBarriers = 10000 * love.math.random()
 local multXBarrier = 0.15 -- 0.03
 local multYBarrier = 0.25 -- 0.1
-local biomeXBarriers = 1000000 * love.math.random()
-local biomeYBarriers = 1000000 * love.math.random()
-local bmultXBarrier = 0.05
-local bmultYBarrier = 0.02
+local biomeXBarriers = 100000 * love.math.random()
+local biomeYBarriers = 100000 * love.math.random()
+local bmultXBarrier = 0.03
+local bmultYBarrier = 0.03
 local function mapBarriers (tileX, tileY)
-    if love.math.noise(baseXBarriers+0.03*tileX, baseYBarriers+0.03*tileY) >= 0.25 then
+    -- if true then return "blank" end
+
+    if love.math.noise(biomeXBarriers+bmultXBarrier*tileX, biomeYBarriers+bmultYBarrier*tileY) >= 0.35 then
         return (love.math.noise(baseXBarriers+multXBarrier*tileX, baseYBarriers+multYBarrier*tileY) > 0.50) and "barrier" or "blank"
     else
         return "blank"
@@ -65,22 +73,30 @@ end
 
 function thisScene:load (...)
     cell:init (map, cellInputs, cellActions, {
-        maxCells = 1000,
         network = {
-            layers = 4,
+            layers = 3,
             -- neuronsPerLayer = 26,
-            neuronsPerLayer = 20
+            neuronsPerLayer = 10
         },
         decision = {
             -- useSoftmax = true,
         },
-        maxHealth = 1500,
-        maxEnergy = 1500,
+        maxHealth = 500,
+        maxEnergy = 500,
+        memVars = 2,
+        displayVars = 1,
         tickCost = 1,
         -- cellAge = {
-        --     min = math.huge,
-        --     max = math.huge,
-        -- }
+            --     min = math.huge,
+            --     max = math.huge,
+            -- },
+        -- maxCells = 1000,
+        maxCells = math.huge,
+        superparents = superparents,
+        consumeOnTick = {
+            amount = 15,
+            cost = 3,
+        }
     })
     map:init (cell, {
         inputBounds = {
@@ -89,24 +105,28 @@ function thisScene:load (...)
         },
         drawBounds = {
             min = 0,
-            max = 5000,
-        }
+            max = 200,
+        },
     })
 
     map:reset (mapSize, mapSize, mapInput, mapBarriers)
-    map:setCamera (-110, -10, 5.8)
+    map:setCamera (-110, -10, 3.8)
     map:setTickSpeed (1/8)
 
-    -- Adds a few heavily mutated cells to the initial captures list
-    for i = 1, maxCaptures do
-        local newCellObj = cell:new (cellStartHealth, cellStartEnergy)
+    -- Adds a few heavily mutated cells to the initial captures lists
+    for superparent = 1, superparents do
+        captures[superparent] = {}
 
-        -- Heavily mutate cell
-        for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, failsafeMutations.min, failsafeMutations.max)) do
-            cell:mutate (newCellObj)
+        for i = 1, maxCaptures do
+            local newCellObj = cell:new (cellStartHealth, cellStartEnergy, superparent)
+
+            -- Heavily mutate cell
+            for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, failsafeMutations.min, failsafeMutations.max)) do
+                cell:mutate (newCellObj)
+            end
+
+            captures[superparent][i] = newCellObj
         end
-
-        captures[i] = newCellObj
     end
 end
 
@@ -127,74 +147,80 @@ function thisScene:update (dt)
     end
 
     if love.keyboard.isDown("q") then
-        zoom = zoom - zoomVelocity * dt
+        zoom = zoom - zoomVelocity * dt * zoom
     elseif love.keyboard.isDown("e") then
-        zoom = zoom + zoomVelocity * dt
+        zoom = zoom + zoomVelocity * dt * zoom
     end
 
     -- Update map and camera
     map:setCamera (camX, camY, zoom)
-    local capture = map:update (dt)
+    local currentCaptures, tickOccured = map:update (dt)
 
-    if capture ~= nil then
+    if tickOccured then
         cyclesSinceLastFail = cyclesSinceLastFail + 1
     end
 
-    if map.stats.cells == 1 and map:getTickSpeed () < math.huge and capture ~= nil then
-        lastCell = capture
-    end
+    for superparent = 1, superparents do
+        local capture = currentCaptures[superparent]
 
-    -- Activate failsafe if all cells are dead
-    if map.stats.cells <= 0 then
-        print ("WARNING: Failsafe #" .. failsafeActivations .. " activated", os.date("%H:%M:%S - %Y-%m-%d"))
-        print ("Number of available captures: " .. #captures)
-
-        -- Add last surviving cell to captures list
-        if lastCell ~= nil then
-            table.insert (captures, 1, lastCell)
-            table.remove (captures, maxCaptures + 1)
+        if capture ~= nil then
+            lastCells[superparent] = capture
         end
 
-        baseXInput = 1000000 * love.math.random()
-        baseYInput = 1000000 * love.math.random()
-        baseXBarriers = 1000000 * love.math.random()
-        baseYBarriers = 1000000 * love.math.random()
-        biomeXBarriers = 1000000000 * love.math.random()
-        biomeYBarriers = 1000000000 * love.math.random()
-        map:reset (mapSize, mapSize, mapInput, mapBarriers)
+        -- Activate failsafe if all cells are dead
+        if map.stats.cells[superparent] <= 0 then
+            print ("WARNING: Failsafe '" .. superparent .. "' #" .. failsafeActivations[superparent] .. " activated", os.date("%H:%M:%S - %Y-%m-%d"))
+            print ("Number of available captures: " .. #captures[superparent])
 
-        local cellsSpawned = 0
+            -- Add last surviving cell to captures list
+            if lastCells[superparent] ~= nil then
+                table.insert (captures[superparent], 1, lastCells[superparent])
+                table.remove (captures[superparent], maxCaptures + 1)
+            end
 
-        while cellsSpawned < math.min (failsafeSpawns, cell.maxCells) do
-            for i = 1, #captures do
-                local newCell = cell:newChild (captures[i])
+            local cellsSpawned = 0
+            local outerTries = 0
+            local outerMaxTries = 5
 
-                -- Heavily mutate cell
-                for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, failsafeMutations.min, failsafeMutations.max)) do
-                    cell:mutate (newCell)
-                end
+            while cellsSpawned < math.min (failsafeSpawns, cell.maxCells[superparent]) and outerTries < outerMaxTries do
+                for i = 1, #captures[superparent] do
+                    local newCell = cell:newChild (captures[superparent][i])
 
-                -- print ("INFO:", i)
-                -- cell:printCellInfo (newCell)
-                -- cell:printCellScriptList (newCell)
+                    -- Heavily mutate cell
+                    for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, failsafeMutations.min, failsafeMutations.max)) do
+                        cell:mutate (newCell)
+                    end
 
-                -- Set the starting health and energy
-                newCell.health = cellStartHealth
-                newCell.energy = cellStartEnergy
+                    -- print ("INFO:", i)
+                    -- cell:printCellInfo (newCell)
+                    -- cell:printCellScriptList (newCell)
 
-                -- Attempt to spawn the cell
-                if map:spawnCell (math.random (1, map.width), math.random (1, map.height), cellStartHealth, cellStartEnergy, newCell) == true then
-                    cellsSpawned = cellsSpawned + 1
+                    -- Set the starting health and energy
+                    newCell.health = cellStartHealth
+                    newCell.energy = cellStartEnergy
 
-                    if cellsSpawned >= math.min (failsafeSpawns, cell.maxCells) then
-                        break
+                    -- Attempt to spawn the cell
+                    local tries = 0
+                    local maxTries = 50
+                    while map:spawnCell (math.random (1, map.width), math.random (1, map.height), cellStartHealth, cellStartEnergy, newCell.superparent, newCell) == false and tries < maxTries do
+                        tries = tries + 1
+                    end
+                    if tries < maxTries then
+                        cellsSpawned = cellsSpawned + 1
+
+                        if cellsSpawned >= math.min (failsafeSpawns, cell.maxCells[superparent]) then
+                            break
+                        end
                     end
                 end
-            end
-        end
 
-        failsafeActivations = failsafeActivations + 1
-        cyclesSinceLastFail = 0
+                outerTries = outerTries + 1
+            end
+
+            failsafeActivations[superparent] = failsafeActivations[superparent] + 1
+            -- cyclesSinceLastFail = 0
+            print ("Cells spawned for " .. superparent .. ": " .. cellsSpawned)
+        end
     end
 end
 
@@ -233,17 +259,32 @@ function thisScene:draw ()
     love.graphics.setColor (1, 1, 1, 1)
     love.graphics.printf ("Cycles:\n" .. cyclesSinceLastFail, 15, 50, 85, "left")
 
+    -- Show cursor tile position
+    love.graphics.setColor (0, 0, 0, 0.75)
+    love.graphics.rectangle ("fill", 10, 90, 125, 25)
+    love.graphics.setColor (1, 1, 1, 1)
+    local cursorTileX, cursorTileY = map:screenToMap (love.mouse.getPosition ())
+    love.graphics.printf ("Cursor: (" .. cursorTileX .. ", " .. cursorTileY .. ")", 15, 95, 125, "left")
+
     -- Show number of cells
     love.graphics.setColor (0, 0, 0, 0.75)
     love.graphics.rectangle ("fill", 720, 10, 76, 25)
     love.graphics.setColor (1, 1, 1, 1)
-    love.graphics.printf ("Cells: " .. map.stats.cells, 725, 15, 100, "left")
+    local totalCellCount = 0
+    for superparent = 1, superparents do
+        totalCellCount = totalCellCount + map.stats.cells[superparent]
+    end
+    love.graphics.printf ("Cells: " .. totalCellCount, 725, 15, 100, "left")
 
     -- Show number of failsafe activations
     love.graphics.setColor (0, 0, 0, 0.75)
     love.graphics.rectangle ("fill", 720, 45, 76, 25)
     love.graphics.setColor (1, 1, 1, 1)
-    love.graphics.printf ("FSs: " .. failsafeActivations, 725, 50, 100, "left")
+    local totalActivations = 0
+    for superparent = 1, superparents do
+        totalActivations = totalActivations + failsafeActivations[superparent]
+    end
+    love.graphics.printf ("FSs: " .. totalActivations, 725, 50, 100, "left")
 
     -- Shows the rendering mode
     love.graphics.setColor (0, 0, 0, 0.75)

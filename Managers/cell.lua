@@ -9,6 +9,7 @@ local NeuralNet = require ("Helpers.NeuralNet")
 local Neuron = require ("Helpers.Neuron")
 local mutationHandlers = require ("Helpers.mutationHandlers")
 local actFuncs = require ("Helpers.actFuncs")
+local lume = require ("Libraries.lume")
 
 local cell = {
     map = nil, -- A reference to the map manager
@@ -23,7 +24,7 @@ local cell = {
     maxHealth = 0, -- The maximum health of a cell object
     maxEnergy = 0, -- The maximum energy of a cell object
     tickCost = 0,
-    maxCells = 0,
+    maxCells = {},
     minMutRate = 0,
     network = {
         layers = 0,
@@ -49,6 +50,10 @@ local cell = {
         temperature = 1.0,    -- Softmax temperature (>0). Lower is peakier; higher is flatter
         sample = false,       -- If true, sample an action by probability; else pick argmax
     },
+    consumeOnTick = {
+        amount = 0,
+        cost = 0,
+    }
 }
 
 --- Initializes the cell class
@@ -87,12 +92,28 @@ function cell:init (map, inputs, actions, options)
         assert (self.network.layers == #self.network.neuronsPerLayer, "Mismatch between layers and neuronsPerLayer length")
     end
 
+    options.consumeOnTick = options.consumeOnTick or {}
+    self.consumeOnTick.amount = options.consumeOnTick.amount or 15
+    self.consumeOnTick.cost = options.consumeOnTick.cost or 1
+
     self.maxHealth = options.maxHealth or 500
     self.maxEnergy = options.maxEnergy or 500
     self.eggTimer = options.eggTimer or 350
     self.tickCost = options.tickCost or 1
-    self.maxCells = options.maxCells or math.huge
     self.minMutRate = options.minMutRate or 1
+    self.superparents = options.superparents or 3
+    self.maxCells = options.maxCells or nil
+    if type(self.maxCells) ~= "table" then
+        assert (type (self.maxCells) == "number" or self.maxCells == nil, "Invalid neuronsPerLayer value")
+
+        local singularValue = self.maxCells or 10
+        self.maxCells = {}
+        for superparent = 1, self.superparents do
+            self.maxCells[superparent] = singularValue
+        end
+    else
+        assert (self.superparents == #self.maxCells, "Mismatch between superparents (" .. self.superparents .. ") and maxCells length (" .. #self.maxCells .. ")")
+    end
 
     options.mutsPerChild = options.mutsPerChild or {}
     self.mutsPerChild.min = options.mutsPerChild.min or 0
@@ -119,7 +140,9 @@ end
 
 --- Generates a default cell with no actions
 --- @return table cellObj The new default cell object
-function cell:new (health, energy, type)
+function cell:new (health, energy, superparent, type)
+    assert (superparent ~= nil, "Superparent must be provided")
+
     local newCell = {
         type = type or "normal",
         lastUpdate = 0,
@@ -129,10 +152,11 @@ function cell:new (health, energy, type)
         health = clamp (health or self.maxHealth, 0, self.maxHealth),
         energy = clamp (energy or self.maxEnergy, 0, self.maxEnergy),
         totalEnergy = 0,
-        ticksLeft = round (mapToScale (love.math.randomNormal () / 10, -3, 3, self.cellAge.min, self.cellAge.max)),
+        ticksLeft = clamp (round (mapToScale (love.math.randomNormal () / 10, -3, 3, self.cellAge.min, self.cellAge.max)), self.cellAge.min, self.cellAge.max),
         direction = 1,
         mutationRates = {},
         network = NeuralNet:new(self.network.layers),
+        superparent = superparent,
     }
 
     -- Initializes the cell's network
@@ -156,9 +180,11 @@ function cell:new (health, energy, type)
         -- Output layer: identity activation produces logits for softmax (or raw scores)
         newCell.network:addHidden (actionID, Neuron:new (actFuncs.identity), finalLayerIndex)
     end
-
-    -- newCell.network:addHidden ("test", Neuron:new (actFuncs.relu), 2) -- TEMP
-    -- newCell.network:addHidden ("test", Neuron:new (actFuncs.relu), 3) -- TEMP
+    for i = 1, self.network.layers do
+        local newNeuron = Neuron:new(actFuncs.leaky()) -- Call the factory to get the actual function
+        local newID = lume.uuid() -- stable unique key
+        newCell.network:addHidden (newID, newNeuron, i + 1)
+    end
 
     -- Initialize memory variables
     for i = 1, self.memVars do
@@ -227,6 +253,12 @@ function cell:update (tileX, tileY, cellObj, map)
         -- Run the NN and get outputs
         local outputs = cellObj.network:predict(inputs)
 
+        -- Consume energy automatically
+        if self.consumeOnTick.amount > 0 then
+            local itx, ity = map:getForwardPos (tileX, tileY, 1)
+            map:transferInputToCell (itx, ity, cellObj, self.consumeOnTick.amount, self.consumeOnTick.cost)
+        end
+
         -- Decide action from outputs: either softmax-based or raw argmax
         if self.decision.useSoftmax == true then
             local T = (self.decision.temperature and self.decision.temperature > 0) and self.decision.temperature or 1.0
@@ -293,8 +325,6 @@ function cell:update (tileX, tileY, cellObj, map)
                 end
             end
 
-            -- print (maxOutputKey)
-
             if maxOutputValue > 0 and maxOutputKey ~= nil then
                 local chosenKey = maxOutputKey
                 -- Check if chosenKey is for memory vars or display vars
@@ -348,12 +378,13 @@ end
 
 
 function cell:newChild (parentCellObj)
-    local childCellObj = self:new ()
+    local childCellObj = self:new (nil, nil, parentCellObj.superparent)
     childCellObj.type = parentCellObj.type
     childCellObj.color = copyTable(parentCellObj.color)
     childCellObj.mutationRates = copyTable(parentCellObj.mutationRates)
     childCellObj.network = parentCellObj.network:copy()
     childCellObj.direction = parentCellObj.direction
+    -- childCellObj.superparent = parentCellObj.superparent
 
     return childCellObj
 end
