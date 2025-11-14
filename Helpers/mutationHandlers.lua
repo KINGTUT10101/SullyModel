@@ -27,7 +27,7 @@ function mutationHandlers.addNeuron(cellObj)
         -- Use a stable unique string key instead of the neuron table itself.
         -- Using the neuron table as the key caused stale position/index mapping issues
         -- inside KeyedArray after insert/delete operations, eventually breaking copies.
-        local newNeuron = Neuron:new(actFuncs.relu)
+        local newNeuron = Neuron:new(actFuncs.leaky()) -- Call the factory to get the actual function
         local newID = lume.uuid() -- stable unique key
         cellObj.network:addHidden (newID, newNeuron, chosenLayer)
     end
