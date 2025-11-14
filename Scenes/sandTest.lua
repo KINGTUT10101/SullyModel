@@ -32,7 +32,7 @@ end
 local lastCells = {}
 local failsafeMutations = {
     min = 10,
-    max = 5000,
+    max = 2000,
 }
 
 local renderMap = true
@@ -44,6 +44,13 @@ local validModes = {
     "health",
     "total",
     "none"
+}
+local renderSubModeIndex = 1
+local validSubModes = {
+    "normal",
+    "inputDisabled",
+    "barriersDisabled",
+    "allDisabled",
 }
 
 local baseXInput = 10000 * love.math.random()
@@ -74,15 +81,15 @@ end
 function thisScene:load (...)
     cell:init (map, cellInputs, cellActions, {
         network = {
-            layers = 3,
+            layers = 2,
             -- neuronsPerLayer = 26,
-            neuronsPerLayer = 10
+            neuronsPerLayer = 5
         },
         decision = {
             -- useSoftmax = true,
         },
-        maxHealth = 500,
-        maxEnergy = 500,
+        maxHealth = 1500,
+        maxEnergy = 1500,
         memVars = 2,
         displayVars = 1,
         tickCost = 1,
@@ -91,10 +98,10 @@ function thisScene:load (...)
             --     max = math.huge,
             -- },
         -- maxCells = 1000,
-        maxCells = math.huge,
+        maxCells = 650,
         superparents = superparents,
         consumeOnTick = {
-            amount = 15,
+            amount = 25,
             cost = 3,
         }
     })
@@ -228,7 +235,7 @@ function thisScene:draw ()
     love.graphics.setBackgroundColor (0, 0, 1, 1)
 
     if renderMap == true then
-        map:draw (validModes[renderModeIndex])
+        map:draw (validModes[renderModeIndex], validSubModes[renderSubModeIndex])
     end
 
     -- Super speed border
@@ -276,21 +283,25 @@ function thisScene:draw ()
     end
     love.graphics.printf ("Cells: " .. totalCellCount, 725, 15, 100, "left")
 
-    -- Show number of failsafe activations
-    love.graphics.setColor (0, 0, 0, 0.75)
-    love.graphics.rectangle ("fill", 720, 45, 76, 25)
-    love.graphics.setColor (1, 1, 1, 1)
-    local totalActivations = 0
+    -- Show number of failsafe activations for each superparent
     for superparent = 1, superparents do
-        totalActivations = totalActivations + failsafeActivations[superparent]
+        love.graphics.setColor (0, 0, 0, 0.75)
+        love.graphics.rectangle ("fill", 720, 45 + (superparent - 1) * 35, 76, 25)
+        love.graphics.setColor (1, 1, 1, 1)
+        love.graphics.printf ("FSs (" .. superparent .. "): " .. failsafeActivations[superparent], 725, 50 + (superparent - 1) * 35, 100, "left")
     end
-    love.graphics.printf ("FSs: " .. totalActivations, 725, 50, 100, "left")
 
     -- Shows the rendering mode
     love.graphics.setColor (0, 0, 0, 0.75)
-    love.graphics.rectangle ("fill", 10, 565, 100, 25)
+    love.graphics.rectangle ("fill", 10, 540, 100, 25)
     love.graphics.setColor (1, 1, 1, 1)
-    love.graphics.printf (validModes[renderModeIndex] .. " mode", 15, 570, 100, "left")
+    love.graphics.printf (validModes[renderModeIndex] .. " mode", 15, 545, 100, "left")
+
+    -- Shows the sub-rendering mode
+    love.graphics.setColor (0, 0, 0, 0.75)
+    love.graphics.rectangle ("fill", 10, 570, 100, 25)
+    love.graphics.setColor (1, 1, 1, 1)
+    love.graphics.printf (validSubModes[renderSubModeIndex] .. " mode", 15, 575, 100, "left")
 end
 
 function thisScene:keypressed (key, scancode, isrepeat)
@@ -354,6 +365,10 @@ function thisScene:keypressed (key, scancode, isrepeat)
         else
             map:setTickSpeed (math.huge)
         end
+
+    -- Changes the sub rendering mode
+    elseif key == "n" then
+        renderSubModeIndex = cycleValue (renderSubModeIndex, 1, #validSubModes)
 
     -- Changes the rendering mode
     elseif key == "m" then

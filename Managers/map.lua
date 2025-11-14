@@ -213,10 +213,17 @@ local validModes = {
     total = true,
     none = true,
 }
-function map:draw (mode)
+local validSubModes = {
+    normal = true,
+    inputDisabled = true,
+    barriersDisabled = true,
+    allDisabled = true,
+}
+function map:draw (mode, subMode)
     mode = mode or "normal"
 
     assert (validModes[mode] == true, "Invalid rendering mode provided")
+    assert (validSubModes[subMode] == true, "Invalid rendering sub-mode provided")
 
     local maxEnergy = self.cellManager.maxEnergy
     local maxHealth = self.cellManager.maxHealth
@@ -259,15 +266,18 @@ function map:draw (mode)
                     love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
                 end
 
-            elseif envTile.type ~= "blank" then
+            elseif envTile.type ~= "blank" and subMode ~= "barriersDisabled" and subMode ~= "allDisabled" then
                 -- Render barrier (assume this is the only other tile type right now)
                 love.graphics.setColor ({1, 0, 0, 1})
                 love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
 
-            else
+            elseif subMode ~= "inputDisabled" and subMode ~= "allDisabled" then
                 -- Render input tile
                 local scaledColor = mapToScale (envTile.input, self.drawBounds.min, self.drawBounds.max, 0, 1)
                 love.graphics.setColor (scaledColor, scaledColor, scaledColor, 1)
+                love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
+            else
+                love.graphics.setColor (0, 0, 0, 1)
                 love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
             end
         end
