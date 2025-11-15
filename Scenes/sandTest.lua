@@ -55,9 +55,11 @@ local validSubModes = {
 
 local baseXInput = 10000 * love.math.random()
 local baseYInput = 10000 * love.math.random()
-local maxInput = 50
+local maxInput = 500
 local function mapInput (tileX, tileY)
-    return round (mapToScale (love.math.noise(baseXInput+.05*tileX, baseYInput+.02*tileY), 0, 1, 0, maxInput))
+    return (math.random () < 0.05) and maxInput or 0
+
+    -- return round (mapToScale (love.math.noise(baseXInput+.05*tileX, baseYInput+.02*tileY), 0, 1, 0, maxInput))
 end
 
 local baseXBarriers = 10000 * love.math.random()
