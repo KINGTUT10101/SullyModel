@@ -39,7 +39,8 @@ local map = {
     lastSave = 0,
     resets = 0,
     lastLogMsg = "",
-    superparentColors = {}
+    superparentColors = {},
+    totalEnergy = 0,
 }
 
 function map:quickSave ()
@@ -107,6 +108,8 @@ end
 function map:reset (width, height, mapEnvInputs, mapEnvTypes)
     self.width, self.height = width, height
 
+    self.totalEnergy = 0
+
     -- Generates the input grid and input render
     local envGrid = {}
     local cellGrid = {}
@@ -125,6 +128,7 @@ function map:reset (width, height, mapEnvInputs, mapEnvTypes)
 
             if mapEnvInputs ~= nil then
                 envTile.input = mapEnvInputs (i, j)
+                self.totalEnergy = self.totalEnergy + envTile.input
             end
 
             if mapEnvTypes ~= nil then
@@ -178,9 +182,13 @@ function map:update (dt)
                         local result, errorStr = xpcall (self.cellManager.update, debug.traceback, self.cellManager, i, j, cellObj, self) -- Call cell update function
                     
                         if result == false then
-                            self.cellManager:printCellInfo (cellObj)
                             print ("Cell located at (" .. i .. ", " .. j .. ")")
-                            error (errorStr)
+                            self.cellManager:printCellInfo (cellObj)
+                            print (errorStr)
+
+                            self.tickSpeed = math.huge
+
+                            return captures, tickOccured
                         end
                     end
 
@@ -235,6 +243,7 @@ function map:draw (mode, subMode)
     -- Draw cells
     local envGrid = self.envGrid
     local cellGrid = self.cellGrid
+    local totalEnergy = 0
     for i = 1, self.width do
         local cellRow = cellGrid[i]
         local envRow = envGrid[i]
@@ -243,8 +252,12 @@ function map:draw (mode, subMode)
             local cellObj = cellRow[j]
             local envTile = envRow[j]
 
+            totalEnergy = totalEnergy + envTile.input
+
             -- Check what exists at the current position to determine what to render
             if cellObj ~= nil then
+                totalEnergy = totalEnergy + cellObj.totalEnergy
+
                 -- Render cell
                 if mode == "normal" then
                     love.graphics.setColor (cellObj.color)
@@ -288,8 +301,41 @@ function map:draw (mode, subMode)
         end
     end
 
+    if math.floor (self.totalEnergy) ~= math.floor (totalEnergy) then
+        if self.tickSpeed ~= math.huge then
+            print ("Total energy mismatch detected! " .. math.floor (self.totalEnergy) .. " vs " .. math.floor (totalEnergy))
+        end
+        self.tickSpeed = math.huge
+    end
+
     love.graphics.pop ()
 end
+
+
+function map:checkEnergyBalance ()
+    local totalEnergy = 0
+
+    local envGrid = self.envGrid
+    local cellGrid = self.cellGrid
+    for i = 1, self.width do
+        local cellRow = cellGrid[i]
+        local envRow = envGrid[i]
+
+        for j = 1, self.height do
+            local cellObj = cellRow[j]
+            local envTile = envRow[j]
+
+            totalEnergy = totalEnergy + envTile.input
+
+            if cellObj ~= nil then
+                totalEnergy = totalEnergy + cellObj.totalEnergy
+            end
+        end
+    end
+
+    return totalEnergy == self.totalEnergy, totalEnergy
+end
+
 
 function map:setLastLogMsg (msg)
     self.lastLogMsg = msg
@@ -391,7 +437,10 @@ function map:adjustInputTile (tileX, tileY, value)
 
     if self:inBounds (tileX, tileY) == true then
         self.envGrid[tileX][tileY].input = clamp (self.envGrid[tileX][tileY].input + value, self.inputBounds.min, self.inputBounds.max)
+        return true
     end
+
+    return false
 end
 
 --- Checks if the provided position is clear of any cells or barriers.
@@ -452,6 +501,7 @@ function map:spawnCell (tileX, tileY, health, energy, superparent, parentCellObj
             newCellObj = self.cellManager:new (health, energy, superparent) -- Create default cell object
         end
 
+        newCellObj.lastUpdate = love.timer.getTime()
         self.cellGrid[tileX][tileY] = newCellObj
         
         -- Only count normal and egg cells
@@ -536,6 +586,7 @@ function map:deleteCell (tileX, tileY, dropEnergy)
 
         -- Add cell's remaining energy and health to the ground
         if dropEnergy ~= false then
+            assert (cellObj.totalEnergy >= 0, "Cell total energy is negative on deletion!")
             map:adjustInputTile (tileX, tileY, cellObj.totalEnergy)
         end
 
@@ -595,17 +646,19 @@ function map:turnRight (tileX, tileY)
     end
 end
 
-function map:transferInputToCell (tileX, tileY, cellObj, amount, cost)
-    if self:inBounds (tileX, tileY) == true then
-        local inputVal = self:getInputTile (tileX, tileY)
+function map:transferInputToCell (tileX, tileY, cellTileX, cellTileY, amount, cost)
+    if self:inBounds (cellTileX, cellTileY) == true then
+        local inputVal = self:getInputTile (tileX, tileY) or 0
         local maxEnergy = self.cellManager.maxEnergy
+
+        local origInput = inputVal
+        local cellObj = self.cellGrid[cellTileX][cellTileY]
+        local origTotalEnergy = cellObj.totalEnergy
         
         -- For some reason, this check is needed to make stable ecosystems possible...
         -- My guess is that the cells would waste too much energy abusing this function otherwise cuz energy is so sparse
-        if inputVal > cost then
+        if inputVal > cost and maxEnergy - cellObj.energy > cost then
             -- Energy cost of consuming a tile
-            self:adjustCellEnergy (tileX, tileY, -cost)
-
             if inputVal <= amount then
                 cellObj.energy = cellObj.energy + inputVal
                 cellObj.totalEnergy = cellObj.totalEnergy + inputVal
@@ -622,8 +675,11 @@ function map:transferInputToCell (tileX, tileY, cellObj, amount, cost)
                 cellObj.energy = maxEnergy
             end
 
+            self:adjustCellEnergy (cellTileX, cellTileY, -cost)
             self:setInputTile (tileX, tileY, inputVal)
         end
+
+        assert (origInput + origTotalEnergy == (self:getInputTile (tileX, tileY) or 0) + cellObj.totalEnergy, "Energy conservation violated in transferInputToCell. " .. tostring(origInput) .. " + " .. tostring(origTotalEnergy) .. " != " .. tostring(self:getInputTile (tileX, tileY)) .. " + " .. tostring(cellObj.totalEnergy) .. ")")
     end
 end
 
@@ -661,8 +717,9 @@ function map:adjustCellEnergy (tileX, tileY, amount)
         cell.energy = math.min (self.cellManager.maxEnergy, cell.energy + amount)
 
         if cell.energy < 0 then
-            map:adjustCellHealth (tileX, tileY, cell.energy)
+            local deficit = cell.energy
             cell.energy = 0
+            map:adjustCellHealth (tileX, tileY, deficit)
         end
     end
 end

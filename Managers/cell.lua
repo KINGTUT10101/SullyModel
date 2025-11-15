@@ -211,7 +211,7 @@ function cell:update (tileX, tileY, cellObj, map)
         -- Energy cost
         self.map:adjustCellEnergy (tileX, tileY, -self.tickCost)
     end
-    
+
     -- Age the cell by one tick
     cellObj.ticksLeft = cellObj.ticksLeft - 1
     
@@ -256,7 +256,7 @@ function cell:update (tileX, tileY, cellObj, map)
         -- Consume energy automatically
         if self.consumeOnTick.amount > 0 then
             local itx, ity = map:getForwardPos (tileX, tileY, 1)
-            map:transferInputToCell (itx, ity, cellObj, self.consumeOnTick.amount, self.consumeOnTick.cost)
+            map:transferInputToCell (itx, ity, tileX, tileY, self.consumeOnTick.amount, self.consumeOnTick.cost)
         end
 
         -- Decide action from outputs: either softmax-based or raw argmax

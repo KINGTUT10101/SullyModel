@@ -20,7 +20,7 @@ local maxCaptureCycles = 10000
 local captureTimer = maxCaptureCycles
 local captures = {}
 
-local superparents = 4
+local superparents = 2
 
 local cyclesSinceLastFail = 0
 
@@ -57,7 +57,7 @@ local baseXInput = 10000 * love.math.random()
 local baseYInput = 10000 * love.math.random()
 local maxInput = 50
 local function mapInput (tileX, tileY)
-    return mapToScale (love.math.noise(baseXInput+.05*tileX, baseYInput+.02*tileY), 0, 1, 0, maxInput)
+    return round (mapToScale (love.math.noise(baseXInput+.05*tileX, baseYInput+.02*tileY), 0, 1, 0, maxInput))
 end
 
 local baseXBarriers = 10000 * love.math.random()
@@ -81,11 +81,9 @@ end
 function thisScene:load (...)
     cell:init (map, cellInputs, cellActions, {
         network = {
-            layers = 3,
+            layers = 2,
             -- neuronsPerLayer = 26,
-            neuronsPerLayer = {
-                4, 8, 16
-            }
+            neuronsPerLayer = 8
         },
         decision = {
             -- useSoftmax = true,
@@ -100,7 +98,12 @@ function thisScene:load (...)
             --     max = math.huge,
             -- },
         -- maxCells = 1000,
-        maxCells = 450,
+        maxCells = {
+            600,
+            450,
+            -- 450,
+            -- 75,
+        },
         superparents = superparents,
         consumeOnTick = {
             amount = 25,
