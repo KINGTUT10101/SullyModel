@@ -22,7 +22,11 @@ local captures = {}
 
 local superparents = 2
 
-local cyclesSinceLastFail = 0
+local totalCycles = 0
+local cyclesSinceLastFail = {}
+for superparent = 1, superparents do
+    cyclesSinceLastFail[superparent] = 0
+end
 
 local failsafeSpawns = 200
 local failsafeActivations = {}
@@ -170,8 +174,13 @@ function thisScene:update (dt)
     map:setCamera (camX, camY, zoom)
     local currentCaptures, tickOccured = map:update (dt)
 
-    if tickOccured then
-        cyclesSinceLastFail = cyclesSinceLastFail + 1
+    if tickOccured == true then
+        for superparent = 1, superparents do
+            cyclesSinceLastFail[superparent] = cyclesSinceLastFail[superparent] + 1
+        end
+
+        totalCycles = totalCycles + 1
+        captureTimer = captureTimer - 1
     end
 
     for superparent = 1, superparents do
@@ -232,7 +241,7 @@ function thisScene:update (dt)
             end
 
             failsafeActivations[superparent] = failsafeActivations[superparent] + 1
-            -- cyclesSinceLastFail = 0
+            cyclesSinceLastFail[superparent] = 0
             print ("Cells spawned for " .. superparent .. ": " .. cellsSpawned)
         end
     end
@@ -267,18 +276,26 @@ function thisScene:draw ()
     love.graphics.setColor (1, 1, 1, 1)
     love.graphics.printf (love.timer.getFPS (), 15, 15, 25, "center")
 
-    -- Show the number of cycles the current generation has survived
-    love.graphics.setColor (0, 0, 0, 0.75)
-    love.graphics.rectangle ("fill", 10, 45, 95, 40)
-    love.graphics.setColor (1, 1, 1, 1)
-    love.graphics.printf ("Cycles:\n" .. cyclesSinceLastFail, 15, 50, 85, "left")
-
     -- Show cursor tile position
     love.graphics.setColor (0, 0, 0, 0.75)
-    love.graphics.rectangle ("fill", 10, 90, 125, 25)
+    love.graphics.rectangle ("fill", 10, 45, 125, 25)
     love.graphics.setColor (1, 1, 1, 1)
     local cursorTileX, cursorTileY = map:screenToMap (love.mouse.getPosition ())
-    love.graphics.printf ("Cursor: (" .. cursorTileX .. ", " .. cursorTileY .. ")", 15, 95, 125, "left")
+    love.graphics.printf ("Cursor: (" .. cursorTileX .. ", " .. cursorTileY .. ")", 15, 50, 125, "left")
+
+    -- Show total number of ticks
+    love.graphics.setColor (0, 0, 0, 0.75)
+    love.graphics.rectangle ("fill", 10, 80, 150, 25)
+    love.graphics.setColor (1, 1, 1, 1)
+    love.graphics.printf ("Cycles: (*): " .. totalCycles, 15, 85, 150, "left")
+
+    -- Ticks since last fail for each superparent
+    for superparent = 1, superparents do
+        love.graphics.setColor (0, 0, 0, 0.75)
+        love.graphics.rectangle ("fill", 10, 115 + (superparent - 1) * 35, 150, 25)
+        love.graphics.setColor (1, 1, 1, 1)
+        love.graphics.printf ("Cycles (" .. superparent .. "): " .. cyclesSinceLastFail[superparent], 15, 120 + (superparent - 1) * 35, 150, "left")
+    end
 
     -- Show number of cells
     love.graphics.setColor (0, 0, 0, 0.75)
