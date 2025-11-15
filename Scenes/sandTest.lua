@@ -181,6 +181,20 @@ function thisScene:update (dt)
 
         totalCycles = totalCycles + 1
         captureTimer = captureTimer - 1
+
+        if captureTimer <= 0 then
+            captureTimer = maxCaptureCycles
+
+            -- Capture cells
+            for superparent = 1, superparents do
+                if currentCaptures[superparent] ~= nil then
+                    table.insert (captures[superparent], 1, currentCaptures[superparent])
+                    if #captures[superparent] > maxCaptures then
+                        table.remove (captures[superparent], maxCaptures + 1)
+                    end
+                end
+            end
+        end
     end
 
     for superparent = 1, superparents do
@@ -198,7 +212,9 @@ function thisScene:update (dt)
             -- Add last surviving cell to captures list
             if lastCells[superparent] ~= nil then
                 table.insert (captures[superparent], 1, lastCells[superparent])
-                table.remove (captures[superparent], maxCaptures + 1)
+                if #captures[superparent] > maxCaptures then
+                    table.remove (captures[superparent], maxCaptures + 1)
+                end
             end
 
             local cellsSpawned = 0
