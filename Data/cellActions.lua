@@ -18,13 +18,13 @@ local hyperArgs = {
         healthCost = 50,
     },
     reproduce = {
-        energyCost = 20,
+        energyCost = 10,
     },
     reproduceExtra = {
-        energyCost = 250,
+        energyCost = 200,
     },
     createWall = {
-        energyCost = 10,
+        energyCost = 5,
     },
     shareEnergy = {
         sharedEnergy = 100,
@@ -122,10 +122,10 @@ function cellActions.createWall (tileX, tileY, cellObj, map)
     end
 end
 
-function cellActions.shareEnergy (tileX, tileY, cellObj, map)
-    local otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
-    map:shareInputToCell (tileX, tileY, otherTileX, otherTileY, hyperArgs.shareEnergy.sharedEnergy, hyperArgs.shareEnergy.energyCost)
-end
+-- function cellActions.shareEnergy (tileX, tileY, cellObj, map)
+--     local otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
+--     map:shareInputToCell (tileX, tileY, otherTileX, otherTileY, hyperArgs.shareEnergy.sharedEnergy, hyperArgs.shareEnergy.energyCost)
+-- end
 
 function cellActions.placeEnergy (tileX, tileY, cellObj, map)
     local otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)

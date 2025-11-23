@@ -8,7 +8,7 @@ local cellActions = require ("Data.cellActions")
 local cellInputs = require ("Data.cellInputs")
 local cycleValue = require ("Helpers.cycleValue")
 
-local mapSize = 150
+local mapSize = 75
 
 local camVelocity = 15
 local zoomVelocity = 2
@@ -20,7 +20,7 @@ local maxCaptureCycles = 10000
 local captureTimer = maxCaptureCycles
 local captures = {}
 
-local superparents = 2
+local superparents = 3
 
 local totalCycles = 0
 local cyclesSinceLastFail = {}
@@ -35,8 +35,8 @@ for superparent = 1, superparents do
 end
 local lastCells = {}
 local failsafeMutations = {
-    min = 10,
-    max = 2000,
+    min = 0,
+    max = 500,
 }
 
 local renderMap = true
@@ -47,11 +47,13 @@ local validModes = {
     "energy",
     "health",
     "total",
+    "one",
     "none"
 }
 local renderSubModeIndex = 1
 local validSubModes = {
     "normal",
+    "pheromones",
     "inputDisabled",
     "barriersDisabled",
     "allDisabled",
@@ -59,7 +61,7 @@ local validSubModes = {
 
 local baseXInput = 10000 * love.math.random()
 local baseYInput = 10000 * love.math.random()
-local maxInput = 500
+local maxInput = 1000
 local function mapInput (tileX, tileY)
     return (math.random () < 0.05) and maxInput or 0
 
@@ -87,7 +89,7 @@ end
 function thisScene:load (...)
     cell:init (map, cellInputs, cellActions, {
         network = {
-            layers = 2,
+            layers = 3,
             -- neuronsPerLayer = 26,
             neuronsPerLayer = 8
         },
@@ -103,18 +105,20 @@ function thisScene:load (...)
             --     min = math.huge,
             --     max = math.huge,
             -- },
-        -- maxCells = 1000,
-        maxCells = {
-            600,
-            450,
-            -- 450,
-            -- 75,
-        },
+        maxCells = 500,
+        -- maxCells = {
+        --     600,
+        --     450,
+        --     -- 450,
+        --     -- 75,
+        -- },
         superparents = superparents,
         consumeOnTick = {
-            amount = 25,
-            cost = 2,
-        }
+            amount = 250,
+            cost = 0,
+        },
+        pheromoneTime = 100,
+        pheromones = 2,
     })
     map:init (cell, {
         inputBounds = {
@@ -123,7 +127,7 @@ function thisScene:load (...)
         },
         drawBounds = {
             min = 0,
-            max = 200,
+            max = 500,
         },
     })
 
@@ -384,6 +388,10 @@ function thisScene:keypressed (key, scancode, isrepeat)
     -- Toggle rendering
     elseif key == "z" then
         renderMap = not renderMap
+
+    -- Show total energy
+    elseif key == "v" then
+        print ("Total energy: " .. map.totalEnergy)
 
     -- Mutate cell
     elseif key == "o" then

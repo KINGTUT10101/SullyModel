@@ -134,6 +134,9 @@ function cell:init (map, inputs, actions, options)
     self.cellAge.min = options.cellAge.min or 3000
     self.cellAge.max = options.cellAge.max or 6500
 
+    self.pheromones = options.pheromones or 2
+    self.pheromoneTime = options.pheromoneTime or 15
+
     mutationHandlers.init (self)
 end
 
@@ -175,6 +178,10 @@ function cell:new (health, energy, superparent, type)
         newCell.network:addHidden ("disIncr" .. i, Neuron:new (actFuncs.identity), finalLayerIndex)
         newCell.network:addHidden ("disDecr" .. i, Neuron:new (actFuncs.identity), finalLayerIndex)
         newCell.network:addHidden ("getDis" .. i, Neuron:new (actFuncs.identity), 1)
+    end
+    for i = 1, self.pheromones do
+        newCell.network:addHidden ("emitPhero" .. i, Neuron:new (actFuncs.identity), finalLayerIndex)
+        newCell.network:addHidden ("getPhero" .. i, Neuron:new (actFuncs.identity), 1)
     end
     for actionID, _ in pairs (self.actions) do
         -- Output layer: identity activation produces logits for softmax (or raw scores)
@@ -229,6 +236,10 @@ function cell:update (tileX, tileY, cellObj, map)
         end
         for i = 1, self.memVars do
             inputs["getMem" .. i] = mapToScale (cellObj.vars[i], -100, 100, -1, 1)
+        end
+        local envTile = map.envGrid[tileX][tileY]
+        for i = 1, self.memVars do
+            inputs["getPhero" .. i] = (envTile.pheromones[i] > 0) and 1 or -1
         end
         for i = 1, self.displayVars do
             local otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
@@ -311,6 +322,9 @@ function cell:update (tileX, tileY, cellObj, map)
                     local varIndex = tonumber(string.sub(chosenKey, 8))
                     cellObj.displayVars[varIndex] = (actionType == "Incr") and cellObj.displayVars[varIndex] + 1 or cellObj.displayVars[varIndex] - 1
 
+                elseif string.sub (chosenKey, 1, 9) == "emitPhero" then
+                    envTile.pheromones[tonumber(string.sub(chosenKey, 10))] = self.pheromoneTime
+
                 else
                     self.actions[chosenKey](tileX, tileY, cellObj, self.map)
                 end
@@ -337,6 +351,9 @@ function cell:update (tileX, tileY, cellObj, map)
                     local actionType = string.sub(chosenKey, 4, 7)
                     local varIndex = tonumber(string.sub(chosenKey, 8))
                     cellObj.displayVars[varIndex] = (actionType == "Incr") and cellObj.displayVars[varIndex] + 1 or cellObj.displayVars[varIndex] - 1
+
+                elseif string.sub (chosenKey, 1, 9) == "emitPhero" then
+                    envTile.pheromones[tonumber(string.sub(chosenKey, 10))] = self.pheromoneTime
 
                 else
                     self.actions[chosenKey](tileX, tileY, cellObj, self.map)

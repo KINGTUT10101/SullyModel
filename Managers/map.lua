@@ -40,6 +40,7 @@ local map = {
     resets = 0,
     lastLogMsg = "",
     superparentColors = {},
+    pheromoneColors = {},
     totalEnergy = 0,
 }
 
@@ -96,8 +97,12 @@ function map:init (cellManager, options)
 
     for i = 1, self.cellManager.superparents do
         self.stats.cells[i] = 0
-        self.superparentColors[i] = {math.random(), math.random(), math.random()}
+        self.superparentColors[i] = {math.random(), math.random(), math.random(), 1}
     end
+    for i = 1, self.cellManager.pheromones do
+        self.pheromoneColors[i] = {math.random(), math.random(), math.random(), 1}
+    end
+    self.pheromoneColors[0] = {0, 0, 0, 1}
 end
 
 --- Resets the map with a new size and input data.
@@ -124,7 +129,12 @@ function map:reset (width, height, mapEnvInputs, mapEnvTypes)
             local envTile = {
                 input = 0,
                 type = "blank",
+                pheromones = {}
             }
+
+            for i = 1, self.cellManager.pheromones do
+                envTile.pheromones[i] = 0
+            end
 
             if mapEnvInputs ~= nil then
                 envTile.input = mapEnvInputs (i, j)
@@ -161,6 +171,7 @@ function map:update (dt)
 
     -- Check if enough time has passed since the last tick
     local cellGrid = self.cellGrid
+    local envGrid = self.envGrid
     if self.lastTick >= self.tickSpeed then
         local updateStartTime = love.timer.getTime()
         tickOccured = true
@@ -169,9 +180,11 @@ function map:update (dt)
         -- TODO: Optimize this system so it doesn't have to iterate over the entire grid
         for i = 1, self.width do
             local cellRow = cellGrid[i]
+            local envRow = envGrid[i]
 
             for j = 1, self.height do
                 local cellObj = cellRow[j]
+                local envTile = envRow[j]
 
                 -- Check if cell exists at this position
                 if cellObj ~= nil then
@@ -194,6 +207,15 @@ function map:update (dt)
 
                     if cellObj.type == "normal" and captures[cellObj.superparent] == nil then
                         captures[cellObj.superparent] = cellObj
+                    end
+                
+                -- Process pheromones
+                else
+                    for i = 1, self.cellManager.pheromones do
+                        local value = envTile.pheromones[i]
+                        if value > 0 then
+                            envTile.pheromones[i] = value - 1
+                        end
                     end
                 end
             end
@@ -219,10 +241,12 @@ local validModes = {
     energy = true,
     health = true,
     total = true,
+    one = true,
     none = true,
 }
 local validSubModes = {
     normal = true,
+    pheromones = true,
     inputDisabled = true,
     barriersDisabled = true,
     allDisabled = true,
@@ -255,7 +279,7 @@ function map:draw (mode, subMode)
             totalEnergy = totalEnergy + envTile.input
 
             -- Check what exists at the current position to determine what to render
-            if cellObj ~= nil then
+            if cellObj ~= nil and mode ~= "none" then
                 totalEnergy = totalEnergy + cellObj.totalEnergy
 
                 -- Render cell
@@ -282,7 +306,23 @@ function map:draw (mode, subMode)
                     local cellTotalPercent = (cellObj.energy + cellObj.health) / (maxEnergy + maxHealth)
                     love.graphics.setColor (0, cellTotalPercent, 0, 1)
                     love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
+                elseif mode == "one" then
+                    love.graphics.setColor (1, 1, 1, 1)
+                    love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
                 end
+
+            elseif subMode == "pheromones" and envTile.type == "blank" then
+                -- Render the strongest pheromone
+                local strongestPhero, highestValue = 0, 0
+                for k = 1, self.cellManager.pheromones do
+                    if envTile.pheromones[k] > highestValue then
+                        highestValue = envTile.pheromones[k]
+                        strongestPhero = k
+                    end
+                end
+
+                love.graphics.setColor (self.pheromoneColors[strongestPhero])
+                love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
 
             elseif envTile.type ~= "blank" and subMode ~= "barriersDisabled" and subMode ~= "allDisabled" then
                 -- Render barrier (assume this is the only other tile type right now)
@@ -301,7 +341,7 @@ function map:draw (mode, subMode)
         end
     end
 
-    if math.floor (self.totalEnergy) ~= math.floor (totalEnergy) then
+    if math.floor (self.totalEnergy) ~= math.floor (totalEnergy) and mode ~= "none" then
         if self.tickSpeed ~= math.huge then
             print ("Total energy mismatch detected! " .. math.floor (self.totalEnergy) .. " vs " .. math.floor (totalEnergy))
         end

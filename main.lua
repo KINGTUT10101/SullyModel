@@ -1,4 +1,10 @@
-math.randomseed (os.time ())
+
+local seed = os.time ()
+math.randomseed (seed)
+
+print (os.time ())
+
+-- TODO: Append seed to file
 
 -- Loads the libraries
 local sceneMan = require("Libraries.sceneMan")
