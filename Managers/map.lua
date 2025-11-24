@@ -200,6 +200,7 @@ function map:update (dt)
                             print (errorStr)
 
                             self.tickSpeed = math.huge
+                            love.window.requestAttention ()
 
                             return captures, tickOccured
                         end
