@@ -42,6 +42,7 @@ local map = {
     superparentColors = {},
     pheromoneColors = {},
     totalEnergy = 0,
+    stopOnError = true,
 }
 
 function map:quickSave ()
@@ -199,8 +200,10 @@ function map:update (dt)
                             self.cellManager:printCellInfo (cellObj)
                             print (errorStr)
 
-                            self.tickSpeed = math.huge
-                            love.window.requestAttention ()
+                            if self.stopOnError == true then
+                                self.tickSpeed = math.huge
+                                love.window.requestAttention ()
+                            end
 
                             return captures, tickOccured
                         end

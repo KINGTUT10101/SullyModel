@@ -8,7 +8,7 @@ local cellActions = require ("Data.cellActions")
 local cellInputs = require ("Data.cellInputs")
 local cycleValue = require ("Helpers.cycleValue")
 
-local mapSize = 75
+local mapSize = 100
 
 local camVelocity = 15
 local zoomVelocity = 2
@@ -61,9 +61,9 @@ local validSubModes = {
 
 local baseXInput = 10000 * love.math.random()
 local baseYInput = 10000 * love.math.random()
-local maxInput = 1000
+local maxInput = 5000
 local function mapInput (tileX, tileY)
-    return (math.random () < 0.05) and maxInput or 0
+    return (math.random () < 0.10) and maxInput or 0
 
     -- return round (mapToScale (love.math.noise(baseXInput+.05*tileX, baseYInput+.02*tileY), 0, 1, 0, maxInput))
 end
@@ -438,6 +438,13 @@ function thisScene:keypressed (key, scancode, isrepeat)
     -- Changes the rendering mode
     elseif key == "m" then
         renderModeIndex = cycleValue (renderModeIndex, 1, #validModes)
+
+    elseif key == "'" then
+        love.system.openURL ("file://"..love.filesystem.getSaveDirectory()) -- TEMP, this will fail on android
+
+    elseif key == "l" then
+        map.stopOnError = not map.stopOnError
+        print ("Stop on error: " .. tostring (map.stopOnError))
     end
 end
 
