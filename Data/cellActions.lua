@@ -9,6 +9,10 @@ local hyperArgs = {
         damage = 250,
         energyCost = 10,
     },
+    stealEnergy = {
+        energyGained = 50,
+        energyCost = 7,
+    },
     healSelf = {
         healing = 50,
         energyCost = 50,
@@ -73,8 +77,20 @@ end
 
 function cellActions.applyDamage (tileX, tileY, cellObj, map)
     local enemyTileX, enemyTileY = map:getForwardPos (tileX, tileY, 1)
-    map:adjustCellEnergy (tileX, tileY, -hyperArgs.applyDamage.energyCost)
-    map:adjustCellHealth (enemyTileX, enemyTileY, -hyperArgs.applyDamage.damage)
+
+    if map:getCellTotalResources (tileX, tileY) > hyperArgs.applyDamage.energyCost then
+        map:adjustCellEnergy (tileX, tileY, -hyperArgs.applyDamage.energyCost)
+        map:adjustCellHealth (enemyTileX, enemyTileY, -hyperArgs.applyDamage.damage)
+    end
+end
+
+function cellActions.stealEnergy (tileX, tileY, cellObj, map)
+    local enemyTileX, enemyTileY = map:getForwardPos (tileX, tileY, 1)
+
+    if map:getCellTotalResources (enemyTileX, enemyTileY) > hyperArgs.stealEnergy.energyGained and map:getCellTotalResources (tileX, tileY) > hyperArgs.stealEnergy.energyCost then
+        map:adjustCellEnergy (tileX, tileY, hyperArgs.stealEnergy.energyGained)
+        map:adjustCellEnergy (enemyTileX, enemyTileY, -hyperArgs.stealEnergy.energyGained)
+    end
 end
 
 function cellActions.healSelf (tileX, tileY, cellObj, map)
