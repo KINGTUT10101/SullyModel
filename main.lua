@@ -2,9 +2,21 @@
 local seed = os.time ()
 math.randomseed (seed)
 
-print (os.time ())
+print ("Seed: " .. type (seed) .. " " .. seed)
 
--- TODO: Append seed to file
+-- Append the numeric seed to a file in the save directory
+local filename = "seeds.txt"
+local prev, readErr = love.filesystem.read(filename)
+local timestamp = os.date("%Y-%m-%d %H:%M:%S")
+local entry = string.format("%s - %s\n", timestamp, tostring(seed))
+local contents = (prev or "") .. entry
+local ok, writeErr = love.filesystem.write(filename, contents)
+if not ok then
+    print("Failed to append seed to " .. filename .. ": " .. tostring(writeErr))
+else
+    print("Seed appended to " .. filename .. " (" .. timestamp .. ")")
+end
+print ()
 
 -- Loads the libraries
 local sceneMan = require("Libraries.sceneMan")
