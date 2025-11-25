@@ -40,11 +40,6 @@ local cell = {
         -- minor = 0,
         -- meta = 0,
     },
-    cellAge = {
-        min = 0,
-        max = 0,
-        mean = 0,
-    },
     decision = {
         useSoftmax = false,   -- If true, turn output logits into probabilities
         temperature = 1.0,    -- Softmax temperature (>0). Lower is peakier; higher is flatter
@@ -60,6 +55,8 @@ local cell = {
     },
     actionThreshold = 0,
     actionsPerTurn = 1,
+    maxAge = 0,
+    maxReproductionEnergy = 0,
 }
 
 --- Initializes the cell class
@@ -135,6 +132,10 @@ function cell:init (map, inputs, actions, options)
     self.mutsPerChild.max = options.mutsPerChild.max or 10
 
     options.initialMutRates = options.initialMutRates or {}
+    -- for mutationType, _ in pairs (mutationHandlers) do
+    --     self.initialMutRates[mutationType] = clamp (options.initialMutRates[mutationType] or 5, self.minMutRate, 100)
+    -- end
+
     self.initialMutRates.addNeuron = clamp (options.initialMutRates.addNeuron or 5, self.minMutRate, 100)
     self.initialMutRates.removeNeuron = clamp (options.initialMutRates.removeNeuron or 2, self.minMutRate, 100)
     self.initialMutRates.increaseWeight = clamp (options.initialMutRates.increaseWeight or 25, self.minMutRate, 100)
@@ -145,14 +146,15 @@ function cell:init (map, inputs, actions, options)
     self.initialMutRates.removeConnection = clamp (options.initialMutRates.removeConnection or 5, self.minMutRate, 100)
     self.initialMutRates.meta = clamp (options.initialMutRates.meta or 5, self.minMutRate, 100)
 
-    options.cellAge = options.cellAge or {}
-    self.cellAge.min = options.cellAge.min or 3000
-    self.cellAge.max = options.cellAge.max or 6500
+    self.maxAge = options.maxAge or 6000
+    self.maxReproductionEnergy = options.maxReproductionEnergy or 1000
 
     self.pheromones = options.pheromones or 2
-    self.pheromoneTime = options.pheromoneTime or 15
+    self.pheromoneTime = options.pheromoneTime or 250
 
     mutationHandlers.init (self)
+
+    print ("Cell manager initialized", self)
 end
 
 
@@ -170,11 +172,13 @@ function cell:new (health, energy, superparent, type)
         health = clamp (health or self.maxHealth, 0, self.maxHealth),
         energy = clamp (energy or self.maxEnergy, 0, self.maxEnergy),
         totalEnergy = 0,
-        ticksLeft = clamp (round (mapToScale (love.math.randomNormal () / 10, -3, 3, self.cellAge.min, self.cellAge.max)), self.cellAge.min, self.cellAge.max),
+        ticksLeft = self.maxAge * 0.5,
         direction = 1,
         mutationRates = {},
         network = NeuralNet:new(self.network.layers),
         superparent = superparent,
+        maxAge = self.maxAge * 0.5,
+        reproductionEnergy = self.maxReproductionEnergy * 0.5,
     }
 
     -- Initializes the cell's network
@@ -418,6 +422,9 @@ function cell:newChild (parentCellObj)
     childCellObj.mutationRates = copyTable(parentCellObj.mutationRates)
     childCellObj.network = parentCellObj.network:copy()
     childCellObj.direction = parentCellObj.direction
+    childCellObj.maxAge = parentCellObj.maxAge
+    childCellObj.reproductionEnergy = parentCellObj.reproductionEnergy
+    childCellObj.ticksLeft = childCellObj.maxAge
     -- childCellObj.superparent = parentCellObj.superparent
 
     return childCellObj

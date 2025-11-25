@@ -22,10 +22,10 @@ local hyperArgs = {
         healthCost = 50,
     },
     reproduce = {
-        energyCost = 50,
+        energyCost = 150,
     },
     reproduceExtra = {
-        energyCost = 200,
+        energyCost = 500,
     },
     createWall = {
         energyCost = 5,
@@ -124,9 +124,11 @@ end
 function cellActions.reproduce (tileX, tileY, cellObj, map)
     local babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
     if map.stats.cells[cellObj.superparent] < map.cellManager.maxCells[cellObj.superparent] and map:isClear (babyTileX, babyTileY) == true then
-        if cellObj.energy + cellObj.health > hyperArgs.reproduce.energyCost then
-            if map:spawnCell (babyTileX, babyTileY, hyperArgs.reproduce.energyCost / 2, hyperArgs.reproduce.energyCost / 2, cellObj.superparent, cellObj) then
-                map:adjustCellEnergy (tileX, tileY, -hyperArgs.reproduce.energyCost)
+        local energyCost = cellObj.reproductionEnergy
+
+        if cellObj.energy + cellObj.health > energyCost then
+            if map:spawnCell (babyTileX, babyTileY, energyCost / 2, energyCost / 2, cellObj.superparent, cellObj) then
+                map:adjustCellEnergy (tileX, tileY, -energyCost)
 
                 -- TODO: Adjust total energy for parent and child
                 -- cellObj.totalEnergy = cellObj.totalEnergy - hyperArgs.reproduce.energyCost
@@ -138,21 +140,38 @@ function cellActions.reproduce (tileX, tileY, cellObj, map)
     return tileX, tileY
 end
 
-function cellActions.reproduceExtra (tileX, tileY, cellObj, map)
-    local babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
-    if map.stats.cells[cellObj.superparent] < map.cellManager.maxCells[cellObj.superparent] and map:isClear (babyTileX, babyTileY) == true then
-        if cellObj.energy + cellObj.health > hyperArgs.reproduceExtra.energyCost then
-            map:adjustCellEnergy (tileX, tileY, -hyperArgs.reproduceExtra.energyCost)
-            map:spawnCell (babyTileX, babyTileY, hyperArgs.reproduceExtra.energyCost / 2, hyperArgs.reproduceExtra.energyCost / 2, cellObj.superparent, cellObj)
+-- function cellActions.reproduce (tileX, tileY, cellObj, map)
+--     local babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
+--     if map.stats.cells[cellObj.superparent] < map.cellManager.maxCells[cellObj.superparent] and map:isClear (babyTileX, babyTileY) == true then
+--         if cellObj.energy + cellObj.health > hyperArgs.reproduce.energyCost then
+--             if map:spawnCell (babyTileX, babyTileY, hyperArgs.reproduce.energyCost / 2, hyperArgs.reproduce.energyCost / 2, cellObj.superparent, cellObj) then
+--                 map:adjustCellEnergy (tileX, tileY, -hyperArgs.reproduce.energyCost)
 
-            -- TODO: Adjust total energy for parent and child
-            -- cellObj.totalEnergy = cellObj.totalEnergy - hyperArgs.reproduceExtra.energyCost
-            -- map.cellGrid[babyTileX][babyTileY].totalEnergy = hyperArgs.reproduceExtra.energyCost
-        end
-    end
+--                 -- TODO: Adjust total energy for parent and child
+--                 -- cellObj.totalEnergy = cellObj.totalEnergy - hyperArgs.reproduce.energyCost
+--                 -- map.cellGrid[babyTileX][babyTileY].totalEnergy = hyperArgs.reproduce.energyCost
+--             end
+--         end
+--     end
 
-    return tileX, tileY
-end
+--     return tileX, tileY
+-- end
+
+-- function cellActions.reproduceExtra (tileX, tileY, cellObj, map)
+--     local babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
+--     if map.stats.cells[cellObj.superparent] < map.cellManager.maxCells[cellObj.superparent] and map:isClear (babyTileX, babyTileY) == true then
+--         if cellObj.energy + cellObj.health > hyperArgs.reproduceExtra.energyCost then
+--             map:adjustCellEnergy (tileX, tileY, -hyperArgs.reproduceExtra.energyCost)
+--             map:spawnCell (babyTileX, babyTileY, hyperArgs.reproduceExtra.energyCost / 2, hyperArgs.reproduceExtra.energyCost / 2, cellObj.superparent, cellObj)
+
+--             -- TODO: Adjust total energy for parent and child
+--             -- cellObj.totalEnergy = cellObj.totalEnergy - hyperArgs.reproduceExtra.energyCost
+--             -- map.cellGrid[babyTileX][babyTileY].totalEnergy = hyperArgs.reproduceExtra.energyCost
+--         end
+--     end
+
+--     return tileX, tileY
+-- end
 
 function cellActions.createWall (tileX, tileY, cellObj, map)
     local babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)

@@ -11,7 +11,7 @@ function cellInputs.health (tileX, tileY, cellObj, map)
 end
 
 function cellInputs.age (tileX, tileY, cellObj, map)
-    return mapToScale (cellObj.ticksLeft, 0, map.cellManager.cellAge.max, -1, 1)
+    return mapToScale (cellObj.ticksLeft, 0, cellObj.maxAge, -1, 1)
 end
 
 function cellInputs.verticalDir (tileX, tileY, cellObj, map)

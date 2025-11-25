@@ -119,7 +119,7 @@ function thisScene:load (...)
         },
         pheromoneTime = 250,
         pheromones = 2,
-        actionsPerTurn = 3,
+        actionsPerTurn = 2,
         actionThreshold = 0.5,
     })
     map:init (cell, {
