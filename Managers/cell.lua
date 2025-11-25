@@ -57,7 +57,9 @@ local cell = {
     varBounds = {
         min = -1,
         max = 1,
-    }
+    },
+    actionThreshold = 0,
+    actionsPerTurn = 1,
 }
 
 --- Initializes the cell class
@@ -72,6 +74,9 @@ function cell:init (map, inputs, actions, options)
     self.map = map
     self.inputs = inputs
     self.actions = actions
+
+    self.actionThreshold = options.actionThreshold or 0.0
+    self.actionsPerTurn = options.actionsPerTurn or 1
 
     self.memVars = options.memVars or 2
     self.displayVars = options.displayVars or 1
@@ -270,96 +275,105 @@ function cell:update (tileX, tileY, cellObj, map)
 
         -- Decide action from outputs: either softmax-based or raw argmax
         if self.decision.useSoftmax == true then
-            local T = (self.decision.temperature and self.decision.temperature > 0) and self.decision.temperature or 1.0
+            error ("Not implemented: softmax-based action selection")
 
-            -- Compute numerically stable softmax probabilities over outputs
-            local maxLogit = -math.huge
-            for _, v in pairs(outputs) do
-                if v > maxLogit then maxLogit = v end
-            end
+            -- local T = (self.decision.temperature and self.decision.temperature > 0) and self.decision.temperature or 1.0
 
-            local expSum = 0
-            local probs = {}
-            for k, v in pairs(outputs) do
-                local z = (v - maxLogit) / T
-                local ev = math.exp(z)
-                probs[k] = ev
-                expSum = expSum + ev
-            end
-            if expSum <= 0 then
-                -- Degenerate case; fall back to uniform distribution
-                local n = 0
-                for _ in pairs(outputs) do n = n + 1 end
-                for k, _ in pairs(outputs) do probs[k] = 1 / n end
-            else
-                for k, v in pairs(probs) do probs[k] = v / expSum end
-            end
+            -- -- Compute numerically stable softmax probabilities over outputs
+            -- local maxLogit = -math.huge
+            -- for _, v in pairs(outputs) do
+            --     if v > maxLogit then maxLogit = v end
+            -- end
 
-            local chosenKey
-            if self.decision.sample == true then
-                -- Sample by probability
-                chosenKey = weightedchoice(probs)
-            else
-                -- Argmax over probabilities
-                local bestK, bestP = nil, -math.huge
-                for k, p in pairs(probs) do
-                    if p > bestP then bestK, bestP = k, p end
-                end
-                chosenKey = bestK
-            end
+            -- local expSum = 0
+            -- local probs = {}
+            -- for k, v in pairs(outputs) do
+            --     local z = (v - maxLogit) / T
+            --     local ev = math.exp(z)
+            --     probs[k] = ev
+            --     expSum = expSum + ev
+            -- end
+            -- if expSum <= 0 then
+            --     -- Degenerate case; fall back to uniform distribution
+            --     local n = 0
+            --     for _ in pairs(outputs) do n = n + 1 end
+            --     for k, _ in pairs(outputs) do probs[k] = 1 / n end
+            -- else
+            --     for k, v in pairs(probs) do probs[k] = v / expSum end
+            -- end
 
-            if chosenKey ~= nil then
-                -- Check if chosenKey is for memory vars or display vars
-                if string.sub (chosenKey, 1, 3) == "mem" then
-                    local actionType = string.sub(chosenKey, 4, 7)
-                    local varIndex = tonumber(string.sub(chosenKey, 8))
-                    cellObj.vars[varIndex] = (actionType == "Incr") and cellObj.vars[varIndex] + 1 or cellObj.vars[varIndex] - 1
-                    cellObj.vars[varIndex] = clamp (cellObj.vars[varIndex], self.varBounds.min, self.varBounds.max)
+            -- local chosenKey
+            -- if self.decision.sample == true then
+            --     -- Sample by probability
+            --     chosenKey = weightedchoice(probs)
+            -- else
+            --     -- Argmax over probabilities
+            --     local bestK, bestP = nil, -math.huge
+            --     for k, p in pairs(probs) do
+            --         if p > bestP then bestK, bestP = k, p end
+            --     end
+            --     chosenKey = bestK
+            -- end
 
-                elseif string.sub (chosenKey, 1, 3) == "dis" then
-                    local actionType = string.sub(chosenKey, 4, 7)
-                    local varIndex = tonumber(string.sub(chosenKey, 8))
-                    cellObj.displayVars[varIndex] = (actionType == "Incr") and cellObj.displayVars[varIndex] + 1 or cellObj.displayVars[varIndex] - 1
-                    cellObj.displayVars[varIndex] = clamp (cellObj.displayVars[varIndex], self.varBounds.min, self.varBounds.max)
+            -- if chosenKey ~= nil then
+            --     -- Check if chosenKey is for memory vars or display vars
+            --     if string.sub (chosenKey, 1, 3) == "mem" then
+            --         local actionType = string.sub(chosenKey, 4, 7)
+            --         local varIndex = tonumber(string.sub(chosenKey, 8))
+            --         cellObj.vars[varIndex] = (actionType == "Incr") and cellObj.vars[varIndex] + 1 or cellObj.vars[varIndex] - 1
+            --         cellObj.vars[varIndex] = clamp (cellObj.vars[varIndex], self.varBounds.min, self.varBounds.max)
 
-                elseif string.sub (chosenKey, 1, 9) == "emitPhero" then
-                    envTile.pheromones[tonumber(string.sub(chosenKey, 10))] = self.pheromoneTime
+            --     elseif string.sub (chosenKey, 1, 3) == "dis" then
+            --         local actionType = string.sub(chosenKey, 4, 7)
+            --         local varIndex = tonumber(string.sub(chosenKey, 8))
+            --         cellObj.displayVars[varIndex] = (actionType == "Incr") and cellObj.displayVars[varIndex] + 1 or cellObj.displayVars[varIndex] - 1
+            --         cellObj.displayVars[varIndex] = clamp (cellObj.displayVars[varIndex], self.varBounds.min, self.varBounds.max)
 
-                else
-                    self.actions[chosenKey](tileX, tileY, cellObj, self.map)
-                end
-            end
+            --     elseif string.sub (chosenKey, 1, 9) == "emitPhero" then
+            --         envTile.pheromones[tonumber(string.sub(chosenKey, 10))] = self.pheromoneTime
+
+            --     else
+            --         self.actions[chosenKey](tileX, tileY, cellObj, self.map)
+            --     end
+            -- end
         else
-            -- Previous behavior: choose argmax over raw outputs and act only if positive
-            local maxOutputKey, maxOutputValue = nil, -math.huge
-            for key, value in pairs(outputs) do
-                -- print (key, value)
-                if value > maxOutputValue then
-                    maxOutputKey, maxOutputValue = key, value
+            -- Choose argmax over raw outputs and act only if its above the threshold
+
+            -- Sort the outputs array
+            table.sort (outputs, function(a, b) return a[2] > b[2] end)
+
+            local cellX, cellY = tileX, tileY
+            for i = 1, self.actionsPerTurn do
+                if cellObj.health <= 0 then
+                    break
                 end
-            end
 
-            if maxOutputValue > 0 and maxOutputKey ~= nil then
-                local chosenKey = maxOutputKey
+                assert (map.cellGrid[cellX][cellY] == cellObj, "Cell object mismatch during action execution")
 
-                -- Check if chosenKey is for memory vars or display vars
-                if string.sub (chosenKey, 1, 3) == "mem" then
-                    local actionType = string.sub(chosenKey, 4, 7)
-                    local varIndex = tonumber(string.sub(chosenKey, 8))
-                    cellObj.vars[varIndex] = (actionType == "Incr") and cellObj.vars[varIndex] + 1 or cellObj.vars[varIndex] - 1
-                    cellObj.vars[varIndex] = clamp (cellObj.vars[varIndex], self.varBounds.min, self.varBounds.max)
+                local outputValue = outputs[i][2]
 
-                elseif string.sub (chosenKey, 1, 3) == "dis" then
-                    local actionType = string.sub(chosenKey, 4, 7)
-                    local varIndex = tonumber(string.sub(chosenKey, 8))
-                    cellObj.displayVars[varIndex] = (actionType == "Incr") and cellObj.displayVars[varIndex] + 1 or cellObj.displayVars[varIndex] - 1
-                    cellObj.displayVars[varIndex] = clamp (cellObj.displayVars[varIndex], self.varBounds.min, self.varBounds.max)
+                if outputValue > self.actionThreshold then
+                    local outputKey = outputs[i][1]
 
-                elseif string.sub (chosenKey, 1, 9) == "emitPhero" then
-                    envTile.pheromones[tonumber(string.sub(chosenKey, 10))] = self.pheromoneTime
+                    -- Check if outputKey is for memory vars or display vars
+                    if string.sub (outputKey, 1, 3) == "mem" then
+                        local actionType = string.sub(outputKey, 4, 7)
+                        local varIndex = tonumber(string.sub(outputKey, 8))
+                        cellObj.vars[varIndex] = (actionType == "Incr") and cellObj.vars[varIndex] + 1 or cellObj.vars[varIndex] - 1
+                        cellObj.vars[varIndex] = clamp (cellObj.vars[varIndex], self.varBounds.min, self.varBounds.max)
 
-                else
-                    self.actions[chosenKey](tileX, tileY, cellObj, self.map)
+                    elseif string.sub (outputKey, 1, 3) == "dis" then
+                        local actionType = string.sub(outputKey, 4, 7)
+                        local varIndex = tonumber(string.sub(outputKey, 8))
+                        cellObj.displayVars[varIndex] = (actionType == "Incr") and cellObj.displayVars[varIndex] + 1 or cellObj.displayVars[varIndex] - 1
+                        cellObj.displayVars[varIndex] = clamp (cellObj.displayVars[varIndex], self.varBounds.min, self.varBounds.max)
+
+                    elseif string.sub (outputKey, 1, 9) == "emitPhero" then
+                        envTile.pheromones[tonumber(string.sub(outputKey, 10))] = self.pheromoneTime
+
+                    else
+                        cellX, cellY = self.actions[outputKey](cellX, cellY, cellObj, self.map)
+                    end
                 end
             end
         end

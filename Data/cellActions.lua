@@ -54,15 +54,19 @@ local hyperArgs = {
 -- end
 
 function cellActions.moveForward (tileX, tileY, cellObj, map)
-    map:moveForward (tileX, tileY)
+    return map:moveForward (tileX, tileY)
 end
 
 function cellActions.turnLeft (tileX, tileY, cellObj, map)
     map:turnLeft (tileX, tileY)
+
+    return tileX, tileY
 end
 
 function cellActions.turnRight (tileX, tileY, cellObj, map)
     map:turnRight (tileX, tileY)
+
+    return tileX, tileY
 end
 
 function cellActions.consume (tileX, tileY, cellObj, map)
@@ -73,6 +77,8 @@ function cellActions.consume (tileX, tileY, cellObj, map)
     --     print ("===Energy change: " .. (cellObj.energy - origEnergy) .. "===")
     --     print (origEnergy .. "->" .. cellObj.energy)
     -- end
+
+    return tileX, tileY
 end
 
 function cellActions.applyDamage (tileX, tileY, cellObj, map)
@@ -82,22 +88,28 @@ function cellActions.applyDamage (tileX, tileY, cellObj, map)
         map:adjustCellEnergy (tileX, tileY, -hyperArgs.applyDamage.energyCost)
         map:adjustCellHealth (enemyTileX, enemyTileY, -hyperArgs.applyDamage.damage)
     end
+
+    return tileX, tileY
 end
 
-function cellActions.stealEnergy (tileX, tileY, cellObj, map)
-    local enemyTileX, enemyTileY = map:getForwardPos (tileX, tileY, 1)
+-- function cellActions.stealEnergy (tileX, tileY, cellObj, map)
+--     local enemyTileX, enemyTileY = map:getForwardPos (tileX, tileY, 1)
 
-    if map:getCellTotalResources (enemyTileX, enemyTileY) > hyperArgs.stealEnergy.energyGained and map:getCellTotalResources (tileX, tileY) > hyperArgs.stealEnergy.energyCost then
-        map:adjustCellEnergy (tileX, tileY, hyperArgs.stealEnergy.energyGained)
-        map:adjustCellEnergy (enemyTileX, enemyTileY, -hyperArgs.stealEnergy.energyGained)
-    end
-end
+--     if map:getCellTotalResources (enemyTileX, enemyTileY) > hyperArgs.stealEnergy.energyGained and map:getCellTotalResources (tileX, tileY) > hyperArgs.stealEnergy.energyCost then
+--         map:adjustCellEnergy (tileX, tileY, hyperArgs.stealEnergy.energyGained)
+--         map:adjustCellEnergy (enemyTileX, enemyTileY, -hyperArgs.stealEnergy.energyGained)
+--     end
+
+--     return tileX, tileY
+-- end
 
 function cellActions.healSelf (tileX, tileY, cellObj, map)
     if map:getCellTotalResources (tileX, tileY) - hyperArgs.healSelf.energyCost > 0 then
         map:adjustCellEnergy (tileX, tileY, -hyperArgs.healSelf.energyCost)
         map:adjustCellHealth (tileX, tileY, hyperArgs.healSelf.healing)
     end
+
+    return tileX, tileY
 end
 
 function cellActions.energizeSelf (tileX, tileY, cellObj, map)
@@ -105,6 +117,8 @@ function cellActions.energizeSelf (tileX, tileY, cellObj, map)
     if map:isTaken (tileX, tileY) == true then
         map:adjustCellEnergy (tileX, tileY, hyperArgs.energizeSelf.energyTransferred)
     end
+
+    return tileX, tileY
 end
 
 function cellActions.reproduce (tileX, tileY, cellObj, map)
@@ -120,6 +134,8 @@ function cellActions.reproduce (tileX, tileY, cellObj, map)
             end
         end
     end
+
+    return tileX, tileY
 end
 
 function cellActions.reproduceExtra (tileX, tileY, cellObj, map)
@@ -134,6 +150,8 @@ function cellActions.reproduceExtra (tileX, tileY, cellObj, map)
             -- map.cellGrid[babyTileX][babyTileY].totalEnergy = hyperArgs.reproduceExtra.energyCost
         end
     end
+
+    return tileX, tileY
 end
 
 function cellActions.createWall (tileX, tileY, cellObj, map)
@@ -144,6 +162,8 @@ function cellActions.createWall (tileX, tileY, cellObj, map)
             map:spawnWall (babyTileX, babyTileY, hyperArgs.createWall.energyCost / 2, cellObj.superparent)
         end
     end
+
+    return tileX, tileY
 end
 
 -- function cellActions.shareEnergy (tileX, tileY, cellObj, map)
@@ -160,6 +180,8 @@ function cellActions.placeEnergy (tileX, tileY, cellObj, map)
             cellObj.totalEnergy = cellObj.totalEnergy - hyperArgs.placeEnergy.sharedEnergy
         end
     end
+
+    return tileX, tileY
 end
 
 return cellActions

@@ -8,7 +8,7 @@ local cellActions = require ("Data.cellActions")
 local cellInputs = require ("Data.cellInputs")
 local cycleValue = require ("Helpers.cycleValue")
 
-local mapSize = 100
+local mapSize = 75
 
 local camVelocity = 15
 local zoomVelocity = 2
@@ -105,7 +105,7 @@ function thisScene:load (...)
             --     min = math.huge,
             --     max = math.huge,
             -- },
-        maxCells = 500,
+        maxCells = 350,
         -- maxCells = {
         --     600,
         --     450,
@@ -114,11 +114,13 @@ function thisScene:load (...)
         -- },
         superparents = superparents,
         consumeOnTick = {
-            amount = 250,
+            amount = 0,
             cost = 0,
         },
-        pheromoneTime = 100,
+        pheromoneTime = 250,
         pheromones = 2,
+        actionsPerTurn = 3,
+        actionThreshold = 0.5,
     })
     map:init (cell, {
         inputBounds = {

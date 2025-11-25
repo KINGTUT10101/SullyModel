@@ -235,7 +235,7 @@ end
 
 --- Makes a prediction using the provided input values
 --- @param networkInputs table<string, number> A table mapping input IDs to their values
---- @return table<string, number> networkOutputs A table mapping output IDs to their predicted values
+--- @return table<table> networkOutputs An array of arrays containing output neuron IDs and their values
 function NeuralNet:predict (networkInputs)
     local networkOutputs = {}
 
@@ -257,7 +257,7 @@ function NeuralNet:predict (networkInputs)
 
     -- Collect output neuron values
     for pos, key, outputNeuron in self.layers[#self.layers]:pairs() do
-        networkOutputs[key] = outputNeuron.lastOutput
+        table.insert (networkOutputs, {key, outputNeuron.lastOutput})
     end
 
     return networkOutputs
