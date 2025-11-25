@@ -249,18 +249,6 @@ function cell:update (tileX, tileY, cellObj, map)
             end
         end
 
-        -- Optional: light input normalization to stabilize ranges
-        -- Keep as simple scaling to [0,1] using known maxima; other inputs are already bounded
-        if inputs.energy ~= nil and self.maxEnergy and self.maxEnergy > 0 then
-            inputs.energy = clamp(inputs.energy / self.maxEnergy, 0, 1)
-        end
-        if inputs.health ~= nil and self.maxHealth and self.maxHealth > 0 then
-            inputs.health = clamp(inputs.health / self.maxHealth, 0, 1)
-        end
-        if inputs.age ~= nil and self.cellAge and self.cellAge.max and self.cellAge.max > 0 then
-            inputs.age = clamp(inputs.age / self.cellAge.max, 0, 1)
-        end
-
         -- Run the NN and get outputs
         local outputs = cellObj.network:predict(inputs)
 

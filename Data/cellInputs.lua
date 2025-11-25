@@ -3,15 +3,15 @@ local mapToScale = require ("Helpers.mapToScale")
 local cellInputs = {}
 
 function cellInputs.energy (tileX, tileY, cellObj, map)
-    return cellObj.energy
+    return mapToScale (cellObj.energy, 0, cellObj.maxEnergy, -1, 1)
 end
 
 function cellInputs.health (tileX, tileY, cellObj, map)
-    return cellObj.health
+    return mapToScale (cellObj.health, 0, cellObj.maxHealth, -1, 1)
 end
 
 function cellInputs.age (tileX, tileY, cellObj, map)
-    return cellObj.age
+    return mapToScale (cellObj.age, 0, cellObj.cellAge.max, -1, 1)
 end
 
 function cellInputs.verticalDir (tileX, tileY, cellObj, map)
