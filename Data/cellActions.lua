@@ -22,7 +22,7 @@ local hyperArgs = {
         healthCost = 50,
     },
     reproduce = {
-        energyCost = 10,
+        energyCost = 50,
     },
     reproduceExtra = {
         energyCost = 200,
@@ -114,9 +114,9 @@ function cellActions.reproduce (tileX, tileY, cellObj, map)
             if map:spawnCell (babyTileX, babyTileY, hyperArgs.reproduce.energyCost / 2, hyperArgs.reproduce.energyCost / 2, cellObj.superparent, cellObj) then
                 map:adjustCellEnergy (tileX, tileY, -hyperArgs.reproduce.energyCost)
 
-                -- Adjust total energy for parent and child
-                cellObj.totalEnergy = cellObj.totalEnergy - hyperArgs.reproduce.energyCost
-                map.cellGrid[babyTileX][babyTileY].cell.totalEnergy = hyperArgs.reproduce.energyCost
+                -- TODO: Adjust total energy for parent and child
+                -- cellObj.totalEnergy = cellObj.totalEnergy - hyperArgs.reproduce.energyCost
+                -- map.cellGrid[babyTileX][babyTileY].totalEnergy = hyperArgs.reproduce.energyCost
             end
         end
     end
@@ -129,9 +129,9 @@ function cellActions.reproduceExtra (tileX, tileY, cellObj, map)
             map:adjustCellEnergy (tileX, tileY, -hyperArgs.reproduceExtra.energyCost)
             map:spawnCell (babyTileX, babyTileY, hyperArgs.reproduceExtra.energyCost / 2, hyperArgs.reproduceExtra.energyCost / 2, cellObj.superparent, cellObj)
 
-            -- Adjust total energy for parent and child
-            cellObj.totalEnergy = cellObj.totalEnergy - hyperArgs.reproduceExtra.energyCost
-            map.cellGrid[babyTileX][babyTileY].cell.totalEnergy = hyperArgs.reproduceExtra.energyCost
+            -- TODO: Adjust total energy for parent and child
+            -- cellObj.totalEnergy = cellObj.totalEnergy - hyperArgs.reproduceExtra.energyCost
+            -- map.cellGrid[babyTileX][babyTileY].totalEnergy = hyperArgs.reproduceExtra.energyCost
         end
     end
 end

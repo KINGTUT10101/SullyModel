@@ -449,9 +449,22 @@ end
 --- Gets the value of the input tile at the provided position
 --- @param tileX integer The horizontal map position
 --- @param tileY integer The vertical map position
+--- @param key any The key of the environment value to get
+--- @return number | nil inputValue The value of the input tile or nil if the provided position was out of bounds
+function map:getEnvValue (tileX, tileY, key)
+    if self:inBounds (tileX, tileY) == true then
+        return self.envGrid[tileX][tileY][key]
+
+    else
+        return nil
+    end
+end
+
+--- Gets the value of the input tile at the provided position
+--- @param tileX integer The horizontal map position
+--- @param tileY integer The vertical map position
 --- @return number | nil inputValue The value of the input tile or nil if the provided position was out of bounds
 function map:getInputTile (tileX, tileY)
-    assert (tileX == tileX and tileY == tileY, "Bad coords found " .. tileX .. " " .. tileY)
     if self:inBounds (tileX, tileY) == true then
         return self.envGrid[tileX][tileY].input
 

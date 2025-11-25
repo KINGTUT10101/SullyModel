@@ -53,6 +53,10 @@ local cell = {
     consumeOnTick = {
         amount = 0,
         cost = 0,
+    },
+    varBounds = {
+        min = -1,
+        max = 1,
     }
 }
 
@@ -337,6 +341,7 @@ function cell:update (tileX, tileY, cellObj, map)
 
             if maxOutputValue > 0 and maxOutputKey ~= nil then
                 local chosenKey = maxOutputKey
+
                 -- Check if chosenKey is for memory vars or display vars
                 if string.sub (chosenKey, 1, 3) == "mem" then
                     local actionType = string.sub(chosenKey, 4, 7)
