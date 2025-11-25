@@ -55,8 +55,14 @@ local cell = {
     },
     actionThreshold = 0,
     actionsPerTurn = 1,
-    maxAge = 0,
-    maxReproductionEnergy = 0,
+    age = {
+        min = 0,
+        max = 0,
+    },
+    reproductionEnergy = {
+        min = 0,
+        max = 0,
+    },
 }
 
 --- Initializes the cell class
@@ -146,8 +152,13 @@ function cell:init (map, inputs, actions, options)
     self.initialMutRates.removeConnection = clamp (options.initialMutRates.removeConnection or 5, self.minMutRate, 100)
     self.initialMutRates.meta = clamp (options.initialMutRates.meta or 5, self.minMutRate, 100)
 
-    self.maxAge = options.maxAge or 6000
-    self.maxReproductionEnergy = options.maxReproductionEnergy or 1000
+    options.age = options.age or {}
+    self.age.min = options.age.min or 50
+    self.age.max = options.age.max or 6000
+
+    options.reproductionEnergy = options.reproductionEnergy or {}
+    self.reproductionEnergy.min = options.reproductionEnergy.min or 10
+    self.reproductionEnergy.max = options.reproductionEnergy.max or 1000
 
     self.pheromones = options.pheromones or 2
     self.pheromoneTime = options.pheromoneTime or 250
@@ -172,13 +183,13 @@ function cell:new (health, energy, superparent, type)
         health = clamp (health or self.maxHealth, 0, self.maxHealth),
         energy = clamp (energy or self.maxEnergy, 0, self.maxEnergy),
         totalEnergy = 0,
-        ticksLeft = self.maxAge * 0.5,
+        ticksLeft = self.age.max * 0.5,
         direction = 1,
         mutationRates = {},
         network = NeuralNet:new(self.network.layers),
         superparent = superparent,
-        maxAge = self.maxAge * 0.5,
-        reproductionEnergy = self.maxReproductionEnergy * 0.5,
+        maxAge = self.age.max * 0.5,
+        reproductionEnergy = self.reproductionEnergy.max * 0.5,
     }
 
     -- Initializes the cell's network
