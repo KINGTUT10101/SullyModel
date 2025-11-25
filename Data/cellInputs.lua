@@ -66,7 +66,7 @@ end
 --     return (allSimilar == true) and 1 or -1
 -- end
 
-function cellInputs.isSimilar (tileX, tileY, cellObj, map)
+function cellInputs.isSameSpecies (tileX, tileY, cellObj, map)
     local otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
 
     if map:isTaken (otherTileX, otherTileY) == true then
