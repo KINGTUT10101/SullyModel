@@ -235,7 +235,7 @@ function cell:update (tileX, tileY, cellObj, map)
             inputs[key] = inputFunc(tileX, tileY, cellObj, self.map)
         end
         for i = 1, self.memVars do
-            inputs["getMem" .. i] = mapToScale (cellObj.vars[i], -100, 100, -1, 1)
+            inputs["getMem" .. i] = cellObj.vars[i]
         end
         local envTile = map.envGrid[tileX][tileY]
         for i = 1, self.memVars do
@@ -303,12 +303,12 @@ function cell:update (tileX, tileY, cellObj, map)
                 if string.sub (chosenKey, 1, 3) == "mem" then
                     local actionType = string.sub(chosenKey, 4, 7)
                     local varIndex = tonumber(string.sub(chosenKey, 8))
-                    cellObj.vars[varIndex] = (actionType == "Incr") and cellObj.vars[varIndex] + 1 or cellObj.vars[varIndex] - 1
+                    cellObj.vars[varIndex] = (actionType == "Incr") and 1 or -1
 
                 elseif string.sub (chosenKey, 1, 3) == "dis" then
                     local actionType = string.sub(chosenKey, 4, 7)
                     local varIndex = tonumber(string.sub(chosenKey, 8))
-                    cellObj.displayVars[varIndex] = (actionType == "Incr") and cellObj.displayVars[varIndex] + 1 or cellObj.displayVars[varIndex] - 1
+                    cellObj.displayVars[varIndex] = (actionType == "Incr") and 1 or -1
 
                 elseif string.sub (chosenKey, 1, 9) == "emitPhero" then
                     envTile.pheromones[tonumber(string.sub(chosenKey, 10))] = self.pheromoneTime
