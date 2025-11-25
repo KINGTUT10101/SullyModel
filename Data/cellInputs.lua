@@ -38,6 +38,12 @@ function cellInputs.otherCellResources (tileX, tileY, cellObj, map)
     return map:getCellTotalResources (map:getForwardPos (tileX, tileY, 1)) or 0
 end
 
+function cellInputs.getTileEnergy (tileX, tileY, cellObj, map)
+    local itx, ity = map:getForwardPos (tileX, tileY, 1)
+    
+    return mapToScale (map:getInputTile (itx, ity) or 0, map.inputBounds.min, map.inputBounds.max, -1, 1)
+end
+
 function cellInputs.getTileValue (tileX, tileY, cellObj, map)
     local itx, ity = map:getForwardPos (tileX, tileY, 1)
     
