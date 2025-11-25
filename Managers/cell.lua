@@ -71,6 +71,12 @@ function cell:init (map, inputs, actions, options)
 
     self.memVars = options.memVars or 2
     self.displayVars = options.displayVars or 1
+    self.voting = options.voting or false
+    assert (self.voting == false or self.memVars > 0, "Voting requires at least 1 memory variable")
+
+    options.varBounds = options.varBounds or {}
+    self.varBounds.min = options.varBounds.min or -1
+    self.varBounds.max = options.varBounds.max or 1
 
     options.network = options.network or {}
     self.network.layers = options.network.layers or 3
@@ -235,7 +241,7 @@ function cell:update (tileX, tileY, cellObj, map)
             inputs[key] = inputFunc(tileX, tileY, cellObj, self.map)
         end
         for i = 1, self.memVars do
-            inputs["getMem" .. i] = cellObj.vars[i]
+            inputs["getMem" .. i] = mapToScale (cellObj.vars[i], self.varBounds.min, self.varBounds.max, -1, 1)
         end
         local envTile = map.envGrid[tileX][tileY]
         for i = 1, self.memVars do
@@ -245,7 +251,7 @@ function cell:update (tileX, tileY, cellObj, map)
             local otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
 
             if map:isTaken (otherTileX, otherTileY) == true then
-                inputs["getDis" .. i] = map.cellGrid[otherTileX][otherTileY].displayVars[i]
+                inputs["getDis" .. i] = mapToScale (map.cellGrid[otherTileX][otherTileY].displayVars[i], self.varBounds.min, self.varBounds.max, -1, 1)
             end
         end
 
@@ -303,12 +309,14 @@ function cell:update (tileX, tileY, cellObj, map)
                 if string.sub (chosenKey, 1, 3) == "mem" then
                     local actionType = string.sub(chosenKey, 4, 7)
                     local varIndex = tonumber(string.sub(chosenKey, 8))
-                    cellObj.vars[varIndex] = (actionType == "Incr") and 1 or -1
+                    cellObj.vars[varIndex] = (actionType == "Incr") and cellObj.vars[varIndex] + 1 or cellObj.vars[varIndex] - 1
+                    cellObj.vars[varIndex] = clamp (cellObj.vars[varIndex], self.varBounds.min, self.varBounds.max)
 
                 elseif string.sub (chosenKey, 1, 3) == "dis" then
                     local actionType = string.sub(chosenKey, 4, 7)
                     local varIndex = tonumber(string.sub(chosenKey, 8))
-                    cellObj.displayVars[varIndex] = (actionType == "Incr") and 1 or -1
+                    cellObj.displayVars[varIndex] = (actionType == "Incr") and cellObj.displayVars[varIndex] + 1 or cellObj.displayVars[varIndex] - 1
+                    cellObj.displayVars[varIndex] = clamp (cellObj.displayVars[varIndex], self.varBounds.min, self.varBounds.max)
 
                 elseif string.sub (chosenKey, 1, 9) == "emitPhero" then
                     envTile.pheromones[tonumber(string.sub(chosenKey, 10))] = self.pheromoneTime
@@ -334,11 +342,13 @@ function cell:update (tileX, tileY, cellObj, map)
                     local actionType = string.sub(chosenKey, 4, 7)
                     local varIndex = tonumber(string.sub(chosenKey, 8))
                     cellObj.vars[varIndex] = (actionType == "Incr") and cellObj.vars[varIndex] + 1 or cellObj.vars[varIndex] - 1
+                    cellObj.vars[varIndex] = clamp (cellObj.vars[varIndex], self.varBounds.min, self.varBounds.max)
 
                 elseif string.sub (chosenKey, 1, 3) == "dis" then
                     local actionType = string.sub(chosenKey, 4, 7)
                     local varIndex = tonumber(string.sub(chosenKey, 8))
                     cellObj.displayVars[varIndex] = (actionType == "Incr") and cellObj.displayVars[varIndex] + 1 or cellObj.displayVars[varIndex] - 1
+                    cellObj.displayVars[varIndex] = clamp (cellObj.displayVars[varIndex], self.varBounds.min, self.varBounds.max)
 
                 elseif string.sub (chosenKey, 1, 9) == "emitPhero" then
                     envTile.pheromones[tonumber(string.sub(chosenKey, 10))] = self.pheromoneTime
