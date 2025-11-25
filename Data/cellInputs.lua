@@ -35,7 +35,10 @@ function cellInputs.horizontalDir (tileX, tileY, cellObj, map)
 end
 
 function cellInputs.otherCellResources (tileX, tileY, cellObj, map)
-    return map:getCellTotalResources (map:getForwardPos (tileX, tileY, 1)) or 0
+    local maxResources = map.cellManager.maxEnergy + map.cellManager.maxHealth
+    local otherCellResources = map:getCellTotalResources (map:getForwardPos (tileX, tileY, 1)) or 0
+
+    return mapToScale (otherCellResources, 0, maxResources, -1, 1)
 end
 
 function cellInputs.getTileEnergy (tileX, tileY, cellObj, map)
@@ -47,7 +50,7 @@ end
 function cellInputs.getTileValue (tileX, tileY, cellObj, map)
     local itx, ity = map:getForwardPos (tileX, tileY, 1)
     
-    return map:getInputTile (itx, ity) or 0
+    return map:getEnvValue (itx, ity, "data") or -1
 end
 
 function cellInputs.isTaken (tileX, tileY, cellObj, map)
@@ -81,7 +84,7 @@ function cellInputs.isSameSpecies (tileX, tileY, cellObj, map)
         return (cellObj.superparent == otherCellObj.superparent) and 1 or -1
     end
 
-    return -1
+    return 0
 end
 
 function cellInputs.randomNumber (tileX, tileY, cellObj, map)
