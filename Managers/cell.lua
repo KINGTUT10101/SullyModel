@@ -138,10 +138,6 @@ function cell:init (map, inputs, actions, options)
     self.mutsPerChild.max = options.mutsPerChild.max or 10
 
     options.initialMutRates = options.initialMutRates or {}
-    -- for mutationType, _ in pairs (mutationHandlers) do
-    --     self.initialMutRates[mutationType] = clamp (options.initialMutRates[mutationType] or 5, self.minMutRate, 100)
-    -- end
-
     self.initialMutRates.addNeuron = clamp (options.initialMutRates.addNeuron or 5, self.minMutRate, 100)
     self.initialMutRates.removeNeuron = clamp (options.initialMutRates.removeNeuron or 2, self.minMutRate, 100)
     self.initialMutRates.increaseWeight = clamp (options.initialMutRates.increaseWeight or 25, self.minMutRate, 100)
@@ -151,6 +147,8 @@ function cell:init (map, inputs, actions, options)
     self.initialMutRates.addConnection = clamp (options.initialMutRates.addConnection or 20, self.minMutRate, 100)
     self.initialMutRates.removeConnection = clamp (options.initialMutRates.removeConnection or 5, self.minMutRate, 100)
     self.initialMutRates.meta = clamp (options.initialMutRates.meta or 5, self.minMutRate, 100)
+    self.initialMutRates.age = clamp (options.initialMutRates.age or 10, self.minMutRate, 100)
+    self.initialMutRates.reproductionEnergy = clamp (options.initialMutRates.reproductionEnergy or 10, self.minMutRate, 100)
 
     options.age = options.age or {}
     self.age.min = options.age.min or 50
@@ -165,7 +163,7 @@ function cell:init (map, inputs, actions, options)
 
     mutationHandlers.init (self)
 
-    print ("Cell manager initialized", self)
+    print ("Cell manager initialized")
 end
 
 
