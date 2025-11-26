@@ -89,9 +89,8 @@ end
 function thisScene:load (...)
     cell:init (map, cellInputs, cellActions, {
         network = {
-            layers = 3,
-            -- neuronsPerLayer = 26,
-            neuronsPerLayer = 8
+            layers = 5,
+            neuronsPerLayer = 20
         },
         decision = {
             -- useSoftmax = true,
@@ -119,8 +118,9 @@ function thisScene:load (...)
         },
         pheromoneTime = 250,
         pheromones = 2,
-        actionsPerTurn = 2,
+        actionsPerTurn = 3,
         actionThreshold = 0.5,
+        canZeroVars = true,
     })
     map:init (cell, {
         inputBounds = {

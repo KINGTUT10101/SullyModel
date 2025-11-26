@@ -87,8 +87,10 @@ function cell:init (map, inputs, actions, options)
     assert (self.voting == false or self.memVars > 0, "Voting requires at least 1 memory variable")
 
     options.varBounds = options.varBounds or {}
-    self.varBounds.min = options.varBounds.min or -1
-    self.varBounds.max = options.varBounds.max or 1
+    self.varBounds.min = options.varBounds.min or -100
+    self.varBounds.max = options.varBounds.max or 100
+
+    self.canZeroVars = options.canZeroVars or false
 
     options.network = options.network or {}
     self.network.layers = options.network.layers or 3
@@ -201,11 +203,19 @@ function cell:new (health, energy, superparent, type)
         newCell.network:addHidden ("getMem" .. i, Neuron:new (actFuncs.identity), 1)
         newCell.network:addHidden ("memIncr" .. i, Neuron:new (actFuncs.identity), finalLayerIndex)
         newCell.network:addHidden ("memDecr" .. i, Neuron:new (actFuncs.identity), finalLayerIndex)
+
+        if self.canZeroVars == true then
+            newCell.network:addHidden ("memZero" .. i, Neuron:new (actFuncs.identity), finalLayerIndex)
+        end
     end
     for i = 1, self.displayVars do
         newCell.network:addHidden ("disIncr" .. i, Neuron:new (actFuncs.identity), finalLayerIndex)
         newCell.network:addHidden ("disDecr" .. i, Neuron:new (actFuncs.identity), finalLayerIndex)
         newCell.network:addHidden ("getDis" .. i, Neuron:new (actFuncs.identity), 1)
+
+        if self.canZeroVars == true then
+            newCell.network:addHidden ("disZero" .. i, Neuron:new (actFuncs.identity), finalLayerIndex)
+        end
     end
     for i = 1, self.pheromones do
         newCell.network:addHidden ("emitPhero" .. i, Neuron:new (actFuncs.identity), finalLayerIndex)
@@ -372,13 +382,29 @@ function cell:update (tileX, tileY, cellObj, map)
                     if string.sub (outputKey, 1, 3) == "mem" then
                         local actionType = string.sub(outputKey, 4, 7)
                         local varIndex = tonumber(string.sub(outputKey, 8))
-                        cellObj.vars[varIndex] = (actionType == "Incr") and cellObj.vars[varIndex] + 1 or cellObj.vars[varIndex] - 1
+                        if actionType == "Zero" then
+                            cellObj.vars[varIndex] = 0
+                        elseif actionType == "Incr" then
+                            cellObj.vars[varIndex] = cellObj.vars[varIndex] + 1
+                        elseif actionType == "Decr" then
+                            cellObj.vars[varIndex] = cellObj.vars[varIndex] - 1
+                        else
+                            error ("Unknown memory var action type: " .. tostring (actionType))
+                        end
                         cellObj.vars[varIndex] = clamp (cellObj.vars[varIndex], self.varBounds.min, self.varBounds.max)
 
                     elseif string.sub (outputKey, 1, 3) == "dis" then
                         local actionType = string.sub(outputKey, 4, 7)
                         local varIndex = tonumber(string.sub(outputKey, 8))
-                        cellObj.displayVars[varIndex] = (actionType == "Incr") and cellObj.displayVars[varIndex] + 1 or cellObj.displayVars[varIndex] - 1
+                        if actionType == "Zero" then
+                            cellObj.displayVars[varIndex] = 0
+                        elseif actionType == "Incr" then
+                            cellObj.displayVars[varIndex] = cellObj.displayVars[varIndex] + 1
+                        elseif actionType == "Decr" then
+                            cellObj.displayVars[varIndex] = cellObj.displayVars[varIndex] - 1
+                        else
+                            error ("Unknown display var action type: " .. tostring (actionType))
+                        end
                         cellObj.displayVars[varIndex] = clamp (cellObj.displayVars[varIndex], self.varBounds.min, self.varBounds.max)
 
                     elseif string.sub (outputKey, 1, 9) == "emitPhero" then
