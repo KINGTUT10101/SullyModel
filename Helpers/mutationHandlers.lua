@@ -185,13 +185,13 @@ function mutationHandlers.meta(cellObj)
 end
 
 function mutationHandlers.age(cellObj)
-    local changeAmount = lume.randomchoice ({-1, 1}) * (math.random (1, 10))
+    local changeAmount = lume.randomchoice ({-1, 1}) * (math.random (5, 25))
 
     cellObj.maxAge = lume.clamp (cellObj.maxAge + changeAmount, cell.age.min, cell.age.max)
 end
 
 function mutationHandlers.reproductionEnergy(cellObj)
-    local changeAmount = lume.randomchoice ({-1, 1}) * (math.random (1, 10))
+    local changeAmount = lume.randomchoice ({-1, 1}) * (math.random (50, 250))
     
     cellObj.reproductionEnergy = lume.clamp (cellObj.reproductionEnergy + changeAmount, cell.reproductionEnergy.min, cell.reproductionEnergy.max)
 end
