@@ -8,7 +8,9 @@ local cellActions = require ("Data.cellActions")
 local cellInputs = require ("Data.cellInputs")
 local cycleValue = require ("Helpers.cycleValue")
 
-local mapSize = 75
+local startTime
+
+local mapSize = 50
 
 local camVelocity = 15
 local zoomVelocity = 2
@@ -61,7 +63,7 @@ local validSubModes = {
 
 local baseXInput = 10000 * love.math.random()
 local baseYInput = 10000 * love.math.random()
-local maxInput = 5000
+local maxInput = 500
 local function mapInput (tileX, tileY)
     return (math.random () < 0.10) and maxInput or 0
 
@@ -104,7 +106,7 @@ function thisScene:load (...)
             --     min = math.huge,
             --     max = math.huge,
             -- },
-        maxCells = 350,
+        maxCells = 150,
         -- maxCells = {
         --     600,
         --     450,
@@ -136,6 +138,7 @@ function thisScene:load (...)
     map:reset (mapSize, mapSize, mapInput, mapBarriers)
     map:setCamera (-110, -10, 3.8)
     map:setTickSpeed (1/8)
+    startTime = os.time()
 
     -- Adds a few heavily mutated cells to the initial captures lists
     for superparent = 1, superparents do
@@ -386,6 +389,10 @@ function thisScene:keypressed (key, scancode, isrepeat)
     -- Quick saves
     elseif key == "g" then
         map:quickSave ()
+
+    -- Get time since start of the simulation
+    elseif key == "t" then
+        print ("Time elapsed since the start of the sim: " .. round (((os.time () - startTime) / 60), 0.01) .. " minutes")
 
     -- Toggle rendering
     elseif key == "z" then
