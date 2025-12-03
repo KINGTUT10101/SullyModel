@@ -10,6 +10,144 @@ local cycleValue = require ("Helpers.cycleValue")
 
 local startTime
 
+local voting = true
+local maxTicksSinceVote = 1000
+local ticksSinceVote = 0
+local predRounds = 0
+local startPredTokens = 1
+
+local minReproChance, maxReproChance = 0.10, 1
+local alpha = 1.5
+local minAccuracyDenom = 5
+
+local currLabel = 0
+
+local cm = {
+    tp = 0,
+    tn = 0,
+    fp = 0,
+    fn = 0,
+} -- Confusion matrix
+local positiveLabels = 0
+
+local function getTotalPreds ()
+    return cm.tp + cm.tn + cm.fp + cm.fn
+end
+local function getAccuracy ()
+    local total = getTotalPreds ()
+    if total == 0 then
+        return 0
+    else
+        return (cm.tp + cm.tn) / total
+    end
+end
+
+local function getPredRatio ()
+    local total = getTotalPreds ()
+    if total == 0 then
+        return 0
+    else
+        return (cm.tp + cm.fp) / total
+    end
+end
+
+local function calcReproChance (accuracy)
+    return minReproChance + (maxReproChance - minReproChance) * (accuracy ^ alpha)
+end
+
+local mapDataGenerator
+local function processPred ()
+    local metrics = {
+        posPreds = 0,
+        negPreds = 0,
+        totalCells = 0,
+        tokensAwarded = 0,
+    }
+    predRounds = predRounds + 1
+
+    map:getCells (function (tileX, tileY, cellObj)
+        -- Cells that are correct have a chance to be awarded a prediction token based on their accuracy
+        cellObj.vote = cellObj.vote or 0
+        cellObj.totalVotes = cellObj.totalVotes or 0
+        cellObj.accurateVotes = cellObj.accurateVotes or 0
+        cellObj.predTokens = cellObj.predTokens or 0
+
+        local accuracy = (cellObj.totalVotes > 0) and (cellObj.accurateVotes / math.max (cellObj.totalVotes, minAccuracyDenom)) or 0
+
+        local cellVote = cellObj.vote
+        metrics.totalCells = metrics.totalCells + 1
+
+        -- True positive
+        if currLabel > 0 and cellVote > 0 then
+            cm.tp = cm.tp + 1
+            metrics.posPreds = metrics.posPreds + 1
+
+            cellObj.accurateVotes = cellObj.accurateVotes + 1
+            
+            if math.random () < calcReproChance (accuracy) then
+                cellObj.predTokens = cellObj.predTokens + 1
+                metrics.tokensAwarded = metrics.tokensAwarded + 1
+            end
+
+        -- False positive
+        elseif currLabel < 0 and cellVote >= 0 then
+            cm.fp = cm.fp + 1
+            metrics.posPreds = metrics.posPreds + 1
+        
+        -- True negative
+        elseif currLabel < 0 and cellVote < 0 then
+            cm.tn = cm.tn + 1
+            metrics.negPreds = metrics.negPreds + 1
+
+            cellObj.accurateVotes = cellObj.accurateVotes + 1
+
+            if math.random () < calcReproChance (accuracy) then
+                cellObj.predTokens = cellObj.predTokens + 1
+                metrics.tokensAwarded = metrics.tokensAwarded + 1
+            end
+
+        -- False negative
+        elseif currLabel > 0 and cellVote <= 0 then
+            cm.fn = cm.fn + 1
+            metrics.negPreds = metrics.negPreds + 1
+
+        end
+
+        -- Each cell gets a shot at a prediction token based on its accuracy
+        -- Cells that predict right have two chances
+        if math.random () < calcReproChance (accuracy) then
+            cellObj.predTokens = cellObj.predTokens + 1
+            metrics.tokensAwarded = metrics.tokensAwarded + 1
+        end
+
+        cellObj.vote = 0 -- Reset vote for next round
+        cellObj.totalVotes = cellObj.totalVotes + 1
+    end)
+
+    -- Print the metrics overall and for this round
+    print ("--- Prediction Metrics for Round #" .. predRounds .. "---")
+    if currLabel > 0 then
+        print ("Current Label: POSITIVE")
+        print ("Round Accuracy : " .. round ((metrics.posPreds / metrics.totalCells) * 100, 0.01) .. "%")
+    elseif currLabel < 0 then
+        print ("Current Label: NEGATIVE")
+        print ("Round Accuracy : " .. round ((metrics.negPreds / metrics.totalCells) * 100, 0.01) .. "%")
+    end
+    print ("Round Total Cells: " .. metrics.totalCells)
+    print ("Round Prediction Ratio: " .. round ((metrics.posPreds / metrics.totalCells) * 100, 0.01) .. "%")
+    print ("Tokens Awarded This Round: " .. metrics.tokensAwarded)
+    print ("Overall Accuracy : " .. round (getAccuracy () * 100, 0.01) .. "%")
+    print ("Overall Prediction Ratio: " .. round (getPredRatio () * 100, 0.01) .. "%")
+    print ("Label Ratio: " .. round ((positiveLabels / predRounds) * 100, 0.01) .. "%")
+    print ()
+
+    -- Reset data
+    local rectFunc = mapDataGenerator ()
+    map:getTiles (function (tileX, tileY, envTile)
+        envTile.data = rectFunc (tileX, tileY)
+    end)
+end
+
 local mapSize = 50
 
 local camVelocity = 15
@@ -55,6 +193,7 @@ local validModes = {
 local renderSubModeIndex = 1
 local validSubModes = {
     "normal",
+    "data",
     "pheromones",
     "inputDisabled",
     "barriersDisabled",
@@ -65,9 +204,9 @@ local baseXInput = 10000 * love.math.random()
 local baseYInput = 10000 * love.math.random()
 local maxInput = 500
 local function mapInput (tileX, tileY)
-    return (math.random () < 0.10) and maxInput or 0
+    -- return (math.random () < 0.10) and maxInput or 0
 
-    -- return round (mapToScale (love.math.noise(baseXInput+.05*tileX, baseYInput+.02*tileY), 0, 1, 0, maxInput))
+    return round (mapToScale (love.math.noise(baseXInput+.05*tileX, baseYInput+.02*tileY), 0, 1, 0, maxInput))
 end
 
 local baseXBarriers = 10000 * love.math.random()
@@ -79,7 +218,7 @@ local biomeYBarriers = 100000 * love.math.random()
 local bmultXBarrier = 0.03
 local bmultYBarrier = 0.03
 local function mapBarriers (tileX, tileY)
-    -- if true then return "blank" end
+    if true then return "blank" end
 
     if love.math.noise(biomeXBarriers+bmultXBarrier*tileX, biomeYBarriers+bmultYBarrier*tileY) >= 0.35 then
         return (love.math.noise(baseXBarriers+multXBarrier*tileX, baseYBarriers+multYBarrier*tileY) > 0.50) and "barrier" or "blank"
@@ -88,17 +227,44 @@ local function mapBarriers (tileX, tileY)
     end
 end
 
+function mapDataGenerator ()
+    local rectX1, rectY1, rectX2, rectY2
+
+    local rectWidth = math.random (1, mapSize)
+    local rectHeight = math.random (1, mapSize)
+
+    -- Center the rectangle within the map bounds (1-indexed)
+    rectX1 = math.floor ((mapSize - rectWidth) / 2) + 1
+    rectY1 = math.floor ((mapSize - rectHeight) / 2) + 1
+    rectX2 = rectX1 + rectWidth - 1
+    rectY2 = rectY1 + rectHeight - 1
+
+    if rectWidth > rectHeight then
+        currLabel = 1 -- Positive, rectangle is wide
+        positiveLabels = positiveLabels + 1
+    else
+        currLabel = -1 -- Negative, rectangle is tall
+    end
+
+    local function mapInputRect (tileX, tileY)
+        if tileX >= rectX1 and tileX <= rectX2 and tileY >= rectY1 and tileY <= rectY2 then
+            return 1
+        else
+            return -1
+        end
+    end
+
+    return mapInputRect
+end
+
 function thisScene:load (...)
     cell:init (map, cellInputs, cellActions, {
         network = {
-            layers = 5,
-            neuronsPerLayer = 20
+            layers = 3,
+            neuronsPerLayer = 15,
         },
-        decision = {
-            -- useSoftmax = true,
-        },
-        maxHealth = 1500,
-        maxEnergy = 1500,
+        maxHealth = 1000,
+        maxEnergy = 2500,
         memVars = 2,
         displayVars = 1,
         tickCost = 1,
@@ -106,7 +272,7 @@ function thisScene:load (...)
             --     min = math.huge,
             --     max = math.huge,
             -- },
-        maxCells = 150,
+        maxCells = 500,
         -- maxCells = {
         --     600,
         --     450,
@@ -115,14 +281,18 @@ function thisScene:load (...)
         -- },
         superparents = superparents,
         consumeOnTick = {
-            amount = 0,
+            amount = 10,
             cost = 0,
         },
         pheromoneTime = 250,
         pheromones = 2,
         actionsPerTurn = 3,
-        actionThreshold = 0.5,
+        actionThreshold = 0.25,
         canZeroVars = true,
+        age = {
+            min = 50,
+            max = 8500,
+        },
     })
     map:init (cell, {
         inputBounds = {
@@ -133,9 +303,19 @@ function thisScene:load (...)
             min = 0,
             max = 500,
         },
+        dataBounds = {
+            min = -1,
+            max = 1,
+        },
+        spawnFunc = function (tileX, tileY, cellObj)
+            cellObj.predTokens = startPredTokens
+            cellObj.vote = 0
+            cellObj.totalVotes = 0
+            cellObj.accurateVotes = 0
+        end
     })
 
-    map:reset (mapSize, mapSize, mapInput, mapBarriers)
+    map:reset (mapSize, mapSize, mapInput, mapBarriers, mapDataGenerator())
     map:setCamera (-110, -10, 3.8)
     map:setTickSpeed (1/8)
     startTime = os.time()
@@ -190,6 +370,12 @@ function thisScene:update (dt)
 
         totalCycles = totalCycles + 1
         captureTimer = captureTimer - 1
+        ticksSinceVote = ticksSinceVote + 1
+
+        if voting == true and ticksSinceVote >= maxTicksSinceVote then
+            ticksSinceVote = 0
+            processPred ()
+        end
 
         if captureTimer <= 0 then
             captureTimer = maxCaptureCycles
@@ -360,6 +546,12 @@ function thisScene:draw ()
     love.graphics.rectangle ("fill", 10, 570, 100, 25)
     love.graphics.setColor (1, 1, 1, 1)
     love.graphics.printf (validSubModes[renderSubModeIndex] .. " mode", 15, 575, 100, "left")
+
+    -- Shows the current label
+    love.graphics.setColor (0, 0, 0, 0.75)
+    love.graphics.rectangle ("fill", 700, 570, 100, 25)
+    love.graphics.setColor (1, 1, 1, 1)
+    love.graphics.printf ("Label: " .. (currLabel > 0 and "Positive" or "Negative"), 705, 575, 100, "left")
 end
 
 function thisScene:keypressed (key, scancode, isrepeat)

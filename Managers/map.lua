@@ -30,6 +30,10 @@ local map = {
         min = 0,
         max = 0,
     },
+    dataBounds = {
+        min = 0,
+        max = 0,
+    },
     title = "Untitled Map", -- The title of the map. Mostly used in menus
     cellManager = nil,
     stats = {
@@ -43,6 +47,7 @@ local map = {
     pheromoneColors = {},
     totalEnergy = 0,
     stopOnError = true,
+    spawnFunc = nil,
 }
 
 function map:quickSave ()
@@ -94,6 +99,10 @@ function map:init (cellManager, options)
     self.drawBounds.min = options.drawBounds.min or self.inputBounds.min
     self.drawBounds.max = options.drawBounds.max or self.inputBounds.max
 
+    options.dataBounds = options.dataBounds or {}
+    self.dataBounds.min = options.dataBounds.min or self.inputBounds.min
+    self.dataBounds.max = options.dataBounds.max or self.inputBounds.max
+
     self.tickSpeed = math.huge
 
     for i = 1, self.cellManager.superparents do
@@ -104,6 +113,8 @@ function map:init (cellManager, options)
         self.pheromoneColors[i] = {math.random(), math.random(), math.random(), 1}
     end
     self.pheromoneColors[0] = {0, 0, 0, 1}
+
+    self.spawnFunc = options.spawnFunc
 end
 
 --- Resets the map with a new size and input data.
@@ -111,7 +122,8 @@ end
 --- @param height integer The height of the input data.
 --- @param mapEnvInputs? fun(param:integer, param:integer):number Used to map the value of each input tile
 --- @param mapEnvTypes? fun(param:integer, param:integer):boolean Used to map the impassible barrier tiles
-function map:reset (width, height, mapEnvInputs, mapEnvTypes)
+--- @param mapEnvData? fun(param:integer, param:integer):boolean Used to map additional environmental data
+function map:reset (width, height, mapEnvInputs, mapEnvTypes, mapEnvData)
     self.width, self.height = width, height
 
     self.totalEnergy = 0
@@ -130,7 +142,8 @@ function map:reset (width, height, mapEnvInputs, mapEnvTypes)
             local envTile = {
                 input = 0,
                 type = "blank",
-                pheromones = {}
+                data = 0,
+                pheromones = {},
             }
 
             for i = 1, self.cellManager.pheromones do
@@ -144,6 +157,10 @@ function map:reset (width, height, mapEnvInputs, mapEnvTypes)
 
             if mapEnvTypes ~= nil then
                 envTile.type = mapEnvTypes (i, j)
+            end
+
+            if mapEnvData ~= nil then
+                envTile.data = mapEnvData (i, j)
             end
 
             envRow[j] = envTile
@@ -250,6 +267,7 @@ local validModes = {
 }
 local validSubModes = {
     normal = true,
+    data = true,
     pheromones = true,
     inputDisabled = true,
     barriersDisabled = true,
@@ -335,7 +353,13 @@ function map:draw (mode, subMode)
 
             elseif subMode ~= "inputDisabled" and subMode ~= "allDisabled" then
                 -- Render input tile
-                local scaledColor = mapToScale (envTile.input, self.drawBounds.min, self.drawBounds.max, 0, 1)
+                local scaledColor = nil
+                if subMode == "data" then
+                    scaledColor = mapToScale (envTile.data, self.dataBounds.min, self.dataBounds.max, 0, 1)
+                else
+                    scaledColor = mapToScale (envTile.input, self.drawBounds.min, self.drawBounds.max, 0, 1)
+                end
+
                 love.graphics.setColor (scaledColor, scaledColor, scaledColor, 1)
                 love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
             else
@@ -353,6 +377,47 @@ function map:draw (mode, subMode)
     end
 
     love.graphics.pop ()
+end
+
+
+-- Runs a function for all cells in the map
+function map:getCells (cellFunc)
+    local totalCells = 0
+
+    for i = 1, #self.stats.cells do
+        totalCells = totalCells + self.stats.cells[i]
+    end
+
+    if totalCells > 0 then
+        local cellGrid = self.cellGrid
+        for i = 1, self.width do
+            local cellRow = cellGrid[i]
+
+            for j = 1, self.height do
+                local cellObj = cellRow[j]
+
+                if cellObj ~= nil then
+                    cellFunc (i, j, cellObj)
+                end
+            end
+        end
+    end
+end
+
+
+function map:getTiles (tileFunc)
+    local envGrid = self.envGrid
+    for i = 1, self.width do
+        local envRow = envGrid[i]
+
+        for j = 1, self.height do
+            local envTile = envRow[j]
+
+            if envTile ~= nil then
+                tileFunc (i, j, envTile)
+            end
+        end
+    end
 end
 
 
@@ -560,6 +625,10 @@ function map:spawnCell (tileX, tileY, health, energy, superparent, parentCellObj
 
         newCellObj.lastUpdate = love.timer.getTime()
         self.cellGrid[tileX][tileY] = newCellObj
+
+        if self.spawnFunc ~= nil then
+            self.spawnFunc (tileX, tileY, newCellObj)
+        end
         
         -- Only count normal and egg cells
         assert (newCellObj.type ~= "wall", "Error: Attempted to count a wall cell as a normal or egg cell.")

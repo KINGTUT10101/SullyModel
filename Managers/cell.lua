@@ -83,8 +83,6 @@ function cell:init (map, inputs, actions, options)
 
     self.memVars = options.memVars or 2
     self.displayVars = options.displayVars or 1
-    self.voting = options.voting or false
-    assert (self.voting == false or self.memVars > 0, "Voting requires at least 1 memory variable")
 
     options.varBounds = options.varBounds or {}
     self.varBounds.min = options.varBounds.min or -100
