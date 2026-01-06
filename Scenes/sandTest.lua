@@ -454,6 +454,7 @@ function thisScene:update (dt)
             failsafeActivations[superparent] = failsafeActivations[superparent] + 1
             cyclesSinceLastFail[superparent] = 0
             print ("Cells spawned for " .. superparent .. ": " .. cellsSpawned)
+            print ()
         end
     end
 end
