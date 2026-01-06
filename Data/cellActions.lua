@@ -60,17 +60,17 @@ local alpha = 2.5
 
 -- end
 
-function cellActions.votePos (tileX, tileY, cellObj, map)
-    cellObj.vote = math.min ((cellObj.vote or 0) + 1, maxVote)
+-- function cellActions.votePos (tileX, tileY, cellObj, map)
+--     cellObj.vote = math.min ((cellObj.vote or 0) + 1, maxVote)
 
-    return tileX, tileY
-end
+--     return tileX, tileY
+-- end
 
-function cellActions.voteNeg (tileX, tileY, cellObj, map)
-    cellObj.vote = math.max ((cellObj.vote or 0) - 1, -maxVote)
+-- function cellActions.voteNeg (tileX, tileY, cellObj, map)
+--     cellObj.vote = math.max ((cellObj.vote or 0) - 1, -maxVote)
 
-    return tileX, tileY
-end
+--     return tileX, tileY
+-- end
 
 function cellActions.moveForward (tileX, tileY, cellObj, map)
     return map:moveForward (tileX, tileY)
@@ -153,42 +153,43 @@ function cellActions.energizeSelf (tileX, tileY, cellObj, map)
     return tileX, tileY
 end
 
-function cellActions.reproduce (tileX, tileY, cellObj, map)
-    local babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
-    local predTokens = cellObj.predTokens or 0
-    if predTokens >= hyperArgs.reproduce.requiredTokens and map.stats.cells[cellObj.superparent] < map.cellManager.maxCells[cellObj.superparent] and map:isClear (babyTileX, babyTileY) == true then
-        local energyCost = cellObj.reproductionEnergy
-
-        if cellObj.energy + cellObj.health > energyCost then
-            if map:spawnCell (babyTileX, babyTileY, energyCost / 2, energyCost / 2, cellObj.superparent, cellObj) then
-                map:adjustCellEnergy (tileX, tileY, -energyCost)
-                cellObj.predTokens = predTokens - hyperArgs.reproduce.requiredTokens
-            end
-        end
-    end
-
-    return tileX, tileY
-end
-
--- -- New reproduction method
+-- -- Voting based reproduction method
 -- function cellActions.reproduce (tileX, tileY, cellObj, map)
 --     local babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
---     if map.stats.cells[cellObj.superparent] < map.cellManager.maxCells[cellObj.superparent] and map:isClear (babyTileX, babyTileY) == true then
+--     local predTokens = cellObj.predTokens or 0
+--     if predTokens >= hyperArgs.reproduce.requiredTokens and map.stats.cells[cellObj.superparent] < map.cellManager.maxCells[cellObj.superparent] and map:isClear (babyTileX, babyTileY) == true then
 --         local energyCost = cellObj.reproductionEnergy
 
 --         if cellObj.energy + cellObj.health > energyCost then
 --             if map:spawnCell (babyTileX, babyTileY, energyCost / 2, energyCost / 2, cellObj.superparent, cellObj) then
 --                 map:adjustCellEnergy (tileX, tileY, -energyCost)
-
---                 -- TODO: Adjust total energy for parent and child
---                 -- cellObj.totalEnergy = cellObj.totalEnergy - hyperArgs.reproduce.energyCost
---                 -- map.cellGrid[babyTileX][babyTileY].totalEnergy = hyperArgs.reproduce.energyCost
+--                 cellObj.predTokens = predTokens - hyperArgs.reproduce.requiredTokens
 --             end
 --         end
 --     end
 
 --     return tileX, tileY
 -- end
+
+-- New reproduction method
+function cellActions.reproduce (tileX, tileY, cellObj, map)
+    local babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
+    if map.stats.cells[cellObj.superparent] < map.cellManager.maxCells[cellObj.superparent] and map:isClear (babyTileX, babyTileY) == true then
+        local energyCost = cellObj.reproductionEnergy
+
+        if cellObj.energy + cellObj.health > energyCost then
+            if map:spawnCell (babyTileX, babyTileY, energyCost / 2, energyCost / 2, cellObj.superparent, cellObj) then
+                map:adjustCellEnergy (tileX, tileY, -energyCost)
+
+                -- TODO: Adjust total energy for parent and child
+                -- cellObj.totalEnergy = cellObj.totalEnergy - hyperArgs.reproduce.energyCost
+                -- map.cellGrid[babyTileX][babyTileY].totalEnergy = hyperArgs.reproduce.energyCost
+            end
+        end
+    end
+
+    return tileX, tileY
+end
 
 -- -- Old reproduction method
 -- function cellActions.reproduce (tileX, tileY, cellObj, map)

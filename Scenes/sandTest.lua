@@ -10,7 +10,7 @@ local cycleValue = require ("Helpers.cycleValue")
 
 local startTime
 
-local voting = true
+local voting = false
 local maxTicksSinceVote = 1000
 local ticksSinceVote = 0
 local predRounds = 0
@@ -218,7 +218,7 @@ local biomeYBarriers = 100000 * love.math.random()
 local bmultXBarrier = 0.03
 local bmultYBarrier = 0.03
 local function mapBarriers (tileX, tileY)
-    if true then return "blank" end
+    -- if true then return "blank" end
 
     if love.math.noise(biomeXBarriers+bmultXBarrier*tileX, biomeYBarriers+bmultYBarrier*tileY) >= 0.35 then
         return (love.math.noise(baseXBarriers+multXBarrier*tileX, baseYBarriers+multYBarrier*tileY) > 0.50) and "barrier" or "blank"
@@ -261,10 +261,10 @@ function thisScene:load (...)
     cell:init (map, cellInputs, cellActions, {
         network = {
             layers = 3,
-            neuronsPerLayer = 15,
+            neuronsPerLayer = 8,
         },
-        maxHealth = 1000,
-        maxEnergy = 2500,
+        maxHealth = 1500,
+        maxEnergy = 1500,
         memVars = 2,
         displayVars = 1,
         tickCost = 1,
@@ -272,7 +272,7 @@ function thisScene:load (...)
             --     min = math.huge,
             --     max = math.huge,
             -- },
-        maxCells = 500,
+        maxCells = 350,
         -- maxCells = {
         --     600,
         --     450,
@@ -287,11 +287,16 @@ function thisScene:load (...)
         pheromoneTime = 250,
         pheromones = 2,
         actionsPerTurn = 3,
-        actionThreshold = 0.25,
+        actionThreshold = 0.5,
         canZeroVars = true,
         age = {
             min = 50,
             max = 8500,
+        },
+        superparentFoodTypes = {
+            "meat",
+            "plants",
+            "waste",
         },
     })
     map:init (cell, {
@@ -301,7 +306,7 @@ function thisScene:load (...)
         },
         drawBounds = {
             min = 0,
-            max = 500,
+            max = 2500,
         },
         dataBounds = {
             min = -1,
@@ -549,10 +554,12 @@ function thisScene:draw ()
     love.graphics.printf (validSubModes[renderSubModeIndex] .. " mode", 15, 575, 100, "left")
 
     -- Shows the current label
-    love.graphics.setColor (0, 0, 0, 0.75)
-    love.graphics.rectangle ("fill", 700, 570, 100, 25)
-    love.graphics.setColor (1, 1, 1, 1)
-    love.graphics.printf ("Label: " .. (currLabel > 0 and "Positive" or "Negative"), 705, 575, 100, "left")
+    if voting == true then
+        love.graphics.setColor (0, 0, 0, 0.75)
+        love.graphics.rectangle ("fill", 700, 570, 100, 25)
+        love.graphics.setColor (1, 1, 1, 1)
+        love.graphics.printf ("Label: " .. (currLabel > 0 and "Positive" or "Negative"), 705, 575, 100, "left")
+    end
 end
 
 function thisScene:keypressed (key, scancode, isrepeat)

@@ -120,6 +120,12 @@ function cell:init (map, inputs, actions, options)
     self.tickCost = options.tickCost or 1
     self.minMutRate = options.minMutRate or 1
     self.superparents = options.superparents or 3
+    self.superparentFoodTypes = options.superparentFoodTypes
+
+    if self.superparentFoodTypes == nil or #self.superparentFoodTypes ~= self.superparents then
+        assert (#self.superparentFoodTypes == self.superparents, "Mismatch between number of superparents and superparentFoodTypes length")
+    end
+
     self.maxCells = options.maxCells or nil
     if type(self.maxCells) ~= "table" then
         assert (type (self.maxCells) == "number" or self.maxCells == nil, "Invalid neuronsPerLayer value")
@@ -166,7 +172,11 @@ function cell:init (map, inputs, actions, options)
     print ("Cell manager initialized")
 end
 
-
+local validFoodTypes = {
+    meat = true,
+    plant = true,
+    waste = true,
+}
 --- Generates a default cell with no actions
 --- @return table cellObj The new default cell object
 function cell:new (health, energy, superparent, type)
@@ -174,6 +184,7 @@ function cell:new (health, energy, superparent, type)
 
     local newCell = {
         type = type or "normal",
+        consumes = self.superparentFoodTypes[superparent],
         lastUpdate = 0,
         color = {0.5, 0.5, 0.5, 1},
         vars = {},
@@ -189,6 +200,8 @@ function cell:new (health, energy, superparent, type)
         maxAge = self.age.max * 0.5,
         reproductionEnergy = self.reproductionEnergy.max * 0.5,
     }
+
+    assert (validFoodTypes[newCell.consumes], "Invalid food type for consumes")
 
     -- Initializes the cell's network
     for inputID, _ in pairs (self.inputs) do
