@@ -224,17 +224,17 @@ end
 --     return tileX, tileY
 -- end
 
-function cellActions.createWall (tileX, tileY, cellObj, map)
-    local babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
-    if map.stats.cells[cellObj.superparent] < map.cellManager.maxCells[cellObj.superparent] and map:isClear (babyTileX, babyTileY) == true then
-        if cellObj.energy + cellObj.health > hyperArgs.createWall.energyCost then
-            map:adjustCellEnergy (tileX, tileY, -hyperArgs.createWall.energyCost)
-            map:spawnWall (babyTileX, babyTileY, hyperArgs.createWall.energyCost / 2, cellObj.superparent)
-        end
-    end
+-- function cellActions.createWall (tileX, tileY, cellObj, map)
+--     local babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
+--     if map.stats.cells[cellObj.superparent] < map.cellManager.maxCells[cellObj.superparent] and map:isClear (babyTileX, babyTileY) == true then
+--         if cellObj.energy + cellObj.health > hyperArgs.createWall.energyCost then
+--             map:adjustCellEnergy (tileX, tileY, -hyperArgs.createWall.energyCost)
+--             map:spawnWall (babyTileX, babyTileY, hyperArgs.createWall.energyCost / 2, cellObj.superparent)
+--         end
+--     end
 
-    return tileX, tileY
-end
+--     return tileX, tileY
+-- end
 
 -- function cellActions.shareEnergy (tileX, tileY, cellObj, map)
 --     local otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
