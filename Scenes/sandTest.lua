@@ -573,7 +573,9 @@ function thisScene:keypressed (key, scancode, isrepeat)
         local tileX, tileY = map:screenToMap (love.mouse.getPosition ())
 
         if love.keyboard.isDown ("lshift") then
-            print ("Input @ (" .. tileX .. ", " .. tileY .. "): " .. map:getInputTile (map:screenToMap (love.mouse.getPosition ())))
+            print ("Meat input @ (" .. tileX .. ", " .. tileY .. "): " .. map:getInputTile (tileX, tileY, "meat"))
+            print ("Plants input @ (" .. tileX .. ", " .. tileY .. "): " .. map:getInputTile (tileX, tileY, "plants"))
+            print ("Waste input @ (" .. tileX .. ", " .. tileY .. "): " .. map:getInputTile (tileX, tileY, "waste"))
         else
             local cellToPrint = map:getCell (tileX, tileY)
 
