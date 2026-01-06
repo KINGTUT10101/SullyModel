@@ -91,4 +91,12 @@ function cellInputs.randomNumber (tileX, tileY, cellObj, map)
     return mapToScale (math.random (), 0, 1, -1, 1)
 end
 
+function cellInputs.getPosX (tileX, tileY, cellObj, map)
+    return mapToScale (tileX, 1, map.width, -1, 1)
+end
+
+function cellInputs.getPosY (tileX, tileY, cellObj, map)
+    return mapToScale (tileY, 1, map.height, -1, 1)
+end
+
 return cellInputs
