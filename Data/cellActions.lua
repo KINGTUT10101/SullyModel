@@ -6,6 +6,7 @@ local hyperArgs = {
     consume = {
         energyFromTile = 100,
         energyCost = 5,
+        wasteThreshold = 200,
     },
     applyDamage = {
         damage = 250,
@@ -95,19 +96,22 @@ local wasteMap = {
 }
 function cellActions.consume (tileX, tileY, cellObj, map)
     local itx, ity = map:getForwardPos (tileX, tileY, 1)
-    local origResources = map:getCellTotalResources (tileX, tileY)
-    -- local origEnergy = cellObj.energy
-    map:transferInputToCell (itx, ity, tileX, tileY, cellObj.consumes, hyperArgs.consume.energyFromTile, hyperArgs.consume.energyCost)
-    -- if cellObj.energy - origEnergy > 0 then
-    --     print ("===Energy change: " .. (cellObj.energy - origEnergy) .. "===")
-    --     print (origEnergy .. "->" .. cellObj.energy)
-    -- end
 
-    cellObj.wasteBuffer = cellObj.wasteBuffer + (map:getCellTotalResources (tileX, tileY) - origResources)
-    
-    if cellObj.wasteBuffer >= map.cellManager.maxWasteBuffer then
-        map:adjustInputTile (tileX, tileY, wasteMap[cellObj.consumes], cellObj.wasteBuffer)
-        cellObj.wasteBuffer = 0
+    if (map:getInputTile (itx, ity, "waste") or 0) < hyperArgs.consume.wasteThreshold or cellObj.consumes == "waste" then
+        local origResources = map:getCellTotalResources (tileX, tileY)
+        -- local origEnergy = cellObj.energy
+        map:transferInputToCell (itx, ity, tileX, tileY, cellObj.consumes, hyperArgs.consume.energyFromTile, hyperArgs.consume.energyCost)
+        -- if cellObj.energy - origEnergy > 0 then
+        --     print ("===Energy change: " .. (cellObj.energy - origEnergy) .. "===")
+        --     print (origEnergy .. "->" .. cellObj.energy)
+        -- end
+
+        cellObj.wasteBuffer = cellObj.wasteBuffer + (map:getCellTotalResources (tileX, tileY) - origResources)
+        
+        if cellObj.wasteBuffer >= map.cellManager.maxWasteBuffer then
+            map:adjustInputTile (tileX, tileY, wasteMap[cellObj.consumes], cellObj.wasteBuffer)
+            cellObj.wasteBuffer = 0
+        end
     end
 
     return tileX, tileY

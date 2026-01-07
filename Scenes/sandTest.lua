@@ -449,9 +449,12 @@ function thisScene:update (dt)
                     -- Attempt to spawn the cell
                     local tries = 0
                     local maxTries = 50
-                    while map:spawnCell (math.random (1, map.width), math.random (1, map.height), cellStartHealth, cellStartEnergy, newCell.superparent, newCell) == false and tries < maxTries do
+                    local tx, ty = math.random (1, map.width), math.random (1, map.height)
+                    while map:spawnCell (tx, ty, cellStartHealth, cellStartEnergy, newCell.superparent, newCell) == false and tries < maxTries do
                         tries = tries + 1
+                        tx, ty = math.random (1, map.width), math.random (1, map.height)
                     end
+                    -- map.cellGrid[tx][ty].baselineEnergy = 0 -- Set to 0 so other cells can't farm it for meat and get infinite food
                     if tries < maxTries then
                         cellsSpawned = cellsSpawned + 1
 
@@ -515,11 +518,16 @@ function thisScene:draw ()
     love.graphics.printf ("Cycles: (*): " .. totalCycles, 15, 85, 150, "left")
 
     -- Ticks since last fail for each superparent
+    local foodMap = {
+        meat = "M",
+        plants = "P",
+        waste = "W",
+    }
     for superparent = 1, superparents do
         love.graphics.setColor (0, 0, 0, 0.75)
         love.graphics.rectangle ("fill", 10, 115 + (superparent - 1) * 35, 150, 25)
         love.graphics.setColor (1, 1, 1, 1)
-        love.graphics.printf ("Cycles (" .. superparent .. "): " .. cyclesSinceLastFail[superparent], 15, 120 + (superparent - 1) * 35, 150, "left")
+        love.graphics.printf ("Cycles (" .. superparent .. ", " .. foodMap[cell.superparentFoodTypes[superparent]] .. "): " .. cyclesSinceLastFail[superparent], 15, 120 + (superparent - 1) * 35, 150, "left")
     end
 
     -- Show number of cells
@@ -546,11 +554,6 @@ function thisScene:draw ()
         love.graphics.setColor (0, 0, 0, 0.75)
         love.graphics.rectangle ("fill", 705, cellsBaseY + (superparent - 1) * 35, 90, 25)
         love.graphics.setColor (1, 1, 1, 1)
-        local foodMap = {
-            meat = "M",
-            plants = "P",
-            waste = "W",
-        }
         love.graphics.printf ("Cells (" .. superparent .. "): " .. map.stats.cells[superparent], 710, cellsBaseY + 5 + (superparent - 1) * 35, 85, "left")
     end
 
