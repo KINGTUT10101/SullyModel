@@ -6,7 +6,7 @@ local hyperArgs = {
     consume = {
         energyFromTile = 100,
         energyCost = 5,
-        wasteThreshold = 200,
+        wasteThreshold = 75,
     },
     applyDamage = {
         damage = 250,
@@ -109,8 +109,12 @@ function cellActions.consume (tileX, tileY, cellObj, map)
         cellObj.wasteBuffer = cellObj.wasteBuffer + (map:getCellTotalResources (tileX, tileY) - origResources)
         
         if cellObj.wasteBuffer >= map.cellManager.maxWasteBuffer then
+            -- print (cellObj.consumes, wasteMap[cellObj.consumes])
+            -- print (cellObj.wasteBuffer, map:getInputTile (tileX, tileY, wasteMap[cellObj.consumes]))
             map:adjustInputTile (tileX, tileY, wasteMap[cellObj.consumes], cellObj.wasteBuffer)
             cellObj.wasteBuffer = 0
+            -- print (cellObj.wasteBuffer, map:getInputTile (tileX, tileY, wasteMap[cellObj.consumes]))
+            -- print ()
         end
     end
 
