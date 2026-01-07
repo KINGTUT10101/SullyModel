@@ -576,6 +576,34 @@ function thisScene:draw ()
         love.graphics.setColor (1, 1, 1, 1)
         love.graphics.printf ("Label: " .. (currLabel > 0 and "Positive" or "Negative"), 705, 575, 100, "left")
     end
+
+    -- Show superparent colors
+    local colorBoxSize = 20
+    local colorBoxSpacing = 5
+    local foodMap = {
+        meat = "M",
+        plants = "P",
+        waste = "W",
+    }
+    local totalWidth = superparents * colorBoxSize + (superparents - 1) * colorBoxSpacing
+    local startX = (love.graphics.getWidth() - totalWidth) / 2
+    
+    for superparent = 1, superparents do
+        local color = map.superparentColors[superparent]
+        local xPos = startX + (superparent - 1) * (colorBoxSize + colorBoxSpacing)
+        
+        -- Draw color box
+        love.graphics.setColor (color[1], color[2], color[3], 1)
+        love.graphics.rectangle ("fill", xPos, 10, colorBoxSize, colorBoxSize)
+        
+        -- Draw border
+        love.graphics.setColor (1, 1, 1, 1)
+        love.graphics.rectangle ("line", xPos, 10, colorBoxSize, colorBoxSize)
+        
+        -- Draw label
+        love.graphics.setColor (1, 1, 1, 1)
+        love.graphics.printf (superparent .. "/" .. foodMap[cell.superparentFoodTypes[superparent]], xPos - 5, 32, colorBoxSize + 10, "center")
+    end
 end
 
 function thisScene:keypressed (key, scancode, isrepeat)
