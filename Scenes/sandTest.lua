@@ -454,7 +454,7 @@ function thisScene:update (dt)
                         tries = tries + 1
                         tx, ty = math.random (1, map.width), math.random (1, map.height)
                     end
-                    -- map.cellGrid[tx][ty].baselineEnergy = 0 -- Set to 0 so other cells can't farm it for meat and get infinite food
+                    map.cellGrid[tx][ty].baselineEnergy = 0 -- Set to 0 so other cells can't farm it for meat and get infinite food
                     if tries < maxTries then
                         cellsSpawned = cellsSpawned + 1
 
