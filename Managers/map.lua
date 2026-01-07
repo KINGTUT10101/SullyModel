@@ -117,12 +117,30 @@ function map:init (cellManager, options)
     self.maxMutsOnSpawn = options.maxMutsOnSpawn or 5 -- TODO: Add this
 
     options.inputBounds = options.inputBounds or {}
+    if options.inputBounds.min ~= nil then
+        assert (options.inputBounds.max ~= nil, "If inputBounds.min is provided, inputBounds.max must also be provided")
+        for index, type in ipairs (foodTypes) do
+            options.inputBounds[type] = {
+                min = options.inputBounds.min,
+                max = options.inputBounds.max,
+            }
+        end
+    end
     for index, type in ipairs (foodTypes) do
         self.inputBounds[type].min = options.inputBounds[type].min or 0
         self.inputBounds[type].max = options.inputBounds[type].max or 500
     end
 
     options.drawBounds = options.drawBounds or {}
+    if options.drawBounds.min ~= nil then
+        assert (options.drawBounds.max ~= nil, "If drawBounds.min is provided, drawBounds.max must also be provided")
+        for index, type in ipairs (foodTypes) do
+            options.drawBounds[type] = {
+                min = options.drawBounds.min,
+                max = options.drawBounds.max,
+            }
+        end
+    end
     for index, type in ipairs (foodTypes) do
         self.drawBounds[type].min = options.drawBounds[type].min or 0
         self.drawBounds[type].max = options.drawBounds[type].max or 500
@@ -392,9 +410,9 @@ function map:draw (mode, subMode)
                     r, g, b = scaledColor, scaledColor, scaledColor
                 else
                     local input = envTile.input
-                    r = mapToScale (input, self.drawBounds.meat.min, self.drawBounds.meat.max, 0, 1)
-                    g = mapToScale (input, self.drawBounds.plants.min, self.drawBounds.plants.max, 0, 1)
-                    b = mapToScale (input, self.drawBounds.waste.min, self.drawBounds.waste.max, 0, 1)
+                    r = mapToScale (input.meat, self.drawBounds.meat.min, self.drawBounds.meat.max, 0, 1)
+                    g = mapToScale (input.plants, self.drawBounds.plants.min, self.drawBounds.plants.max, 0, 1)
+                    b = mapToScale (input.waste, self.drawBounds.waste.min, self.drawBounds.waste.max, 0, 1)
                 end
 
                 love.graphics.setColor (r, g, b, 1)
@@ -406,12 +424,12 @@ function map:draw (mode, subMode)
         end
     end
 
-    if math.floor (self.totalEnergy) ~= math.floor (totalEnergy) and mode ~= "none" then
-        if self.tickSpeed ~= math.huge then
-            print ("Total energy mismatch detected! " .. math.floor (self.totalEnergy) .. " vs " .. math.floor (totalEnergy))
-        end
-        self.tickSpeed = math.huge
-    end
+    -- if math.floor (self.totalEnergy) ~= math.floor (totalEnergy) and mode ~= "none" then
+    --     if self.tickSpeed ~= math.huge then
+    --         print ("Total energy mismatch detected! " .. math.floor (self.totalEnergy) .. " vs " .. math.floor (totalEnergy)) -- Add this back later
+    --     end
+    --     self.tickSpeed = math.huge
+    -- end
 
     love.graphics.pop ()
 end
@@ -583,7 +601,7 @@ function map:setInputTile (tileX, tileY, foodType, value)
     assert (type (value) == "number", "Provided value is not a number")
 
     if self:inBounds (tileX, tileY) == true then
-        self.envGrid[tileX][tileY].input[foodType] = clamp (value, self.inputBounds.min, self.inputBounds.max)
+        self.envGrid[tileX][tileY].input[foodType] = clamp (value, self.inputBounds[foodType].min, self.inputBounds[foodType].max)
     end
 end
 
@@ -595,7 +613,7 @@ function map:adjustInputTile (tileX, tileY, foodType, value)
     assert (type (value) == "number", "Provided value is not a number")
 
     if self:inBounds (tileX, tileY) == true then
-        self.envGrid[tileX][tileY].input[foodType] = clamp (self.envGrid[tileX][tileY].input[foodType] + value, self.inputBounds.min, self.inputBounds.max)
+        self.envGrid[tileX][tileY].input[foodType] = clamp (self.envGrid[tileX][tileY].input[foodType] + value, self.inputBounds[foodType].min, self.inputBounds[foodType].max)
         return true
     end
 
@@ -739,6 +757,12 @@ function map:spawnWall (tileX, tileY, health, superparent)
     end
 end
 
+local wasteMap = {
+    meat = "waste",
+    plants = "waste",
+    waste = "plants",
+}
+
 --- Removes a cell object from the map.
 --- @param tileX integer The horizontal map position.
 --- @param tileY integer The vertical map position.
@@ -750,7 +774,8 @@ function map:deleteCell (tileX, tileY, dropEnergy)
         -- Add cell's remaining energy and health to the ground
         if dropEnergy ~= false then
             assert (cellObj.totalEnergy >= 0, "Cell total energy is negative on deletion!")
-            map:adjustInputTile (tileX, tileY, "meat", cellObj.health + cellObj.energy + cellObj.baseEnergy)
+            map:adjustInputTile (tileX, tileY, "meat", cellObj.health + cellObj.energy + cellObj.baselineEnergy)
+            map:adjustInputTile (tileX, tileY, wasteMap[cellObj.consumes], cellObj.wasteBuffer)
         end
 
         self.cellGrid[tileX][tileY] = nil

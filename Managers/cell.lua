@@ -116,6 +116,8 @@ function cell:init (map, inputs, actions, options)
 
     self.maxHealth = options.maxHealth or 500
     self.maxEnergy = options.maxEnergy or 500
+    self.maxWasteBuffer = options.maxWasteBuffer or 500
+    self.baselineEnergy = options.baselineEnergy or 150
     self.eggTimer = options.eggTimer or 350
     self.tickCost = options.tickCost or 1
     self.minMutRate = options.minMutRate or 1
@@ -184,13 +186,14 @@ function cell:new (health, energy, superparent, type)
 
     local newCell = {
         type = type or "normal",
-        consumes = self.superparentFoodTypes[superparent],
         lastUpdate = 0,
         color = {0.5, 0.5, 0.5, 1},
         vars = {},
         displayVars = {},
         health = clamp (health or self.maxHealth, 0, self.maxHealth),
         energy = clamp (energy or self.maxEnergy, 0, self.maxEnergy),
+        baselineEnergy = self.baselineEnergy,
+        wasteBuffer = 0,
         totalEnergy = 0,
         ticksLeft = self.age.max * 0.5,
         direction = 1,
@@ -199,9 +202,8 @@ function cell:new (health, energy, superparent, type)
         superparent = superparent,
         maxAge = self.age.max * 0.5,
         reproductionEnergy = self.reproductionEnergy.max * 0.5,
+        consumes = self.superparentFoodTypes[superparent],
     }
-
-    assert (validFoodTypes[newCell.consumes], "Invalid food type for consumes")
 
     -- Initializes the cell's network
     for inputID, _ in pairs (self.inputs) do
@@ -281,7 +283,14 @@ function cell:update (tileX, tileY, cellObj, map)
 
         -- Execute the input functions and add their keys/values to the input table
         for key, inputFunc in pairs(self.inputs) do
-            inputs[key] = inputFunc(tileX, tileY, cellObj, self.map)
+            local success, result = pcall (inputFunc, tileX, tileY, cellObj, self.map)
+
+            if success == true then
+                inputs[key] = result
+            else
+                local errorMsg = "Error in cell input function '" .. tostring (key) .. "': " .. tostring (result)
+                error (errorMsg)
+            end
         end
         for i = 1, self.memVars do
             inputs["getMem" .. i] = mapToScale (cellObj.vars[i], self.varBounds.min, self.varBounds.max, -1, 1)

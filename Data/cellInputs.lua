@@ -43,15 +43,16 @@ end
 
 function cellInputs.getTileEnergy (tileX, tileY, cellObj, map)
     local itx, ity = map:getForwardPos (tileX, tileY, 1)
+    local foodType = cellObj.consumes
     
-    return mapToScale (map:getInputTile (itx, ity) or 0, map.inputBounds.min, map.inputBounds.max, -1, 1)
+    return mapToScale (map:getInputTile (itx, ity, foodType) or 0, map.inputBounds[foodType].min, map.inputBounds[foodType].max, -1, 1)
 end
 
-function cellInputs.getTileValue (tileX, tileY, cellObj, map)
-    local itx, ity = map:getForwardPos (tileX, tileY, 1)
+-- function cellInputs.getTileValue (tileX, tileY, cellObj, map)
+--     local itx, ity = map:getForwardPos (tileX, tileY, 1)
     
-    return map:getEnvValue (itx, ity, "data") or -1
-end
+--     return map:getEnvValue (itx, ity, "data") or -1
+-- end
 
 function cellInputs.isTaken (tileX, tileY, cellObj, map)
     return (map:isTaken (map:getForwardPos (tileX, tileY, 1))) and 1 or -1

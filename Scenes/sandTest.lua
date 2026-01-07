@@ -200,13 +200,21 @@ local validSubModes = {
     "allDisabled",
 }
 
-local baseXInput = 10000 * love.math.random()
-local baseYInput = 10000 * love.math.random()
+local baseXInput1 = 10000 * love.math.random()
+local baseYInput1 = 10000 * love.math.random()
+local baseXInput2 = 10000 * love.math.random()
+local baseYInput2 = 10000 * love.math.random()
+local baseXInput3 = 10000 * love.math.random()
+local baseYInput3 = 10000 * love.math.random()
 local maxInput = 500
 local function mapInput (tileX, tileY)
     -- return (math.random () < 0.10) and maxInput or 0
 
-    return round (mapToScale (love.math.noise(baseXInput+.05*tileX, baseYInput+.02*tileY), 0, 1, 0, maxInput))
+    return{
+        meat = round (mapToScale (love.math.noise(baseXInput1+.05*tileX, baseYInput1+.02*tileY), 0, 1, 0, maxInput)),
+        plants = round (mapToScale (love.math.noise(baseXInput2+.05*tileX, baseYInput2+.02*tileY), 0, 1, 0, maxInput)),
+        waste = round (mapToScale (love.math.noise(baseXInput3+.05*tileX, baseYInput3+.02*tileY), 0, 1, 0, maxInput)),
+    }
 end
 
 local baseXBarriers = 10000 * love.math.random()
@@ -538,6 +546,11 @@ function thisScene:draw ()
         love.graphics.setColor (0, 0, 0, 0.75)
         love.graphics.rectangle ("fill", 705, cellsBaseY + (superparent - 1) * 35, 90, 25)
         love.graphics.setColor (1, 1, 1, 1)
+        local foodMap = {
+            meat = "M",
+            plants = "P",
+            waste = "W",
+        }
         love.graphics.printf ("Cells (" .. superparent .. "): " .. map.stats.cells[superparent], 710, cellsBaseY + 5 + (superparent - 1) * 35, 85, "left")
     end
 
@@ -576,6 +589,7 @@ function thisScene:keypressed (key, scancode, isrepeat)
             print ("Meat input @ (" .. tileX .. ", " .. tileY .. "): " .. map:getInputTile (tileX, tileY, "meat"))
             print ("Plants input @ (" .. tileX .. ", " .. tileY .. "): " .. map:getInputTile (tileX, tileY, "plants"))
             print ("Waste input @ (" .. tileX .. ", " .. tileY .. "): " .. map:getInputTile (tileX, tileY, "waste"))
+            print ()
         else
             local cellToPrint = map:getCell (tileX, tileY)
 

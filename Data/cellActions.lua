@@ -25,7 +25,7 @@ local hyperArgs = {
     },
     reproduce = {
         -- energyCost = 250,
-        requiredTokens = 1,
+        -- requiredTokens = 1,
     },
     reproduceExtra = {
         energyCost = 500,
@@ -88,14 +88,27 @@ function cellActions.turnRight (tileX, tileY, cellObj, map)
     return tileX, tileY
 end
 
+local wasteMap = {
+    meat = "waste",
+    plants = "waste",
+    waste = "plants",
+}
 function cellActions.consume (tileX, tileY, cellObj, map)
     local itx, ity = map:getForwardPos (tileX, tileY, 1)
+    local origResources = map:getCellTotalResources (tileX, tileY)
     -- local origEnergy = cellObj.energy
-    map:transferInputToCell (itx, ity, tileX, tileY, hyperArgs.consume.energyFromTile, hyperArgs.consume.energyCost)
+    map:transferInputToCell (itx, ity, tileX, tileY, cellObj.consumes, hyperArgs.consume.energyFromTile, hyperArgs.consume.energyCost)
     -- if cellObj.energy - origEnergy > 0 then
     --     print ("===Energy change: " .. (cellObj.energy - origEnergy) .. "===")
     --     print (origEnergy .. "->" .. cellObj.energy)
     -- end
+
+    cellObj.wasteBuffer = cellObj.wasteBuffer + (map:getCellTotalResources (tileX, tileY) - origResources)
+    
+    if cellObj.wasteBuffer >= map.cellManager.maxWasteBuffer then
+        map:adjustInputTile (tileX, tileY, wasteMap[cellObj.consumes], cellObj.wasteBuffer)
+        cellObj.wasteBuffer = 0
+    end
 
     return tileX, tileY
 end
@@ -177,7 +190,7 @@ function cellActions.reproduce (tileX, tileY, cellObj, map)
     if map.stats.cells[cellObj.superparent] < map.cellManager.maxCells[cellObj.superparent] and map:isClear (babyTileX, babyTileY) == true then
         local energyCost = cellObj.reproductionEnergy
 
-        if cellObj.energy + cellObj.health > energyCost then
+        if cellObj.energy + cellObj.health > energyCost + map.cellManager.baselineEnergy then
             if map:spawnCell (babyTileX, babyTileY, energyCost / 2, energyCost / 2, cellObj.superparent, cellObj) then
                 map:adjustCellEnergy (tileX, tileY, -energyCost)
 
@@ -246,7 +259,7 @@ function cellActions.placeEnergy (tileX, tileY, cellObj, map)
     local otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
     
     if hyperArgs.placeEnergy.energyCost + hyperArgs.placeEnergy.sharedEnergy < map:getCellTotalResources (tileX, tileY) and hyperArgs.placeEnergy.energyCost + hyperArgs.placeEnergy.sharedEnergy < cellObj.totalEnergy then
-        if map:adjustInputTile (otherTileX, otherTileY, hyperArgs.placeEnergy.sharedEnergy) then
+        if map:adjustInputTile (otherTileX, otherTileY, cellObj.consumes, hyperArgs.placeEnergy.sharedEnergy) then
             map:adjustCellEnergy (tileX, tileY, -(hyperArgs.placeEnergy.energyCost + hyperArgs.placeEnergy.sharedEnergy))
             cellObj.totalEnergy = cellObj.totalEnergy - hyperArgs.placeEnergy.sharedEnergy
         end
