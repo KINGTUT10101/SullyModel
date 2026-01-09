@@ -281,18 +281,17 @@ function thisScene:load (...)
             --     min = math.huge,
             --     max = math.huge,
             -- },
-        maxCells = 200,
+        -- maxCells = 200,
         maxWalls = 100,
-        -- maxCells = {
-        --     600,
-        --     450,
-        --     -- 450,
-        --     -- 75,
-        -- },
+        maxCells = {
+            100,
+            250,
+            400,
+        },
         superparents = superparents,
         consumeOnTick = {
-            amount = 10,
-            cost = 2,
+            amount = 15,
+            cost = 0,
         },
         pheromoneTime = 250,
         pheromones = 2,
@@ -325,7 +324,7 @@ function thisScene:load (...)
             },
             waste = {
                 min = 0,
-                max = 600,
+                max = 2500,
             },
         },
         dataBounds = {

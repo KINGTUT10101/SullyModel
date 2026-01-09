@@ -4,14 +4,13 @@ local cellActions = {}
 
 local hyperArgs = {
     consume = {
-        energyFromTile = 100,
-        energyCost = 5,
-        wasteThreshold = 75,
-        wasteCost = 20,
+        energyFromTile = 250,
+        energyCost = 30,
+        wasteThreshold = math.huge,
     },
     applyDamage = {
-        damage = 250,
-        energyCost = 10,
+        damage = 1000,
+        energyCost = 25,
     },
     stealEnergy = {
         energyGained = 50,
@@ -96,17 +95,17 @@ local wasteMap = {
     waste = "plants",
 }
 
--- -- WORKS
--- function cellActions.consume (tileX, tileY, cellObj, map)
---     local itx, ity = map:getForwardPos (tileX, tileY, 1)
+-- WORKS
+function cellActions.consume (tileX, tileY, cellObj, map)
+    local itx, ity = map:getForwardPos (tileX, tileY, 1)
 
---     if (map:getInputTile (itx, ity, "waste") or 0) < hyperArgs.consume.wasteThreshold or cellObj.consumes == "waste" then
---         local origResources = map:getCellTotalResources (tileX, tileY)
---         map:transferInputToCell (itx, ity, tileX, tileY, cellObj.consumes, hyperArgs.consume.energyFromTile, hyperArgs.consume.energyCost)
---     end
+    if (map:getInputTile (itx, ity, "waste") or 0) < hyperArgs.consume.wasteThreshold or cellObj.consumes == "waste" then
+        local origResources = map:getCellTotalResources (tileX, tileY)
+        map:transferInputToCell (itx, ity, tileX, tileY, cellObj.consumes, hyperArgs.consume.energyFromTile, hyperArgs.consume.energyCost)
+    end
 
---     return tileX, tileY
--- end
+    return tileX, tileY
+end
 
 -- -- Voting based consumption method
 -- function cellActions.consume (tileX, tileY, cellObj, map)
@@ -122,36 +121,38 @@ local wasteMap = {
 --     return tileX, tileY
 -- end
 
--- -- WORKS
--- function cellActions.applyDamage (tileX, tileY, cellObj, map)
---     local enemyTileX, enemyTileY = map:getForwardPos (tileX, tileY, 1)
+-- WORKS
+function cellActions.applyDamage (tileX, tileY, cellObj, map)
+    local enemyTileX, enemyTileY = map:getForwardPos (tileX, tileY, 1)
 
---     if map:getCellTotalResources (tileX, tileY) > hyperArgs.applyDamage.energyCost then
---         -- print ("BEFORE:", map:getCellTotalResources (tileX, tileY), map:getCellTotalResources (enemyTileX, enemyTileY))
---         -- print ("WASTE BUFFERS:", map.cellGrid[tileX][tileY].wasteBuffer, map.cellGrid[enemyTileX][enemyTileY].wasteBuffer)
---         -- print ("TILES:", map:getInputTile (tileX, tileY, "meat"), map:getInputTile (enemyTileX, enemyTileY, "meat"))
+    local damage = (cellObj.consumes == "meat") and hyperArgs.applyDamage.damage or math.ceil (hyperArgs.applyDamage.damage / 8)
 
---         map:adjustCellEnergy (tileX, tileY, -hyperArgs.applyDamage.energyCost)
+    if map:getCellTotalResources (tileX, tileY) > hyperArgs.applyDamage.energyCost then
+        -- print ("BEFORE:", map:getCellTotalResources (tileX, tileY), map:getCellTotalResources (enemyTileX, enemyTileY))
+        -- print ("WASTE BUFFERS:", map.cellGrid[tileX][tileY].wasteBuffer, map.cellGrid[enemyTileX][enemyTileY].wasteBuffer)
+        -- print ("TILES:", map:getInputTile (tileX, tileY, "meat"), map:getInputTile (enemyTileX, enemyTileY, "meat"))
 
---         if map:isTaken (enemyTileX, enemyTileY) == true then
---             local enemyCell = map.cellGrid[enemyTileX][enemyTileY]
---             local origEnemyHealth = enemyCell.health
---             map:adjustCellHealth (enemyTileX, enemyTileY, -hyperArgs.applyDamage.damage, false)
+        map:adjustCellEnergy (tileX, tileY, -hyperArgs.applyDamage.energyCost)
 
---             -- Credit the environment with the exact health lost, even on kill
---             local newHealth = math.max (enemyCell.health or 0, 0)
---             local healthLost = origEnemyHealth - newHealth
---             if healthLost > 0 then
---                 map:adjustInputTile (enemyTileX, enemyTileY, "meat", healthLost)
---             end
---         end
---         -- print ("AFTER:", map:getCellTotalResources (tileX, tileY), map:getCellTotalResources (enemyTileX, enemyTileY))
---         -- print ("WASTE BUFFERS:", map.cellGrid[tileX][tileY].wasteBuffer, map.cellGrid[enemyTileX][enemyTileY].wasteBuffer)
---         -- print ("TILES:", map:getInputTile (tileX, tileY, "meat"), map:getInputTile (enemyTileX, enemyTileY, "meat"))
---     end
+        if map:isTaken (enemyTileX, enemyTileY) == true then
+            local enemyCell = map.cellGrid[enemyTileX][enemyTileY]
+            local origEnemyHealth = enemyCell.health
+            map:adjustCellHealth (enemyTileX, enemyTileY, -damage, false)
 
---     return tileX, tileY
--- end
+            -- Credit the environment with the exact health lost, even on kill
+            local newHealth = math.max (enemyCell.health or 0, 0)
+            local healthLost = origEnemyHealth - newHealth
+            if healthLost > 0 then
+                map:adjustInputTile (enemyTileX, enemyTileY, "meat", healthLost)
+            end
+        end
+        -- print ("AFTER:", map:getCellTotalResources (tileX, tileY), map:getCellTotalResources (enemyTileX, enemyTileY))
+        -- print ("WASTE BUFFERS:", map.cellGrid[tileX][tileY].wasteBuffer, map.cellGrid[enemyTileX][enemyTileY].wasteBuffer)
+        -- print ("TILES:", map:getInputTile (tileX, tileY, "meat"), map:getInputTile (enemyTileX, enemyTileY, "meat"))
+    end
+
+    return tileX, tileY
+end
 
 -- function cellActions.stealEnergy (tileX, tileY, cellObj, map)
 --     local enemyTileX, enemyTileY = map:getForwardPos (tileX, tileY, 1)
@@ -164,17 +165,17 @@ local wasteMap = {
 --     return tileX, tileY
 -- end
 
--- -- WORKS
--- function cellActions.healSelf (tileX, tileY, cellObj, map)
---     if map:getCellEnergy (tileX, tileY) - hyperArgs.healSelf.energyCost > 0 then
---         local energyUsed = math.min (hyperArgs.healSelf.energyCost, map.cellManager.maxHealth - cellObj.health) -- Calculate the exact energy needed to heal to full
+-- WORKS
+function cellActions.healSelf (tileX, tileY, cellObj, map)
+    if map:getCellEnergy (tileX, tileY) - hyperArgs.healSelf.energyCost > 0 then
+        local energyUsed = math.min (hyperArgs.healSelf.energyCost, map.cellManager.maxHealth - cellObj.health) -- Calculate the exact energy needed to heal to full
 
---         map:adjustCellEnergy (tileX, tileY, -energyUsed, false)
---         map:adjustCellHealth (tileX, tileY, energyUsed, false)
---     end
+        map:adjustCellEnergy (tileX, tileY, -energyUsed, false)
+        map:adjustCellHealth (tileX, tileY, energyUsed, false)
+    end
 
---     return tileX, tileY
--- end
+    return tileX, tileY
+end
 
 -- -- Not currently working with the new food system in term of energy stability, but it was kinda useless anyway
 -- function cellActions.energizeSelf (tileX, tileY, cellObj, map)
@@ -204,22 +205,22 @@ local wasteMap = {
 --     return tileX, tileY
 -- end
 
--- -- WORKS
--- -- New reproduction method
--- function cellActions.reproduce (tileX, tileY, cellObj, map)
---     local babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
---     if map.stats.cells[cellObj.superparent] < map.cellManager.maxCells[cellObj.superparent] and map:isClear (babyTileX, babyTileY) == true then
---         local energyCost = cellObj.reproductionEnergy
+-- WORKS
+-- New reproduction method
+function cellActions.reproduce (tileX, tileY, cellObj, map)
+    local babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
+    if map.stats.cells[cellObj.superparent] < map.cellManager.maxCells[cellObj.superparent] and map:isClear (babyTileX, babyTileY) == true then
+        local energyCost = cellObj.reproductionEnergy
 
---         if cellObj.energy + cellObj.health > energyCost then
---             if map:spawnCell (babyTileX, babyTileY, math.ceil (energyCost / 2), math.floor (energyCost / 2), cellObj.superparent, cellObj) then
---                 map:adjustCellEnergy (tileX, tileY, -energyCost, false)
---             end
---         end
---     end
+        if cellObj.energy + cellObj.health > energyCost then
+            if map:spawnCell (babyTileX, babyTileY, math.ceil (energyCost / 2), math.floor (energyCost / 2), cellObj.superparent, cellObj) then
+                map:adjustCellEnergy (tileX, tileY, -energyCost, false)
+            end
+        end
+    end
 
---     return tileX, tileY
--- end
+    return tileX, tileY
+end
 
 -- -- Old reproduction method
 -- function cellActions.reproduce (tileX, tileY, cellObj, map)
@@ -278,18 +279,18 @@ end
 --     return tileX, tileY
 -- end
 
--- -- WORKS
--- function cellActions.placeEnergy (tileX, tileY, cellObj, map)
---     local otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
+-- WORKS
+function cellActions.placeEnergy (tileX, tileY, cellObj, map)
+    local otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
     
---     if hyperArgs.placeEnergy.energyCost + hyperArgs.placeEnergy.sharedEnergy < map:getCellTotalResources (tileX, tileY) then
---         if map:adjustInputTile (otherTileX, otherTileY, cellObj.consumes, hyperArgs.placeEnergy.sharedEnergy) then
---             map:adjustCellEnergy (tileX, tileY, -hyperArgs.placeEnergy.sharedEnergy, false)
---             map:adjustCellEnergy (tileX, tileY, -hyperArgs.placeEnergy.energyCost)
---         end
---     end
+    if hyperArgs.placeEnergy.energyCost + hyperArgs.placeEnergy.sharedEnergy < map:getCellTotalResources (tileX, tileY) then
+        if map:adjustInputTile (otherTileX, otherTileY, cellObj.consumes, hyperArgs.placeEnergy.sharedEnergy) then
+            map:adjustCellEnergy (tileX, tileY, -hyperArgs.placeEnergy.sharedEnergy, false)
+            map:adjustCellEnergy (tileX, tileY, -hyperArgs.placeEnergy.energyCost)
+        end
+    end
 
---     return tileX, tileY
--- end
+    return tileX, tileY
+end
 
 return cellActions
