@@ -353,7 +353,7 @@ function map:draw (mode, subMode)
 
             -- Check what exists at the current position to determine what to render
             if cellObj ~= nil and mode ~= "none" then
-                totalEnergy = totalEnergy + cellObj.totalEnergy
+                totalEnergy = totalEnergy + cellObj.wasteBuffer + cellObj.energy + cellObj.health
 
                 -- Render cell
                 if mode == "normal" then
@@ -424,12 +424,12 @@ function map:draw (mode, subMode)
         end
     end
 
-    -- if math.floor (self.totalEnergy) ~= math.floor (totalEnergy) and mode ~= "none" then
-    --     if self.tickSpeed ~= math.huge then
-    --         print ("Total energy mismatch detected! " .. math.floor (self.totalEnergy) .. " vs " .. math.floor (totalEnergy)) -- Add this back later
-    --     end
-    --     self.tickSpeed = math.huge
-    -- end
+    if math.floor (self.totalEnergy) ~= math.floor (totalEnergy) and mode ~= "none" then
+        if self.tickSpeed ~= math.huge then
+            print ("Total energy mismatch detected! " .. math.floor (self.totalEnergy) .. " vs " .. math.floor (totalEnergy) .. " (Diff: " .. math.floor (self.totalEnergy) - math.floor (totalEnergy) .. ")") -- Add this back later
+        end
+        self.tickSpeed = math.huge
+    end
 
     love.graphics.pop ()
 end
@@ -492,7 +492,7 @@ function map:checkEnergyBalance ()
             totalEnergy = totalEnergy + envTile.input.meat + envTile.input.plants + envTile.input.waste
 
             if cellObj ~= nil then
-                totalEnergy = totalEnergy + cellObj.totalEnergy
+                totalEnergy = totalEnergy + cellObj.wasteBuffer + cellObj.energy + cellObj.health
             end
         end
     end
@@ -773,9 +773,8 @@ function map:deleteCell (tileX, tileY, dropEnergy)
 
         -- Add cell's remaining energy and health to the ground
         if dropEnergy ~= false then
-            assert (cellObj.totalEnergy >= 0, "Cell total energy is negative on deletion!")
-            map:adjustInputTile (tileX, tileY, "meat", cellObj.health + cellObj.energy + cellObj.baselineEnergy)
-            map:adjustInputTile (tileX, tileY, wasteMap[cellObj.consumes], cellObj.wasteBuffer)
+            self:adjustInputTile (tileX, tileY, "meat", cellObj.energy + cellObj.health)
+            self:emptyCellWasteBuffer (tileX, tileY)
         end
 
         self.cellGrid[tileX][tileY] = nil
@@ -841,7 +840,7 @@ function map:transferInputToCell (tileX, tileY, cellTileX, cellTileY, foodType, 
 
         local origInput = inputVal
         local cellObj = self.cellGrid[cellTileX][cellTileY]
-        local origTotalEnergy = cellObj.totalEnergy
+        -- local origTotalEnergy = cellObj.totalEnergy
         
         -- For some reason, this check is needed to make stable ecosystems possible...
         -- My guess is that the cells would waste too much energy abusing this function otherwise cuz energy is so sparse
@@ -849,16 +848,16 @@ function map:transferInputToCell (tileX, tileY, cellTileX, cellTileY, foodType, 
             -- Energy cost of consuming a tile
             if inputVal <= amount then
                 cellObj.energy = cellObj.energy + inputVal
-                cellObj.totalEnergy = cellObj.totalEnergy + inputVal
+                -- cellObj.totalEnergy = cellObj.totalEnergy + inputVal
                 inputVal = 0
             else
                 cellObj.energy = cellObj.energy + amount
-                cellObj.totalEnergy = cellObj.totalEnergy + amount
+                -- cellObj.totalEnergy = cellObj.totalEnergy + amount
                 inputVal = inputVal - amount
             end
             
             if cellObj.energy > maxEnergy then -- Cell energy max
-                cellObj.totalEnergy = cellObj.totalEnergy - (cellObj.energy - maxEnergy)
+                -- cellObj.totalEnergy = cellObj.totalEnergy - (cellObj.energy - maxEnergy)
                 inputVal = inputVal + cellObj.energy - maxEnergy
                 cellObj.energy = maxEnergy
             end
@@ -867,7 +866,7 @@ function map:transferInputToCell (tileX, tileY, cellTileX, cellTileY, foodType, 
             self:setInputTile (tileX, tileY, foodType, inputVal)
         end
 
-        assert (origInput + origTotalEnergy == (self:getInputTile (tileX, tileY, foodType) or 0) + cellObj.totalEnergy, "Energy conservation violated in transferInputToCell. " .. tostring(origInput) .. " + " .. tostring(origTotalEnergy) .. " != " .. tostring(self:getInputTile (tileX, tileY, foodType)) .. " + " .. tostring(cellObj.totalEnergy) .. ")")
+        -- assert (origInput + origTotalEnergy == (self:getInputTile (tileX, tileY, foodType) or 0) + cellObj.totalEnergy, "Energy conservation violated in transferInputToCell. " .. tostring(origInput) .. " + " .. tostring(origTotalEnergy) .. " != " .. tostring(self:getInputTile (tileX, tileY, foodType)) .. " + " .. tostring(cellObj.totalEnergy) .. ")")
     end
 end
 
@@ -899,7 +898,11 @@ function map:shareInputToCell (tileX1, tileY1, tileX2, tileY2, amount, cost)
     end
 end
 
-function map:adjustCellEnergy (tileX, tileY, amount)
+function map:adjustCellEnergy (tileX, tileY, amount, updateWasteBuffer)
+    if updateWasteBuffer == nil then
+        updateWasteBuffer = true
+    end
+
     if self:isTaken (tileX, tileY) == true then
         local cell = self.cellGrid[tileX][tileY]
         cell.energy = math.min (self.cellManager.maxEnergy, cell.energy + amount)
@@ -907,15 +910,32 @@ function map:adjustCellEnergy (tileX, tileY, amount)
         if cell.energy < 0 then
             local deficit = cell.energy
             cell.energy = 0
-            map:adjustCellHealth (tileX, tileY, deficit)
+
+            if updateWasteBuffer == true and amount < 0 then
+                self:adjustCellWasteBuffer (tileX, tileY, -amount+deficit)
+            end
+            map:adjustCellHealth (tileX, tileY, deficit, updateWasteBuffer)
+        else
+            if updateWasteBuffer == true and amount < 0 then
+                self:adjustCellWasteBuffer (tileX, tileY, -amount)
+            end
         end
     end
 end
 
-function map:adjustCellHealth (tileX, tileY, amount)
+function map:adjustCellHealth (tileX, tileY, amount, updateWasteBuffer)
+    if updateWasteBuffer == nil then
+        updateWasteBuffer = true
+    end
+
     if self:isTaken (tileX, tileY) == true then
         local cell = self.cellGrid[tileX][tileY]
-        cell.health = math.min (self.cellManager.maxHealth, cell.health + amount)
+        local origHealth = cell.health
+        cell.health = clamp (cell.health + amount, 0, self.cellManager.maxHealth)
+
+        if updateWasteBuffer == true and amount < 0 then
+            self:adjustCellWasteBuffer (tileX, tileY, -amount)
+        end
 
         if cell.health <= 0 then
             self:deleteCell (tileX, tileY)
@@ -953,6 +973,31 @@ function map:getCellDisplayVar (tileX, tileY, index)
         return self.cellGrid[tileX][tileY].displayVars[index]
     else
         return nil
+    end
+end
+
+function map:adjustCellWasteBuffer (tileX, tileY, amount)
+    if self:isTaken (tileX, tileY) == true then
+        local cellObj = self.cellGrid[tileX][tileY]
+        cellObj.wasteBuffer = math.max (0, cellObj.wasteBuffer + amount)
+
+        if cellObj.wasteBuffer >= self.cellManager.maxWasteBuffer then
+            local deficit = cellObj.wasteBuffer - self.cellManager.maxWasteBuffer
+            cellObj.wasteBuffer = self.cellManager.maxWasteBuffer
+
+            self:emptyCellWasteBuffer (tileX, tileY)
+
+            cellObj.wasteBuffer = cellObj.wasteBuffer + deficit
+        end
+    end
+end
+
+function map:emptyCellWasteBuffer (tileX, tileY)
+    if self:isTaken (tileX, tileY) == true then
+        local cellObj = self.cellGrid[tileX][tileY]
+        
+        self:adjustInputTile (tileX, tileY, wasteMap[cellObj.consumes], cellObj.wasteBuffer)
+        cellObj.wasteBuffer = 0
     end
 end
 

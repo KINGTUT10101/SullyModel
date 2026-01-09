@@ -112,12 +112,11 @@ function cell:init (map, inputs, actions, options)
 
     options.consumeOnTick = options.consumeOnTick or {}
     self.consumeOnTick.amount = options.consumeOnTick.amount or 15
-    self.consumeOnTick.cost = options.consumeOnTick.cost or 1
+    self.consumeOnTick.cost = options.consumeOnTick.cost or 5
 
     self.maxHealth = options.maxHealth or 500
     self.maxEnergy = options.maxEnergy or 500
     self.maxWasteBuffer = options.maxWasteBuffer or 500
-    self.baselineEnergy = options.baselineEnergy or 150
     self.eggTimer = options.eggTimer or 350
     self.tickCost = options.tickCost or 1
     self.minMutRate = options.minMutRate or 1
@@ -192,9 +191,8 @@ function cell:new (health, energy, superparent, type)
         displayVars = {},
         health = clamp (health or self.maxHealth, 0, self.maxHealth),
         energy = clamp (energy or self.maxEnergy, 0, self.maxEnergy),
-        baselineEnergy = self.baselineEnergy,
         wasteBuffer = 0,
-        totalEnergy = 0,
+        -- totalEnergy = 0,
         ticksLeft = self.age.max * 0.5,
         direction = 1,
         mutationRates = {},
@@ -262,7 +260,11 @@ function cell:new (health, energy, superparent, type)
     return newCell
 end
 
-
+local wasteMap = {
+    meat = "waste",
+    plants = "waste",
+    waste = "plants",
+}
 --- Updates a single cell during a game tick
 function cell:update (tileX, tileY, cellObj, map)
     if cellObj.type == "normal" or cellObj.type == "egg" then
@@ -397,6 +399,11 @@ function cell:update (tileX, tileY, cellObj, map)
 
                 if outputValue > self.actionThreshold then
                     local outputKey = outputs[i][1]
+
+                    -- -- TEMP
+                    -- cellObj.actionsTaken = cellObj.actionsTaken or {}
+                    -- table.insert (cellObj.actionsTaken, 1, outputKey)
+                    -- table.remove (cellObj.actionsTaken, 6)
 
                     -- Check if outputKey is for memory vars or display vars
                     if string.sub (outputKey, 1, 3) == "mem" then
