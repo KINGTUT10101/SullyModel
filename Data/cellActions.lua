@@ -205,20 +205,20 @@ local wasteMap = {
 -- end
 
 -- New reproduction method
--- function cellActions.reproduce (tileX, tileY, cellObj, map)
---     local babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
---     if map.stats.cells[cellObj.superparent] < map.cellManager.maxCells[cellObj.superparent] and map:isClear (babyTileX, babyTileY) == true then
---         local energyCost = cellObj.reproductionEnergy
+function cellActions.reproduce (tileX, tileY, cellObj, map)
+    local babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
+    if map.stats.cells[cellObj.superparent] < map.cellManager.maxCells[cellObj.superparent] and map:isClear (babyTileX, babyTileY) == true then
+        local energyCost = cellObj.reproductionEnergy
 
---         if cellObj.energy + cellObj.health > energyCost then
---             if map:spawnCell (babyTileX, babyTileY, energyCost / 2, energyCost / 2, cellObj.superparent, cellObj) then
---                 map:adjustCellEnergy (tileX, tileY, -energyCost)
---             end
---         end
---     end
+        if cellObj.energy + cellObj.health > energyCost then
+            if map:spawnCell (babyTileX, babyTileY, math.ceil (energyCost / 2), math.floor (energyCost / 2), cellObj.superparent, cellObj) then
+                map:adjustCellEnergy (tileX, tileY, -energyCost, false)
+            end
+        end
+    end
 
---     return tileX, tileY
--- end
+    return tileX, tileY
+end
 
 -- -- Old reproduction method
 -- function cellActions.reproduce (tileX, tileY, cellObj, map)
