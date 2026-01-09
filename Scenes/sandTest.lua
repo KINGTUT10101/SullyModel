@@ -211,7 +211,7 @@ local function mapInput (tileX, tileY)
     -- return (math.random () < 0.10) and maxInput or 0
 
     return{
-        meat = round (mapToScale (love.math.noise(baseXInput1+.05*tileX, baseYInput1+.02*tileY), 0, 1, 0, maxInput)),
+        meat = 0, -- round (mapToScale (love.math.noise(baseXInput1+.05*tileX, baseYInput1+.02*tileY), 0, 1, 0, maxInput)),
         plants = round (mapToScale (love.math.noise(baseXInput2+.05*tileX, baseYInput2+.02*tileY), 0, 1, 0, maxInput)),
         waste = round (mapToScale (love.math.noise(baseXInput3+.05*tileX, baseYInput3+.02*tileY), 0, 1, 0, maxInput)),
     }
@@ -280,7 +280,7 @@ function thisScene:load (...)
             --     min = math.huge,
             --     max = math.huge,
             -- },
-        maxCells = 350,
+        maxCells = 200,
         -- maxCells = {
         --     600,
         --     450,
@@ -290,7 +290,7 @@ function thisScene:load (...)
         superparents = superparents,
         consumeOnTick = {
             amount = 10,
-            cost = 0,
+            cost = 2,
         },
         pheromoneTime = 250,
         pheromones = 2,
@@ -313,8 +313,18 @@ function thisScene:load (...)
             max = math.huge,
         },
         drawBounds = {
-            min = 0,
-            max = 2500,
+            meat = {
+                min = 0,
+                max = 2500,
+            },
+            plants = {
+                min = 0,
+                max = 2500,
+            },
+            waste = {
+                min = 0,
+                max = 600,
+            },
         },
         dataBounds = {
             min = -1,
@@ -454,8 +464,8 @@ function thisScene:update (dt)
                         tries = tries + 1
                         tx, ty = math.random (1, map.width), math.random (1, map.height)
                     end
-                    map.cellGrid[tx][ty].baselineEnergy = 0 -- Set to 0 so other cells can't farm it for meat and get infinite food
                     if tries < maxTries then
+                        map.totalEnergy = map.totalEnergy + newCell.energy + newCell.health
                         cellsSpawned = cellsSpawned + 1
 
                         if cellsSpawned >= math.min (failsafeSpawns, cell.maxCells[superparent]) then
@@ -588,21 +598,23 @@ function thisScene:draw ()
     local totalWidth = superparents * colorBoxSize + (superparents - 1) * colorBoxSpacing
     local startX = (love.graphics.getWidth() - totalWidth) / 2
     
-    for superparent = 1, superparents do
-        local color = map.superparentColors[superparent]
-        local xPos = startX + (superparent - 1) * (colorBoxSize + colorBoxSpacing)
-        
-        -- Draw color box
-        love.graphics.setColor (color[1], color[2], color[3], 1)
-        love.graphics.rectangle ("fill", xPos, 10, colorBoxSize, colorBoxSize)
-        
-        -- Draw border
-        love.graphics.setColor (1, 1, 1, 1)
-        love.graphics.rectangle ("line", xPos, 10, colorBoxSize, colorBoxSize)
-        
-        -- Draw label
-        love.graphics.setColor (1, 1, 1, 1)
-        love.graphics.printf (superparent .. "/" .. foodMap[cell.superparentFoodTypes[superparent]], xPos - 5, 32, colorBoxSize + 10, "center")
+    if validModes[renderModeIndex] == "superparents" then
+        for superparent = 1, superparents do
+            local color = map.superparentColors[superparent]
+            local xPos = startX + (superparent - 1) * (colorBoxSize + colorBoxSpacing)
+            
+            -- Draw color box
+            love.graphics.setColor (color[1], color[2], color[3], 1)
+            love.graphics.rectangle ("fill", xPos, 10, colorBoxSize, colorBoxSize)
+            
+            -- Draw border
+            love.graphics.setColor (1, 1, 1, 1)
+            love.graphics.rectangle ("line", xPos, 10, colorBoxSize, colorBoxSize)
+            
+            -- Draw label
+            love.graphics.setColor (1, 1, 1, 1)
+            love.graphics.printf (superparent .. "/" .. foodMap[cell.superparentFoodTypes[superparent]], xPos - 5, 32, colorBoxSize + 10, "center")
+        end
     end
 end
 
