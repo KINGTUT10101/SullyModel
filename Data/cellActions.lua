@@ -33,7 +33,7 @@ local hyperArgs = {
         energyCost = 500,
     },
     createWall = {
-        energyCost = 5,
+        energyCost = 50,
     },
     shareEnergy = {
         sharedEnergy = 100,
@@ -204,21 +204,22 @@ local wasteMap = {
 --     return tileX, tileY
 -- end
 
--- New reproduction method
-function cellActions.reproduce (tileX, tileY, cellObj, map)
-    local babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
-    if map.stats.cells[cellObj.superparent] < map.cellManager.maxCells[cellObj.superparent] and map:isClear (babyTileX, babyTileY) == true then
-        local energyCost = cellObj.reproductionEnergy
+-- -- WORKS
+-- -- New reproduction method
+-- function cellActions.reproduce (tileX, tileY, cellObj, map)
+--     local babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
+--     if map.stats.cells[cellObj.superparent] < map.cellManager.maxCells[cellObj.superparent] and map:isClear (babyTileX, babyTileY) == true then
+--         local energyCost = cellObj.reproductionEnergy
 
-        if cellObj.energy + cellObj.health > energyCost then
-            if map:spawnCell (babyTileX, babyTileY, math.ceil (energyCost / 2), math.floor (energyCost / 2), cellObj.superparent, cellObj) then
-                map:adjustCellEnergy (tileX, tileY, -energyCost, false)
-            end
-        end
-    end
+--         if cellObj.energy + cellObj.health > energyCost then
+--             if map:spawnCell (babyTileX, babyTileY, math.ceil (energyCost / 2), math.floor (energyCost / 2), cellObj.superparent, cellObj) then
+--                 map:adjustCellEnergy (tileX, tileY, -energyCost, false)
+--             end
+--         end
+--     end
 
-    return tileX, tileY
-end
+--     return tileX, tileY
+-- end
 
 -- -- Old reproduction method
 -- function cellActions.reproduce (tileX, tileY, cellObj, map)
@@ -254,17 +255,19 @@ end
 --     return tileX, tileY
 -- end
 
--- function cellActions.createWall (tileX, tileY, cellObj, map)
---     local babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
---     if map.stats.cells[cellObj.superparent] < map.cellManager.maxCells[cellObj.superparent] and map:isClear (babyTileX, babyTileY) == true then
---         if cellObj.energy + cellObj.health > hyperArgs.createWall.energyCost then
---             map:adjustCellEnergy (tileX, tileY, -hyperArgs.createWall.energyCost)
---             map:spawnWall (babyTileX, babyTileY, hyperArgs.createWall.energyCost / 2, cellObj.superparent)
---         end
---     end
+-- WORKS
+function cellActions.createWall (tileX, tileY, cellObj, map)
+    local babyTileX, babyTileY = map:getForwardPos (tileX, tileY, 1)
+    if map.stats.walls[cellObj.superparent] < map.cellManager.maxWalls[cellObj.superparent] and map:isClear (babyTileX, babyTileY) == true then
+        if cellObj.energy + cellObj.health > hyperArgs.createWall.energyCost then
+            if map:spawnWall (babyTileX, babyTileY, hyperArgs.createWall.energyCost, cellObj.superparent) then
+                map:adjustCellEnergy (tileX, tileY, -hyperArgs.createWall.energyCost, false)
+            end
+        end
+    end
 
---     return tileX, tileY
--- end
+    return tileX, tileY
+end
 
 -- function cellActions.shareEnergy (tileX, tileY, cellObj, map)
 --     local otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
@@ -275,12 +278,14 @@ end
 --     return tileX, tileY
 -- end
 
+-- -- WORKS
 -- function cellActions.placeEnergy (tileX, tileY, cellObj, map)
 --     local otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
     
 --     if hyperArgs.placeEnergy.energyCost + hyperArgs.placeEnergy.sharedEnergy < map:getCellTotalResources (tileX, tileY) then
 --         if map:adjustInputTile (otherTileX, otherTileY, cellObj.consumes, hyperArgs.placeEnergy.sharedEnergy) then
---             map:adjustCellEnergy (tileX, tileY, -(hyperArgs.placeEnergy.energyCost + hyperArgs.placeEnergy.sharedEnergy))
+--             map:adjustCellEnergy (tileX, tileY, -hyperArgs.placeEnergy.sharedEnergy, false)
+--             map:adjustCellEnergy (tileX, tileY, -hyperArgs.placeEnergy.energyCost)
 --         end
 --     end
 
