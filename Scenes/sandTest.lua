@@ -180,6 +180,7 @@ local failsafeMutations = {
 }
 
 local renderMap = true
+local showWalls = false
 local renderModeIndex = 1
 local validModes = {
     "normal",
@@ -281,6 +282,7 @@ function thisScene:load (...)
             --     max = math.huge,
             -- },
         maxCells = 200,
+        maxWalls = 100,
         -- maxCells = {
         --     600,
         --     450,
@@ -540,15 +542,23 @@ function thisScene:draw ()
         love.graphics.printf ("Cycles (" .. superparent .. ", " .. foodMap[cell.superparentFoodTypes[superparent]] .. "): " .. cyclesSinceLastFail[superparent], 15, 120 + (superparent - 1) * 35, 150, "left")
     end
 
-    -- Show number of cells
+    -- Show number of cells or walls
     love.graphics.setColor (0, 0, 0, 0.75)
     love.graphics.rectangle ("fill", 720, 10, 76, 25)
     love.graphics.setColor (1, 1, 1, 1)
-    local totalCellCount = 0
-    for superparent = 1, superparents do
-        totalCellCount = totalCellCount + map.stats.cells[superparent]
+    if showWalls then
+        local totalWallCount = 0
+        for superparent = 1, superparents do
+            totalWallCount = totalWallCount + map.stats.walls[superparent]
+        end
+        love.graphics.printf ("Walls: " .. totalWallCount, 725, 15, 100, "left")
+    else
+        local totalCellCount = 0
+        for superparent = 1, superparents do
+            totalCellCount = totalCellCount + map.stats.cells[superparent]
+        end
+        love.graphics.printf ("Cells: " .. totalCellCount, 725, 15, 100, "left")
     end
-    love.graphics.printf ("Cells: " .. totalCellCount, 725, 15, 100, "left")
 
     -- Show number of failsafe activations for each superparent
     for superparent = 1, superparents do
@@ -558,13 +568,17 @@ function thisScene:draw ()
         love.graphics.printf ("FSs (" .. superparent .. "): " .. failsafeActivations[superparent], 725, 50 + (superparent - 1) * 35, 100, "left")
     end
 
-    -- Show number of cells for each superparent (rendered below the failsafe boxes)
+    -- Show number of cells or walls for each superparent (rendered below the failsafe boxes)
     local cellsBaseY = 45 + superparents * 35
     for superparent = 1, superparents do
         love.graphics.setColor (0, 0, 0, 0.75)
         love.graphics.rectangle ("fill", 705, cellsBaseY + (superparent - 1) * 35, 90, 25)
         love.graphics.setColor (1, 1, 1, 1)
-        love.graphics.printf ("Cells (" .. superparent .. "): " .. map.stats.cells[superparent], 710, cellsBaseY + 5 + (superparent - 1) * 35, 85, "left")
+        if showWalls then
+            love.graphics.printf ("Walls (" .. superparent .. "): " .. map.stats.walls[superparent], 710, cellsBaseY + 5 + (superparent - 1) * 35, 85, "left")
+        else
+            love.graphics.printf ("Cells (" .. superparent .. "): " .. map.stats.cells[superparent], 710, cellsBaseY + 5 + (superparent - 1) * 35, 85, "left")
+        end
     end
 
     -- Shows the rendering mode
@@ -713,6 +727,15 @@ function thisScene:keypressed (key, scancode, isrepeat)
     elseif key == "l" then
         map.stopOnError = not map.stopOnError
         print ("Stop on error: " .. tostring (map.stopOnError))
+
+    -- Toggle between cells and walls display
+    elseif key == "c" then
+        showWalls = not showWalls
+        if showWalls then
+            print ("Display switched to walls count")
+        else
+            print ("Display switched to cells count")
+        end
     end
 end
 
