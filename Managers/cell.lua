@@ -25,6 +25,7 @@ local cell = {
     maxEnergy = 0, -- The maximum energy of a cell object
     tickCost = 0,
     maxCells = {},
+    maxWalls = {},
     minMutRate = 0,
     network = {
         layers = 0,
@@ -129,7 +130,7 @@ function cell:init (map, inputs, actions, options)
 
     self.maxCells = options.maxCells or nil
     if type(self.maxCells) ~= "table" then
-        assert (type (self.maxCells) == "number" or self.maxCells == nil, "Invalid neuronsPerLayer value")
+        assert (type (self.maxCells) == "number" or self.maxCells == nil, "Invalid max cells value")
 
         local singularValue = self.maxCells or 10
         self.maxCells = {}
@@ -138,6 +139,19 @@ function cell:init (map, inputs, actions, options)
         end
     else
         assert (self.superparents == #self.maxCells, "Mismatch between superparents (" .. self.superparents .. ") and maxCells length (" .. #self.maxCells .. ")")
+    end
+
+    self.maxWalls = options.maxWalls or nil
+    if type(self.maxWalls) ~= "table" then
+        assert (type (self.maxWalls) == "number" or self.maxWalls == nil, "Invalid max walls value")
+
+        local singularValue = self.maxWalls or 10
+        self.maxWalls = {}
+        for superparent = 1, self.superparents do
+            self.maxWalls[superparent] = singularValue
+        end
+    else
+        assert (self.superparents == #self.maxWalls, "Mismatch between superparents (" .. self.superparents .. ") and maxWalls length (" .. #self.maxWalls .. ")")
     end
 
     options.mutsPerChild = options.mutsPerChild or {}

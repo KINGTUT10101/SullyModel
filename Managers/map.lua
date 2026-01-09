@@ -58,6 +58,7 @@ local map = {
     cellManager = nil,
     stats = {
         cells = {},
+        walls = {},
     },
     ticksBetweenSaves = 0,
     lastSave = 0,
@@ -154,6 +155,7 @@ function map:init (cellManager, options)
 
     for i = 1, self.cellManager.superparents do
         self.stats.cells[i] = 0
+        self.stats.walls[i] = 0
         self.superparentColors[i] = {math.random(), math.random(), math.random(), 1}
     end
     for i = 1, self.cellManager.pheromones do
@@ -225,6 +227,7 @@ function map:reset (width, height, mapEnvInputs, mapEnvTypes, mapEnvData)
 
     for i = 1, self.cellManager.superparents do
         self.stats.cells[i] = 0
+        self.stats.walls[i] = 0
     end
     -- self.inputRender = love.graphics.newImage (inputRender)
     -- self.inputRender:setFilter ("nearest", "nearest")
@@ -743,13 +746,13 @@ end
 --- @param health number The health value of the new cell object.
 --- @return boolean success True if a cell object was spawned successfully.
 function map:spawnWall (tileX, tileY, health, superparent)
-    if self.stats.cells[superparent] < self.cellManager.maxCells[superparent] and self:isClear (tileX, tileY) == true then
+    if self.stats.walls[superparent] < self.cellManager.maxWalls[superparent] and self:isClear (tileX, tileY) == true then
         local newCellObj = self.cellManager:new (health, 0, superparent, "wall") -- Create default cell object
 
         newCellObj.color = {1, 1, 0, 1}
 
         self.cellGrid[tileX][tileY] = newCellObj
-        -- self.stats.cells[superparent] = self.stats.cells[superparent] + 1
+        self.stats.walls[superparent] = self.stats.walls[superparent] + 1
         
         return true
     else
@@ -781,6 +784,8 @@ function map:deleteCell (tileX, tileY, dropEnergy)
 
         if cellObj.type == "normal" or cellObj.type == "egg" then
             self.stats.cells[cellObj.superparent] = self.stats.cells[cellObj.superparent] - 1
+        elseif cellObj.type == "wall" then
+            self.stats.walls[cellObj.superparent] = self.stats.walls[cellObj.superparent] - 1
         end
     end
 end
