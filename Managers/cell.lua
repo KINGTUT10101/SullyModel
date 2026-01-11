@@ -176,8 +176,8 @@ function cell:init (map, inputs, actions, options)
     self.age.max = options.age.max or 6000
 
     options.reproductionEnergy = options.reproductionEnergy or {}
-    self.reproductionEnergy.min = options.reproductionEnergy.min or 10
-    self.reproductionEnergy.max = options.reproductionEnergy.max or 1000
+    self.reproductionEnergy.min = options.reproductionEnergy.min or 2
+    self.reproductionEnergy.max = options.reproductionEnergy.max or math.ceil ((self.maxEnergy + self.maxHealth) * 0.5)
 
     self.pheromones = options.pheromones or 2
     self.pheromoneTime = options.pheromoneTime or 250

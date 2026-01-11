@@ -6,7 +6,7 @@ local hyperArgs = {
     consume = {
         energyFromTile = 250,
         energyCost = 30,
-        wasteThreshold = math.huge,
+        wasteThreshold = 200,
     },
     applyDamage = {
         damage = 1000,
@@ -98,8 +98,22 @@ local wasteMap = {
 -- WORKS
 function cellActions.consume (tileX, tileY, cellObj, map)
     local itx, ity = map:getForwardPos (tileX, tileY, 1)
-
-    if (map:getInputTile (itx, ity, "waste") or 0) < hyperArgs.consume.wasteThreshold or cellObj.consumes == "waste" then
+    
+    local wasteAtTile = (map:getInputTile (itx, ity, "waste") or 0)
+    local meatAtTile = (map:getInputTile (itx, ity, "meat") or 0)
+    
+    local canEat = false
+    if cellObj.consumes == "waste" then
+        canEat = true
+    elseif cellObj.consumes == "plants" then
+        -- Plant eaters cannot eat if there is too much meat
+        canEat = meatAtTile < hyperArgs.consume.wasteThreshold
+    elseif cellObj.consumes == "meat" then
+        -- Meat eaters cannot eat if there is too much waste
+        canEat = wasteAtTile < hyperArgs.consume.wasteThreshold
+    end
+    
+    if canEat then
         local origResources = map:getCellTotalResources (tileX, tileY)
         map:transferInputToCell (itx, ity, tileX, tileY, cellObj.consumes, hyperArgs.consume.energyFromTile, hyperArgs.consume.energyCost)
     end

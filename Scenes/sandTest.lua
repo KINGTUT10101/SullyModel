@@ -207,14 +207,14 @@ local baseXInput2 = 10000 * love.math.random()
 local baseYInput2 = 10000 * love.math.random()
 local baseXInput3 = 10000 * love.math.random()
 local baseYInput3 = 10000 * love.math.random()
-local maxInput = 500
+local maxInput = 25
 local function mapInput (tileX, tileY)
     -- return (math.random () < 0.10) and maxInput or 0
 
     return{
         meat = 0, -- round (mapToScale (love.math.noise(baseXInput1+.05*tileX, baseYInput1+.02*tileY), 0, 1, 0, maxInput)),
-        plants = round (mapToScale (love.math.noise(baseXInput2+.05*tileX, baseYInput2+.02*tileY), 0, 1, 0, maxInput)),
-        waste = round (mapToScale (love.math.noise(baseXInput3+.05*tileX, baseYInput3+.02*tileY), 0, 1, 0, maxInput)),
+        plants = 0, -- round (mapToScale (love.math.noise(baseXInput2+.05*tileX, baseYInput2+.02*tileY), 0, 1, 0, maxInput)),
+        waste = 0, -- round (mapToScale (love.math.noise(baseXInput3+.05*tileX, baseYInput3+.02*tileY), 0, 1, 0, maxInput)),
     }
 end
 
@@ -272,8 +272,8 @@ function thisScene:load (...)
             layers = 3,
             neuronsPerLayer = 8,
         },
-        maxHealth = 1500,
-        maxEnergy = 1500,
+        maxHealth = 5000,
+        maxEnergy = 5000,
         memVars = 2,
         displayVars = 1,
         tickCost = 1,
@@ -281,32 +281,35 @@ function thisScene:load (...)
             --     min = math.huge,
             --     max = math.huge,
             -- },
-        -- maxCells = 200,
-        maxWalls = 100,
-        maxCells = {
-            100,
-            250,
-            400,
-        },
+        maxCells = math.huge,
+        maxWalls = math.huge,
+        -- maxCells = {
+        --     100,
+        --     250,
+        --     400,
+        -- },
         superparents = superparents,
         consumeOnTick = {
             amount = 15,
             cost = 0,
         },
-        pheromoneTime = 250,
+        pheromoneTime = 500,
         pheromones = 2,
         actionsPerTurn = 3,
         actionThreshold = 0.5,
         canZeroVars = true,
         age = {
             min = 50,
-            max = 8500,
+            max = 20000,
         },
         superparentFoodTypes = {
             "meat",
             "plants",
             "waste",
         },
+        reproductionEnergy = {
+            -- min = 3000,
+        }
     })
     map:init (cell, {
         inputBounds = {
@@ -735,6 +738,27 @@ function thisScene:keypressed (key, scancode, isrepeat)
         else
             print ("Display switched to cells count")
         end
+
+    -- Reduce tile energy by 25%
+    elseif key == "x" then
+        local totalReduction = 0
+        map:getTiles (function (tileX, tileY, envTile)
+            local oldMeat = map:getInputTile (tileX, tileY, "meat")
+            local oldPlants = map:getInputTile (tileX, tileY, "plants")
+            local oldWaste = map:getInputTile (tileX, tileY, "waste")
+            
+            local newMeat = math.floor (oldMeat * 0.75)
+            local newPlants = math.floor (oldPlants * 0.75)
+            local newWaste = math.floor (oldWaste * 0.75)
+            
+            map:setInputTile (tileX, tileY, "meat", newMeat)
+            map:setInputTile (tileX, tileY, "plants", newPlants)
+            map:setInputTile (tileX, tileY, "waste", newWaste)
+            
+            totalReduction = totalReduction + (oldMeat - newMeat) + (oldPlants - newPlants) + (oldWaste - newWaste)
+        end)
+        map.totalEnergy = map.totalEnergy - totalReduction
+        print ("Tile energy reduced by 25% (total reduction: " .. totalReduction .. ")")
     end
 end
 
