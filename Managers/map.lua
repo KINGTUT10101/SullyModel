@@ -69,6 +69,9 @@ local map = {
     totalEnergy = 0,
     stopOnError = true,
     spawnFunc = nil,
+    energyImbalanceMessagesEnabled = true,
+    energyImbalanceLogInterval = 60 * 15,
+    lastEnergyImbalanceLogTime = -math.huge,
 }
 
 function map:quickSave ()
@@ -176,6 +179,7 @@ function map:reset (width, height, mapEnvInputs, mapEnvTypes, mapEnvData)
     self.width, self.height = width, height
 
     self.totalEnergy = 0
+    self.lastEnergyImbalanceLogTime = -math.huge
 
     -- Generates the input grid and input render
     local envGrid = {}
@@ -429,7 +433,11 @@ function map:draw (mode, subMode)
 
     if math.floor (self.totalEnergy) ~= math.floor (totalEnergy) and mode ~= "none" then
         if self.tickSpeed ~= math.huge then
-            print ("Total energy mismatch detected! " .. math.floor (self.totalEnergy) .. " vs " .. math.floor (totalEnergy) .. " (Diff: " .. math.floor (self.totalEnergy) - math.floor (totalEnergy) .. ")") -- Add this back later
+            local now = love.timer.getTime ()
+            if self.energyImbalanceMessagesEnabled == true or (now - self.lastEnergyImbalanceLogTime) >= self.energyImbalanceLogInterval then
+                print ("Total energy mismatch detected! " .. math.floor (self.totalEnergy) .. " vs " .. math.floor (totalEnergy) .. " (Diff: " .. math.floor (self.totalEnergy) - math.floor (totalEnergy) .. ")") -- Add this back later
+                self.lastEnergyImbalanceLogTime = now
+            end
         end
         self.tickSpeed = math.huge
     end

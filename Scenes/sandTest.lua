@@ -677,6 +677,17 @@ function thisScene:keypressed (key, scancode, isrepeat)
     elseif key == "v" then
         print ("Total energy: " .. map.totalEnergy)
 
+    -- Toggle energy imbalance warnings
+    elseif key == "e" then
+        map.energyImbalanceMessagesEnabled = not map.energyImbalanceMessagesEnabled
+
+        if map.energyImbalanceMessagesEnabled == true then
+            print ("Energy imbalance warnings enabled")
+        else
+            map.lastEnergyImbalanceLogTime = love.timer.getTime ()
+            print ("Energy imbalance warnings disabled; periodic reminders every " .. (map.energyImbalanceLogInterval / 60) .. " minutes")
+        end
+
     -- Mutate cell
     elseif key == "o" then
         if love.keyboard.isDown ("lctrl") then
