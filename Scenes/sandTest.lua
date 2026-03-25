@@ -7,6 +7,7 @@ local round = require ("Libraries.lume").round
 local cellActions = require ("Data.cellActions")
 local cellInputs = require ("Data.cellInputs")
 local cycleValue = require ("Helpers.cycleValue")
+local lume = require ("Libraries.lume")
 
 local startTime
 
@@ -295,8 +296,8 @@ function thisScene:load (...)
         },
         pheromoneTime = 500,
         pheromones = 2,
-        actionsPerTurn = 3,
-        actionThreshold = 0.5,
+        actionsPerTurn = lume.count (cellActions),
+        -- actionThreshold = 0.5,
         canZeroVars = true,
         age = {
             min = 50,
@@ -678,7 +679,7 @@ function thisScene:keypressed (key, scancode, isrepeat)
         print ("Total energy: " .. map.totalEnergy)
 
     -- Toggle energy imbalance warnings
-    elseif key == "e" then
+    elseif key == "u" then
         map.energyImbalanceMessagesEnabled = not map.energyImbalanceMessagesEnabled
 
         if map.energyImbalanceMessagesEnabled == true then

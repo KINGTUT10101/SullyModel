@@ -54,7 +54,7 @@ local cell = {
         min = -1,
         max = 1,
     },
-    actionThreshold = 0,
+    -- actionThreshold = 0,
     actionsPerTurn = 1,
     age = {
         min = 0,
@@ -79,7 +79,7 @@ function cell:init (map, inputs, actions, options)
     self.inputs = inputs
     self.actions = actions
 
-    self.actionThreshold = options.actionThreshold or 0.0
+    -- self.actionThreshold = options.actionThreshold or 0.0
     self.actionsPerTurn = options.actionsPerTurn or 1
 
     self.memVars = options.memVars or 2
@@ -170,6 +170,7 @@ function cell:init (map, inputs, actions, options)
     self.initialMutRates.meta = clamp (options.initialMutRates.meta or 5, self.minMutRate, 100)
     self.initialMutRates.age = clamp (options.initialMutRates.age or 10, self.minMutRate, 100)
     self.initialMutRates.reproductionEnergy = clamp (options.initialMutRates.reproductionEnergy or 10, self.minMutRate, 100)
+    self.initialMutRates.actionThreshold = clamp (options.initialMutRates.actionThreshold or 25, self.minMutRate, 100)
 
     options.age = options.age or {}
     self.age.min = options.age.min or 50
@@ -215,6 +216,7 @@ function cell:new (health, energy, superparent, type)
         maxAge = self.age.max * 0.5,
         reproductionEnergy = self.reproductionEnergy.max * 0.5,
         consumes = self.superparentFoodTypes[superparent],
+        actionThreshold = 0.95,
     }
 
     -- Initializes the cell's network
@@ -223,32 +225,33 @@ function cell:new (health, energy, superparent, type)
         newCell.network:addHidden (inputID, Neuron:new (actFuncs.identity), 1)
     end
 
+    -- Output neurons
     local finalLayerIndex = self.network.layers + 2
     for i = 1, self.memVars do
         newCell.network:addHidden ("getMem" .. i, Neuron:new (actFuncs.identity), 1)
-        newCell.network:addHidden ("memIncr" .. i, Neuron:new (actFuncs.identity), finalLayerIndex)
-        newCell.network:addHidden ("memDecr" .. i, Neuron:new (actFuncs.identity), finalLayerIndex)
+        newCell.network:addHidden ("memIncr" .. i, Neuron:new (actFuncs.tanh), finalLayerIndex)
+        newCell.network:addHidden ("memDecr" .. i, Neuron:new (actFuncs.tanh), finalLayerIndex)
 
         if self.canZeroVars == true then
-            newCell.network:addHidden ("memZero" .. i, Neuron:new (actFuncs.identity), finalLayerIndex)
+            newCell.network:addHidden ("memZero" .. i, Neuron:new (actFuncs.tanh), finalLayerIndex)
         end
     end
     for i = 1, self.displayVars do
-        newCell.network:addHidden ("disIncr" .. i, Neuron:new (actFuncs.identity), finalLayerIndex)
-        newCell.network:addHidden ("disDecr" .. i, Neuron:new (actFuncs.identity), finalLayerIndex)
+        newCell.network:addHidden ("disIncr" .. i, Neuron:new (actFuncs.tanh), finalLayerIndex)
+        newCell.network:addHidden ("disDecr" .. i, Neuron:new (actFuncs.tanh), finalLayerIndex)
         newCell.network:addHidden ("getDis" .. i, Neuron:new (actFuncs.identity), 1)
 
         if self.canZeroVars == true then
-            newCell.network:addHidden ("disZero" .. i, Neuron:new (actFuncs.identity), finalLayerIndex)
+            newCell.network:addHidden ("disZero" .. i, Neuron:new (actFuncs.tanh), finalLayerIndex)
         end
     end
     for i = 1, self.pheromones do
-        newCell.network:addHidden ("emitPhero" .. i, Neuron:new (actFuncs.identity), finalLayerIndex)
+        newCell.network:addHidden ("emitPhero" .. i, Neuron:new (actFuncs.tanh), finalLayerIndex)
         newCell.network:addHidden ("getPhero" .. i, Neuron:new (actFuncs.identity), 1)
     end
     for actionID, _ in pairs (self.actions) do
         -- Output layer: identity activation produces logits for softmax (or raw scores)
-        newCell.network:addHidden (actionID, Neuron:new (actFuncs.identity), finalLayerIndex)
+        newCell.network:addHidden (actionID, Neuron:new (actFuncs.tanh), finalLayerIndex)
     end
     for i = 1, self.network.layers do
         local newNeuron = Neuron:new(actFuncs.leaky()) -- Call the factory to get the actual function
@@ -411,7 +414,7 @@ function cell:update (tileX, tileY, cellObj, map)
 
                 local outputValue = outputs[i][2]
 
-                if outputValue > self.actionThreshold then
+                if outputValue > cellObj.actionThreshold then
                     local outputKey = outputs[i][1]
 
                     -- -- TEMP
