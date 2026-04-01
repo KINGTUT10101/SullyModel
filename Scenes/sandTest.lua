@@ -186,6 +186,8 @@ local renderModeIndex = 1
 local validModes = {
     "normal",
     "superparents",
+    "normalEnergyOpacity",
+    "superparentsEnergyOpacity",
     "energy",
     "health",
     "total",
@@ -196,7 +198,9 @@ local renderSubModeIndex = 1
 local validSubModes = {
     "normal",
     "data",
+    "energyOnly",
     "pheromones",
+    "pheromonesOpacity",
     "inputDisabled",
     "barriersDisabled",
     "allDisabled",
@@ -329,6 +333,14 @@ function thisScene:load (...)
             waste = {
                 min = 0,
                 max = 2500,
+            },
+            energy = {
+                min = 0,
+                max = 5000,
+            },
+            pheromones = {
+                min = 0,
+                max = 500,
             },
         },
         dataBounds = {

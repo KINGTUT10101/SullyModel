@@ -49,6 +49,14 @@ local map = {
             min = 0,
             max = 0,
         },
+        energy = {
+            min = 0,
+            max = 0,
+        },
+        pheromones = {
+            min = 0,
+            max = 0,
+        },
     },
     dataBounds = {
         min = 0,
@@ -149,6 +157,20 @@ function map:init (cellManager, options)
         self.drawBounds[type].min = options.drawBounds[type].min or 0
         self.drawBounds[type].max = options.drawBounds[type].max or 500
     end
+    local defaultEnergyDrawMax = (type (self.cellManager.maxEnergy) == "number" and self.cellManager.maxEnergy < math.huge and self.cellManager.maxEnergy > 0)
+        and self.cellManager.maxEnergy
+        or math.max (self.cellManager.maxHealth or 0, 1000)
+    local defaultPheromoneDrawMax = (type (self.cellManager.pheromoneTime) == "number" and self.cellManager.pheromoneTime > 0)
+        and self.cellManager.pheromoneTime
+        or 500
+
+    options.drawBounds.energy = options.drawBounds.energy or {}
+    self.drawBounds.energy.min = options.drawBounds.energy.min or 0
+    self.drawBounds.energy.max = options.drawBounds.energy.max or defaultEnergyDrawMax
+
+    options.drawBounds.pheromones = options.drawBounds.pheromones or {}
+    self.drawBounds.pheromones.min = options.drawBounds.pheromones.min or 0
+    self.drawBounds.pheromones.max = options.drawBounds.pheromones.max or defaultPheromoneDrawMax
 
     options.dataBounds = options.dataBounds or {}
     self.dataBounds.min = options.dataBounds.min or self.inputBounds.min
@@ -317,6 +339,8 @@ end
 local validModes = {
     normal = true,
     superparents = true,
+    normalEnergyOpacity = true,
+    superparentsEnergyOpacity = true,
     energy = true,
     health = true,
     total = true,
@@ -326,7 +350,9 @@ local validModes = {
 local validSubModes = {
     normal = true,
     data = true,
+    energyOnly = true,
     pheromones = true,
+    pheromonesOpacity = true,
     inputDisabled = true,
     barriersDisabled = true,
     allDisabled = true,
@@ -339,6 +365,22 @@ function map:draw (mode, subMode)
 
     local maxEnergy = self.cellManager.maxEnergy
     local maxHealth = self.cellManager.maxHealth
+    local function scaleToAlpha (value, minValue, maxValue)
+        if type (value) ~= "number" then
+            return 0
+        end
+        if value == math.huge then
+            value = maxValue
+        elseif value == -math.huge then
+            value = minValue
+        end
+
+        if maxValue <= minValue then
+            return (value > minValue) and 1 or 0
+        end
+
+        return clamp (mapToScale (value, minValue, maxValue, 0, 1), 0, 1)
+    end
 
     love.graphics.push ()
     love.graphics.translate (-self.camera.x, -self.camera.y)
@@ -374,6 +416,21 @@ function map:draw (mode, subMode)
                         love.graphics.setColor (cellObj.color)
                         love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
                     end
+                elseif mode == "normalEnergyOpacity" then
+                    local alpha = scaleToAlpha (cellObj.energy, self.drawBounds.energy.min, self.drawBounds.energy.max)
+                    local color = cellObj.color
+                    love.graphics.setColor (color[1], color[2], color[3], alpha)
+                    love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
+                elseif mode == "superparentsEnergyOpacity" then
+                    local alpha = scaleToAlpha (cellObj.energy, self.drawBounds.energy.min, self.drawBounds.energy.max)
+                    if cellObj.type == "normal" then
+                        local color = self.superparentColors[cellObj.superparent]
+                        love.graphics.setColor (color[1], color[2], color[3], alpha)
+                    else
+                        local color = cellObj.color
+                        love.graphics.setColor (color[1], color[2], color[3], alpha)
+                    end
+                    love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
                 elseif mode == "energy" then
                     local cellEnergyPercent = cellObj.energy / maxEnergy
                     love.graphics.setColor (0, cellEnergyPercent, 0, 1)
@@ -391,7 +448,7 @@ function map:draw (mode, subMode)
                     love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
                 end
 
-            elseif subMode == "pheromones" and envTile.type == "blank" then
+            elseif (subMode == "pheromones" or subMode == "pheromonesOpacity") and envTile.type == "blank" then
                 -- Render the strongest pheromone
                 local strongestPhero, highestValue = 0, 0
                 for k = 1, self.cellManager.pheromones do
@@ -401,7 +458,13 @@ function map:draw (mode, subMode)
                     end
                 end
 
-                love.graphics.setColor (self.pheromoneColors[strongestPhero])
+                local color = self.pheromoneColors[strongestPhero]
+                if subMode == "pheromonesOpacity" then
+                    local alpha = scaleToAlpha (highestValue, self.drawBounds.pheromones.min, self.drawBounds.pheromones.max)
+                    love.graphics.setColor (color[1], color[2], color[3], alpha)
+                else
+                    love.graphics.setColor (color)
+                end
                 love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
 
             elseif envTile.type ~= "blank" and subMode ~= "barriersDisabled" and subMode ~= "allDisabled" then
@@ -414,6 +477,12 @@ function map:draw (mode, subMode)
                 local r, g, b
                 if subMode == "data" then
                     local scaledColor = mapToScale (envTile.data, self.dataBounds.min, self.dataBounds.max, 0, 1)
+                    r, g, b = scaledColor, scaledColor, scaledColor
+                elseif subMode == "energyOnly" then
+                    local totalInput = envTile.input.meat + envTile.input.plants + envTile.input.waste
+                    local minInput = self.drawBounds.meat.min + self.drawBounds.plants.min + self.drawBounds.waste.min
+                    local maxInput = self.drawBounds.meat.max + self.drawBounds.plants.max + self.drawBounds.waste.max
+                    local scaledColor = mapToScale (totalInput, minInput, maxInput, 0, 1)
                     r, g, b = scaledColor, scaledColor, scaledColor
                 else
                     local input = envTile.input
