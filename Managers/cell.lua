@@ -324,8 +324,9 @@ function cell:update (tileX, tileY, cellObj, map)
             inputs["getMem" .. i] = mapToScale (cellObj.vars[i], self.varBounds.min, self.varBounds.max, -1, 1)
         end
         local envTile = map.envGrid[tileX][tileY]
-        for i = 1, self.memVars do
-            inputs["getPhero" .. i] = (envTile.pheromones[i] > 0) and 1 or -1
+        for i = 1, self.pheromones do
+            local pheromoneValue = (envTile.pheromones and envTile.pheromones[i]) or 0
+            inputs["getPhero" .. i] = (pheromoneValue > 0) and 1 or -1
         end
         for i = 1, self.displayVars do
             local otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)

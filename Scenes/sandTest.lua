@@ -338,19 +338,19 @@ end
 function thisScene:load (...)
     cell:init (map, cellInputs, cellActions, {
         network = {
-            layers = 3,
-            neuronsPerLayer = 8,
+            layers = 6,
+            neuronsPerLayer = 10,
         },
         maxHealth = 5000,
         maxEnergy = 5000,
-        memVars = 2,
-        displayVars = 1,
+        memVars = 6,
+        displayVars = 2,
         tickCost = 1,
         -- cellAge = {
             --     min = math.huge,
             --     max = math.huge,
             -- },
-        maxCells = math.huge,
+        maxCells = 150,
         maxWalls = math.huge,
         -- maxCells = {
         --     100,
