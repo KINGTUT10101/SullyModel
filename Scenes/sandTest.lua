@@ -829,6 +829,32 @@ function thisScene:keypressed (key, scancode, isrepeat)
             end
         end
 
+    -- Prints pheromone levels at the cursor tile
+    elseif key == "p" then
+        local tileX, tileY = map:screenToMap (love.mouse.getPosition ())
+        local pheromones = map:getEnvValue (tileX, tileY, "pheromones")
+
+        if pheromones ~= nil then
+            print ("Pheromones @ (" .. tileX .. ", " .. tileY .. "):")
+
+            local strongestIndex = 0
+            local strongestValue = 0
+            for i = 1, cell.pheromones do
+                local value = pheromones[i] or 0
+                if value > strongestValue then
+                    strongestValue = value
+                    strongestIndex = i
+                end
+
+                print ("  P" .. i .. ": " .. value)
+            end
+
+            print ("  Strongest: " .. strongestIndex .. " (" .. strongestValue .. ")")
+            print ()
+        else
+            print ("No tile at (" .. tileX .. ", " .. tileY .. ")")
+        end
+
     -- Quick saves
     elseif key == "g" then
         map:quickSave ()

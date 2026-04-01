@@ -393,6 +393,14 @@ local validSubModes = {
     barriersDisabled = true,
     allDisabled = true,
 }
+
+local blackBackgroundModes = {
+    energy = true,
+    health = true,
+    total = true,
+    one = true,
+}
+
 function map:draw (mode, subMode)
     mode = mode or "normal"
 
@@ -453,18 +461,18 @@ function map:draw (mode, subMode)
                         love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
                     end
                 elseif mode == "normalEnergyOpacity" then
-                    local alpha = scaleToAlpha (cellObj.energy, self.drawBounds.energy.min, self.drawBounds.energy.max)
+                    local intensity = scaleToAlpha (cellObj.energy, self.drawBounds.energy.min, self.drawBounds.energy.max)
                     local color = cellObj.color
-                    love.graphics.setColor (color[1], color[2], color[3], alpha)
+                    love.graphics.setColor (color[1] * intensity, color[2] * intensity, color[3] * intensity, 1)
                     love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
                 elseif mode == "superparentsEnergyOpacity" then
-                    local alpha = scaleToAlpha (cellObj.energy, self.drawBounds.energy.min, self.drawBounds.energy.max)
+                    local intensity = scaleToAlpha (cellObj.energy, self.drawBounds.energy.min, self.drawBounds.energy.max)
                     if cellObj.type == "normal" then
                         local color = self.superparentColors[cellObj.superparent]
-                        love.graphics.setColor (color[1], color[2], color[3], alpha)
+                        love.graphics.setColor (color[1] * intensity, color[2] * intensity, color[3] * intensity, 1)
                     else
                         local color = cellObj.color
-                        love.graphics.setColor (color[1], color[2], color[3], alpha)
+                        love.graphics.setColor (color[1] * intensity, color[2] * intensity, color[3] * intensity, 1)
                     end
                     love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
                 elseif mode == "energy" then
@@ -496,8 +504,8 @@ function map:draw (mode, subMode)
 
                 local color = self.pheromoneColors[strongestPhero]
                 if subMode == "pheromonesOpacity" then
-                    local alpha = scaleToAlpha (highestValue, self.drawBounds.pheromones.min, self.drawBounds.pheromones.max)
-                    love.graphics.setColor (color[1], color[2], color[3], alpha)
+                    local intensity = scaleToAlpha (highestValue, self.drawBounds.pheromones.min, self.drawBounds.pheromones.max)
+                    love.graphics.setColor (color[1] * intensity, color[2] * intensity, color[3] * intensity, 1)
                 else
                     love.graphics.setColor (color)
                 end
@@ -506,6 +514,11 @@ function map:draw (mode, subMode)
             elseif envTile.type ~= "blank" and subMode ~= "barriersDisabled" and subMode ~= "allDisabled" then
                 -- Render barrier (assume this is the only other tile type right now)
                 love.graphics.setColor ({1, 0, 0, 1})
+                love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
+
+            elseif blackBackgroundModes[mode] == true and subMode == "normal" then
+                -- In cell energy-focused modes, empty tiles default to black for contrast.
+                love.graphics.setColor (0, 0, 0, 1)
                 love.graphics.rectangle ("fill", i - 1, j - 1, 1, 1)
 
             elseif subMode ~= "inputDisabled" and subMode ~= "allDisabled" then
