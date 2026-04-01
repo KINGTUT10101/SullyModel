@@ -197,8 +197,9 @@ end
 
 local validFoodTypes = {
     meat = true,
-    plant = true,
+    plants = true,
     waste = true,
+    any = true,
 }
 --- Generates a default cell with no actions
 --- @return table cellObj The new default cell object

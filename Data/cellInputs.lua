@@ -1,6 +1,12 @@
 local mapToScale = require ("Helpers.mapToScale")
 
 local cellInputs = {}
+local consumableFoodTypes = {
+    "meat",
+    "plants",
+    "waste",
+    "any",
+}
 
 function cellInputs.energy (tileX, tileY, cellObj, map)
     return mapToScale (cellObj.energy, 0, map.cellManager.maxEnergy, -1, 1)
@@ -44,6 +50,24 @@ end
 function cellInputs.getTileEnergy (tileX, tileY, cellObj, map)
     local itx, ity = map:getForwardPos (tileX, tileY, 1)
     local foodType = cellObj.consumes
+
+    if foodType == "any" then
+        local totalInput = 0
+        local minInput = 0
+        local maxInput = 0
+
+        for i = 1, #consumableFoodTypes do
+            local currFoodType = consumableFoodTypes[i]
+            local bounds = map.inputBounds[currFoodType]
+            if bounds ~= nil then
+                totalInput = totalInput + (map:getInputTile (itx, ity, currFoodType) or 0)
+                minInput = minInput + bounds.min
+                maxInput = maxInput + bounds.max
+            end
+        end
+
+        return mapToScale (totalInput, minInput, maxInput, -1, 1)
+    end
     
     return mapToScale (map:getInputTile (itx, ity, foodType) or 0, map.inputBounds[foodType].min, map.inputBounds[foodType].max, -1, 1)
 end

@@ -99,11 +99,14 @@ local wasteMap = {
 function cellActions.consume (tileX, tileY, cellObj, map)
     local itx, ity = map:getForwardPos (tileX, tileY, 1)
     
+    local anyAtTile = (map:getInputTile (itx, ity, "any") or 0)
     local wasteAtTile = (map:getInputTile (itx, ity, "waste") or 0)
     local meatAtTile = (map:getInputTile (itx, ity, "meat") or 0)
     
     local canEat = false
-    if cellObj.consumes == "waste" then
+    if anyAtTile > 0 or cellObj.consumes == "any" then
+        canEat = true
+    elseif cellObj.consumes == "waste" then
         canEat = true
     elseif cellObj.consumes == "plants" then
         -- Plant eaters cannot eat if there is too much meat

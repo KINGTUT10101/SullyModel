@@ -549,6 +549,7 @@ function thisScene:draw ()
         meat = "M",
         plants = "P",
         waste = "W",
+        any = "A",
     }
     for superparent = 1, superparents do
         love.graphics.setColor (0, 0, 0, 0.75)
@@ -623,6 +624,7 @@ function thisScene:draw ()
         meat = "M",
         plants = "P",
         waste = "W",
+        any = "A",
     }
     local totalWidth = superparents * colorBoxSize + (superparents - 1) * colorBoxSpacing
     local startX = (love.graphics.getWidth() - totalWidth) / 2

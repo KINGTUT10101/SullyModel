@@ -35,6 +35,10 @@ local map = {
             min = 0,
             max = 0,
         },
+        any = {
+            min = 0,
+            max = 0,
+        },
     },
     drawBounds = {
         meat = {
@@ -46,6 +50,10 @@ local map = {
             max = 0,
         },
         waste = {
+            min = 0,
+            max = 0,
+        },
+        any = {
             min = 0,
             max = 0,
         },
@@ -116,7 +124,30 @@ local foodTypes = {
     "meat",
     "plants",
     "waste",
+    "any",
 }
+
+local function sumInputEnergy (input)
+    local total = 0
+    for i = 1, #foodTypes do
+        local foodType = foodTypes[i]
+        total = total + (input[foodType] or 0)
+    end
+
+    return total
+end
+
+local function normalizeInputTile (rawInput)
+    local input = rawInput or {}
+    local normalized = {}
+
+    for i = 1, #foodTypes do
+        local foodType = foodTypes[i]
+        normalized[foodType] = input[foodType] or 0
+    end
+
+    return normalized
+end
 --- Initializes the map manager and prepares it for processing.
 function map:init (cellManager, options)
     options = options or {}
@@ -139,8 +170,9 @@ function map:init (cellManager, options)
         end
     end
     for index, type in ipairs (foodTypes) do
-        self.inputBounds[type].min = options.inputBounds[type].min or 0
-        self.inputBounds[type].max = options.inputBounds[type].max or 500
+        local typeBounds = options.inputBounds[type] or {}
+        self.inputBounds[type].min = typeBounds.min or 0
+        self.inputBounds[type].max = typeBounds.max or 500
     end
 
     options.drawBounds = options.drawBounds or {}
@@ -154,8 +186,9 @@ function map:init (cellManager, options)
         end
     end
     for index, type in ipairs (foodTypes) do
-        self.drawBounds[type].min = options.drawBounds[type].min or 0
-        self.drawBounds[type].max = options.drawBounds[type].max or 500
+        local typeBounds = options.drawBounds[type] or {}
+        self.drawBounds[type].min = typeBounds.min or 0
+        self.drawBounds[type].max = typeBounds.max or 500
     end
     local defaultEnergyDrawMax = (type (self.cellManager.maxEnergy) == "number" and self.cellManager.maxEnergy < math.huge and self.cellManager.maxEnergy > 0)
         and self.cellManager.maxEnergy
@@ -215,11 +248,7 @@ function map:reset (width, height, mapEnvInputs, mapEnvTypes, mapEnvData)
 
         for j = 1, self.height do
             local envTile = {
-                input = {
-                    meat = 0,
-                    plants = 0,
-                    waste = 0,
-                },
+                input = normalizeInputTile (),
                 type = "blank",
                 data = 0,
                 pheromones = {},
@@ -230,8 +259,8 @@ function map:reset (width, height, mapEnvInputs, mapEnvTypes, mapEnvData)
             end
 
             if mapEnvInputs ~= nil then
-                envTile.input = mapEnvInputs (i, j)
-                self.totalEnergy = self.totalEnergy + envTile.input.meat + envTile.input.plants + envTile.input.waste
+                envTile.input = normalizeInputTile (mapEnvInputs (i, j))
+                self.totalEnergy = self.totalEnergy + sumInputEnergy (envTile.input)
             end
 
             if mapEnvTypes ~= nil then
@@ -398,7 +427,7 @@ function map:draw (mode, subMode)
             local cellObj = cellRow[j]
             local envTile = envRow[j]
 
-            totalEnergy = totalEnergy + envTile.input.meat + envTile.input.plants + envTile.input.waste
+            totalEnergy = totalEnergy + sumInputEnergy (envTile.input)
 
             -- Check what exists at the current position to determine what to render
             if cellObj ~= nil and mode ~= "none" then
@@ -479,16 +508,17 @@ function map:draw (mode, subMode)
                     local scaledColor = mapToScale (envTile.data, self.dataBounds.min, self.dataBounds.max, 0, 1)
                     r, g, b = scaledColor, scaledColor, scaledColor
                 elseif subMode == "energyOnly" then
-                    local totalInput = envTile.input.meat + envTile.input.plants + envTile.input.waste
-                    local minInput = self.drawBounds.meat.min + self.drawBounds.plants.min + self.drawBounds.waste.min
-                    local maxInput = self.drawBounds.meat.max + self.drawBounds.plants.max + self.drawBounds.waste.max
+                    local totalInput = sumInputEnergy (envTile.input)
+                    local minInput = self.drawBounds.meat.min + self.drawBounds.plants.min + self.drawBounds.waste.min + self.drawBounds.any.min
+                    local maxInput = self.drawBounds.meat.max + self.drawBounds.plants.max + self.drawBounds.waste.max + self.drawBounds.any.max
                     local scaledColor = mapToScale (totalInput, minInput, maxInput, 0, 1)
                     r, g, b = scaledColor, scaledColor, scaledColor
                 else
                     local input = envTile.input
-                    r = mapToScale (input.meat, self.drawBounds.meat.min, self.drawBounds.meat.max, 0, 1)
-                    g = mapToScale (input.plants, self.drawBounds.plants.min, self.drawBounds.plants.max, 0, 1)
-                    b = mapToScale (input.waste, self.drawBounds.waste.min, self.drawBounds.waste.max, 0, 1)
+                    local anyScaled = mapToScale (input.any, self.drawBounds.any.min, self.drawBounds.any.max, 0, 1)
+                    r = clamp (mapToScale (input.meat, self.drawBounds.meat.min, self.drawBounds.meat.max, 0, 1) + anyScaled, 0, 1)
+                    g = clamp (mapToScale (input.plants, self.drawBounds.plants.min, self.drawBounds.plants.max, 0, 1) + anyScaled, 0, 1)
+                    b = clamp (mapToScale (input.waste, self.drawBounds.waste.min, self.drawBounds.waste.max, 0, 1) + anyScaled, 0, 1)
                 end
 
                 love.graphics.setColor (r, g, b, 1)
@@ -569,7 +599,7 @@ function map:checkEnergyBalance ()
             local cellObj = cellRow[j]
             local envTile = envRow[j]
 
-            totalEnergy = totalEnergy + envTile.input.meat + envTile.input.plants + envTile.input.waste
+            totalEnergy = totalEnergy + sumInputEnergy (envTile.input)
 
             if cellObj ~= nil then
                 totalEnergy = totalEnergy + cellObj.wasteBuffer + cellObj.energy + cellObj.health
@@ -841,6 +871,7 @@ local wasteMap = {
     meat = "waste",
     plants = "waste",
     waste = "plants",
+    any = "any",
 }
 
 --- Removes a cell object from the map.
@@ -917,7 +948,29 @@ end
 
 function map:transferInputToCell (tileX, tileY, cellTileX, cellTileY, foodType, amount, cost)
     if self:inBounds (cellTileX, cellTileY) == true then
+        local resolvedFoodType = foodType
         local inputVal = self:getInputTile (tileX, tileY, foodType) or 0
+        local anyInputVal = self:getInputTile (tileX, tileY, "any") or 0
+
+        if foodType == "any" then
+            local bestType = "any"
+            local bestValue = anyInputVal
+            for i = 1, #foodTypes do
+                local currType = foodTypes[i]
+                local currValue = self:getInputTile (tileX, tileY, currType) or 0
+                if currValue > bestValue then
+                    bestType = currType
+                    bestValue = currValue
+                end
+            end
+
+            resolvedFoodType = bestType
+            inputVal = bestValue
+        elseif inputVal <= 0 and anyInputVal > 0 then
+            resolvedFoodType = "any"
+            inputVal = anyInputVal
+        end
+
         local maxEnergy = self.cellManager.maxEnergy
 
         local origInput = inputVal
@@ -945,7 +998,7 @@ function map:transferInputToCell (tileX, tileY, cellTileX, cellTileY, foodType, 
             end
 
             self:adjustCellEnergy (cellTileX, cellTileY, -cost)
-            self:setInputTile (tileX, tileY, foodType, inputVal)
+            self:setInputTile (tileX, tileY, resolvedFoodType, inputVal)
         end
 
         -- assert (origInput + origTotalEnergy == (self:getInputTile (tileX, tileY, foodType) or 0) + cellObj.totalEnergy, "Energy conservation violated in transferInputToCell. " .. tostring(origInput) .. " + " .. tostring(origTotalEnergy) .. " != " .. tostring(self:getInputTile (tileX, tileY, foodType)) .. " + " .. tostring(cellObj.totalEnergy) .. ")")
