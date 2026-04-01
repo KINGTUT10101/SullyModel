@@ -154,7 +154,7 @@ function cellActions.applyDamage (tileX, tileY, cellObj, map)
         if map:isTaken (enemyTileX, enemyTileY) == true then
             local enemyCell = map.cellGrid[enemyTileX][enemyTileY]
             local origEnemyHealth = enemyCell.health
-            map:adjustCellHealth (enemyTileX, enemyTileY, -damage, false)
+            map:adjustCellHealth (enemyTileX, enemyTileY, -damage, false, "cell", cellObj.superparent)
 
             -- Credit the environment with the exact health lost, even on kill
             local newHealth = math.max (enemyCell.health or 0, 0)

@@ -182,6 +182,7 @@ local failsafeMutations = {
 
 local renderMap = true
 local showWalls = false
+local showSuperparentKills = false
 local renderModeIndex = 1
 local validModes = {
     "normal",
@@ -544,6 +545,17 @@ function thisScene:draw ()
     love.graphics.setColor (1, 1, 1, 1)
     love.graphics.printf ("Cycles: (*): " .. totalCycles, 15, 85, 150, "left")
 
+    -- Show death counters
+    love.graphics.setColor (0, 0, 0, 0.75)
+    love.graphics.rectangle ("fill", 10, 115, 180, 25)
+    love.graphics.setColor (1, 1, 1, 1)
+    love.graphics.printf ("Deaths: " .. map.stats.totalCellDeaths, 15, 120, 180, "left")
+
+    love.graphics.setColor (0, 0, 0, 0.75)
+    love.graphics.rectangle ("fill", 10, 150, 180, 25)
+    love.graphics.setColor (1, 1, 1, 1)
+    love.graphics.printf ("Cell Kills: " .. map.stats.cellVsCellDeaths, 15, 155, 180, "left")
+
     -- Ticks since last fail for each superparent
     local foodMap = {
         meat = "M",
@@ -553,9 +565,9 @@ function thisScene:draw ()
     }
     for superparent = 1, superparents do
         love.graphics.setColor (0, 0, 0, 0.75)
-        love.graphics.rectangle ("fill", 10, 115 + (superparent - 1) * 35, 150, 25)
+        love.graphics.rectangle ("fill", 10, 185 + (superparent - 1) * 35, 150, 25)
         love.graphics.setColor (1, 1, 1, 1)
-        love.graphics.printf ("Cycles (" .. superparent .. ", " .. foodMap[cell.superparentFoodTypes[superparent]] .. "): " .. cyclesSinceLastFail[superparent], 15, 120 + (superparent - 1) * 35, 150, "left")
+        love.graphics.printf ("Cycles (" .. superparent .. ", " .. foodMap[cell.superparentFoodTypes[superparent]] .. "): " .. cyclesSinceLastFail[superparent], 15, 190 + (superparent - 1) * 35, 150, "left")
     end
 
     -- Show number of cells or walls
@@ -594,6 +606,16 @@ function thisScene:draw ()
             love.graphics.printf ("Walls (" .. superparent .. "): " .. map.stats.walls[superparent], 710, cellsBaseY + 5 + (superparent - 1) * 35, 85, "left")
         else
             love.graphics.printf ("Cells (" .. superparent .. "): " .. map.stats.cells[superparent], 710, cellsBaseY + 5 + (superparent - 1) * 35, 85, "left")
+        end
+    end
+
+    if showSuperparentKills == true then
+        local killsBaseY = cellsBaseY + superparents * 35
+        for superparent = 1, superparents do
+            love.graphics.setColor (0, 0, 0, 0.75)
+            love.graphics.rectangle ("fill", 705, killsBaseY + (superparent - 1) * 35, 90, 25)
+            love.graphics.setColor (1, 1, 1, 1)
+            love.graphics.printf ("Kills (" .. superparent .. "): " .. map.stats.kills[superparent], 710, killsBaseY + 5 + (superparent - 1) * 35, 85, "left")
         end
     end
 
@@ -653,7 +675,7 @@ function thisScene:keypressed (key, scancode, isrepeat)
     -- Kills  a cell in the map
     if key == "k" then
         local tileX, tileY = map:screenToMap (love.mouse.getPosition ())
-        map:deleteCell (tileX, tileY)
+        map:deleteCell (tileX, tileY, true)
 
     -- Prints an input tile's value
     elseif key == "i" then
@@ -764,6 +786,11 @@ function thisScene:keypressed (key, scancode, isrepeat)
         else
             print ("Display switched to cells count")
         end
+
+    -- Toggle superparent kill count display
+    elseif key == "j" then
+        showSuperparentKills = not showSuperparentKills
+        print ("Superparent kill display: " .. tostring (showSuperparentKills))
 
     -- Reduce tile energy by 25%
     elseif key == "x" then

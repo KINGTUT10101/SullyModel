@@ -75,6 +75,9 @@ local map = {
     stats = {
         cells = {},
         walls = {},
+        totalCellDeaths = 0,
+        cellVsCellDeaths = 0,
+        kills = {},
     },
     ticksBetweenSaves = 0,
     lastSave = 0,
@@ -214,6 +217,7 @@ function map:init (cellManager, options)
     for i = 1, self.cellManager.superparents do
         self.stats.cells[i] = 0
         self.stats.walls[i] = 0
+        self.stats.kills[i] = 0
         self.superparentColors[i] = {math.random(), math.random(), math.random(), 1}
     end
     for i = 1, self.cellManager.pheromones do
@@ -283,7 +287,10 @@ function map:reset (width, height, mapEnvInputs, mapEnvTypes, mapEnvData)
     for i = 1, self.cellManager.superparents do
         self.stats.cells[i] = 0
         self.stats.walls[i] = 0
+        self.stats.kills[i] = 0
     end
+    self.stats.totalCellDeaths = 0
+    self.stats.cellVsCellDeaths = 0
     -- self.inputRender = love.graphics.newImage (inputRender)
     -- self.inputRender:setFilter ("nearest", "nearest")
 end
@@ -877,8 +884,10 @@ local wasteMap = {
 --- Removes a cell object from the map.
 --- @param tileX integer The horizontal map position.
 --- @param tileY integer The vertical map position.
---- @param dropEnergy boolean If true, the energy from the deleted cell will be added to the environment
-function map:deleteCell (tileX, tileY, dropEnergy)
+--- @param dropEnergy? boolean If true, the energy from the deleted cell will be added to the environment
+--- @param deathCause? string Optional death cause. Use "cell" for deaths caused by another cell.
+--- @param killerSuperparent? integer Optional superparent that gets credit for the kill.
+function map:deleteCell (tileX, tileY, dropEnergy, deathCause, killerSuperparent)
     if self:isTaken (tileX, tileY) == true then
         local cellObj = self.cellGrid[tileX][tileY]
 
@@ -892,6 +901,16 @@ function map:deleteCell (tileX, tileY, dropEnergy)
 
         if cellObj.type == "normal" or cellObj.type == "egg" then
             self.stats.cells[cellObj.superparent] = self.stats.cells[cellObj.superparent] - 1
+
+            self.stats.totalCellDeaths = self.stats.totalCellDeaths + 1
+
+            if deathCause == "cell" then
+                self.stats.cellVsCellDeaths = self.stats.cellVsCellDeaths + 1
+
+                if killerSuperparent ~= nil and self.stats.kills[killerSuperparent] ~= nil then
+                    self.stats.kills[killerSuperparent] = self.stats.kills[killerSuperparent] + 1
+                end
+            end
         elseif cellObj.type == "wall" then
             self.stats.walls[cellObj.superparent] = self.stats.walls[cellObj.superparent] - 1
         end
@@ -1028,7 +1047,7 @@ function map:shareInputToCell (tileX1, tileY1, tileX2, tileY2, amount, cost)
         end
 
         if currCellObj.energy <= 0 then
-            self:deleteCell (tileX1, tileY1)
+            self:deleteCell (tileX1, tileY1, true)
         end
     end
 end
@@ -1058,7 +1077,7 @@ function map:adjustCellEnergy (tileX, tileY, amount, updateWasteBuffer)
     end
 end
 
-function map:adjustCellHealth (tileX, tileY, amount, updateWasteBuffer)
+function map:adjustCellHealth (tileX, tileY, amount, updateWasteBuffer, deathCause, killerSuperparent)
     if updateWasteBuffer == nil then
         updateWasteBuffer = true
     end
@@ -1073,7 +1092,7 @@ function map:adjustCellHealth (tileX, tileY, amount, updateWasteBuffer)
         end
 
         if cell.health <= 0 then
-            self:deleteCell (tileX, tileY)
+            self:deleteCell (tileX, tileY, true, deathCause, killerSuperparent)
         end
     end
 end

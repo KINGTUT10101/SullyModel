@@ -303,7 +303,7 @@ function cell:update (tileX, tileY, cellObj, map)
     
     if cellObj.health <= 0 or cellObj.ticksLeft <= 0 then
         -- Delete cell
-        self.map:deleteCell (tileX, tileY)
+        self.map:deleteCell (tileX, tileY, true)
 
     elseif cellObj.type == "normal" then
         -- Gather input values
