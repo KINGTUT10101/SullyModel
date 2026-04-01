@@ -197,7 +197,7 @@ function mutationHandlers.reproductionEnergy(cellObj)
 end
 
 function mutationHandlers.actionThreshold (cellObj)
-    local changeAmount = lume.randomchoice ({-1, 1}) * (math.random (1, 10) / 100)
+    local changeAmount = lume.randomchoice ({-1, 1}) * (math.random (1, 25) / 100)
 
     cellObj.actionThreshold = lume.clamp (cellObj.actionThreshold + changeAmount, -1, 1)
 end
