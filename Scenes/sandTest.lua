@@ -6,7 +6,6 @@ local mapToScale = require ("Helpers.mapToScale")
 local round = require ("Libraries.lume").round
 local cellActions = require ("Data.cellActions")
 local cellInputs = require ("Data.cellInputs")
-local cycleValue = require ("Helpers.cycleValue")
 local lume = require ("Libraries.lume")
 
 local startTime
@@ -206,6 +205,70 @@ local validSubModes = {
     "barriersDisabled",
     "allDisabled",
 }
+
+local renderSelector = {
+    active = false,
+    target = "mode",
+    selectedIndex = 1,
+}
+
+local function openRenderSelector (target)
+    renderSelector.active = true
+    renderSelector.target = target
+
+    if target == "mode" then
+        renderSelector.selectedIndex = renderModeIndex
+    else
+        renderSelector.selectedIndex = renderSubModeIndex
+    end
+end
+
+local function getSelectorList ()
+    if renderSelector.target == "mode" then
+        return validModes
+    else
+        return validSubModes
+    end
+end
+
+local function getCurrentRenderIndex ()
+    if renderSelector.target == "mode" then
+        return renderModeIndex
+    else
+        return renderSubModeIndex
+    end
+end
+
+local function applyRenderSelector ()
+    if renderSelector.target == "mode" then
+        renderModeIndex = renderSelector.selectedIndex
+    else
+        renderSubModeIndex = renderSelector.selectedIndex
+    end
+end
+
+local function moveRenderSelector (direction)
+    local list = getSelectorList ()
+    local newIndex = renderSelector.selectedIndex + direction
+
+    if newIndex < 1 then
+        newIndex = #list
+    elseif newIndex > #list then
+        newIndex = 1
+    end
+
+    renderSelector.selectedIndex = newIndex
+end
+
+local function switchRenderSelectorTarget ()
+    if renderSelector.target == "mode" then
+        renderSelector.target = "submode"
+        renderSelector.selectedIndex = renderSubModeIndex
+    else
+        renderSelector.target = "mode"
+        renderSelector.selectedIndex = renderModeIndex
+    end
+end
 
 local baseXInput1 = 10000 * love.math.random()
 local baseYInput1 = 10000 * love.math.random()
@@ -621,15 +684,62 @@ function thisScene:draw ()
 
     -- Shows the rendering mode
     love.graphics.setColor (0, 0, 0, 0.75)
-    love.graphics.rectangle ("fill", 10, 540, 100, 25)
+    love.graphics.rectangle ("fill", 10, 510, 210, 25)
     love.graphics.setColor (1, 1, 1, 1)
-    love.graphics.printf (validModes[renderModeIndex] .. " mode", 15, 545, 100, "left")
+    love.graphics.printf ("Mode: " .. validModes[renderModeIndex], 15, 515, 210, "left")
 
     -- Shows the sub-rendering mode
     love.graphics.setColor (0, 0, 0, 0.75)
-    love.graphics.rectangle ("fill", 10, 570, 100, 25)
+    love.graphics.rectangle ("fill", 10, 540, 210, 25)
     love.graphics.setColor (1, 1, 1, 1)
-    love.graphics.printf (validSubModes[renderSubModeIndex] .. " mode", 15, 575, 100, "left")
+    love.graphics.printf ("Submode: " .. validSubModes[renderSubModeIndex], 15, 545, 210, "left")
+
+    love.graphics.setColor (0, 0, 0, 0.75)
+    love.graphics.rectangle ("fill", 10, 570, 330, 25)
+    love.graphics.setColor (1, 1, 1, 1)
+    if renderSelector.active then
+        love.graphics.printf ("Selector: up/down move, tab switch, enter apply, esc cancel", 15, 575, 325, "left")
+    else
+        love.graphics.printf ("Press M (mode) or N (submode) to open selector", 15, 575, 325, "left")
+    end
+
+    if renderSelector.active then
+        local selectorList = getSelectorList ()
+        local currentIndex = getCurrentRenderIndex ()
+        local panelX = 10
+        local panelWidth = 280
+        local panelHeight = 30 + (#selectorList * 20)
+        local panelY = math.max (10, 510 - panelHeight - 10)
+
+        love.graphics.setColor (0, 0, 0, 0.85)
+        love.graphics.rectangle ("fill", panelX, panelY, panelWidth, panelHeight)
+
+        love.graphics.setColor (1, 1, 1, 1)
+        love.graphics.printf (
+            "Selecting " .. ((renderSelector.target == "mode") and "mode" or "submode"),
+            panelX + 5,
+            panelY + 5,
+            panelWidth - 10,
+            "left"
+        )
+
+        for i = 1, #selectorList do
+            local prefix = "   "
+            if i == renderSelector.selectedIndex then
+                prefix = ">  "
+            elseif i == currentIndex then
+                prefix = "*  "
+            end
+
+            if i == renderSelector.selectedIndex then
+                love.graphics.setColor (0.1, 0.35, 0.65, 0.9)
+                love.graphics.rectangle ("fill", panelX + 3, panelY + 24 + (i - 1) * 20, panelWidth - 6, 18)
+            end
+
+            love.graphics.setColor (1, 1, 1, 1)
+            love.graphics.printf (prefix .. selectorList[i], panelX + 8, panelY + 25 + (i - 1) * 20, panelWidth - 16, "left")
+        end
+    end
 
     -- Shows the current label
     if voting == true then
@@ -672,6 +782,27 @@ function thisScene:draw ()
 end
 
 function thisScene:keypressed (key, scancode, isrepeat)
+    if renderSelector.active then
+        if key == "up" or key == "w" then
+            moveRenderSelector (-1)
+        elseif key == "down" or key == "s" then
+            moveRenderSelector (1)
+        elseif key == "tab" or key == "left" or key == "right" then
+            switchRenderSelectorTarget ()
+        elseif key == "return" or key == "kpenter" then
+            applyRenderSelector ()
+            renderSelector.active = false
+        elseif key == "escape" then
+            renderSelector.active = false
+        elseif key == "m" then
+            openRenderSelector ("mode")
+        elseif key == "n" then
+            openRenderSelector ("submode")
+        end
+
+        return
+    end
+
     -- Kills  a cell in the map
     if key == "k" then
         local tileX, tileY = map:screenToMap (love.mouse.getPosition ())
@@ -763,13 +894,13 @@ function thisScene:keypressed (key, scancode, isrepeat)
             print (superparent .. ": " .. color[1] .. ", " .. color[2] .. ", " .. color[3])
         end
 
-    -- Changes the sub rendering mode
+    -- Open sub rendering mode selector
     elseif key == "n" then
-        renderSubModeIndex = cycleValue (renderSubModeIndex, 1, #validSubModes)
+        openRenderSelector ("submode")
 
-    -- Changes the rendering mode
+    -- Open rendering mode selector
     elseif key == "m" then
-        renderModeIndex = cycleValue (renderModeIndex, 1, #validModes)
+        openRenderSelector ("mode")
 
     elseif key == "'" then
         love.system.openURL ("file://"..love.filesystem.getSaveDirectory()) -- TEMP, this will fail on android
