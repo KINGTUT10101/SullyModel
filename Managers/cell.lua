@@ -11,6 +11,13 @@ local mutationHandlers = require ("Helpers.mutationHandlers")
 local actFuncs = require ("Helpers.actFuncs")
 local lume = require ("Libraries.lume")
 
+local adjacentOffsets = {
+    {0, -1},
+    {1, 0},
+    {0, 1},
+    {-1, 0},
+}
+
 local cell = {
     map = nil, -- A reference to the map manager
     actionsByKey = nil,
@@ -216,7 +223,7 @@ function cell:new (health, energy, superparent, type)
         maxAge = self.age.max * 0.5,
         reproductionEnergy = self.reproductionEnergy.max * 0.5,
         consumes = self.superparentFoodTypes[superparent],
-        actionThreshold = 0.95,
+        actionThreshold = 0,
     }
 
     -- Initializes the cell's network
@@ -240,6 +247,7 @@ function cell:new (health, energy, superparent, type)
         newCell.network:addHidden ("disIncr" .. i, Neuron:new (actFuncs.tanh), finalLayerIndex)
         newCell.network:addHidden ("disDecr" .. i, Neuron:new (actFuncs.tanh), finalLayerIndex)
         newCell.network:addHidden ("getDis" .. i, Neuron:new (actFuncs.identity), 1)
+        newCell.network:addHidden ("avgAdjDis" .. i, Neuron:new (actFuncs.identity), 1)
 
         if self.canZeroVars == true then
             newCell.network:addHidden ("disZero" .. i, Neuron:new (actFuncs.tanh), finalLayerIndex)
@@ -323,6 +331,28 @@ function cell:update (tileX, tileY, cellObj, map)
 
             if map:isTaken (otherTileX, otherTileY) == true then
                 inputs["getDis" .. i] = mapToScale (map.cellGrid[otherTileX][otherTileY].displayVars[i], self.varBounds.min, self.varBounds.max, -1, 1)
+            end
+
+            local total = 0
+            local count = 0
+            for j = 1, #adjacentOffsets do
+                local dx = adjacentOffsets[j][1]
+                local dy = adjacentOffsets[j][2]
+                local adjX, adjY = tileX + dx, tileY + dy
+
+                if map:isTaken (adjX, adjY) == true then
+                    local value = map.cellGrid[adjX][adjY].displayVars[i]
+                    if value ~= nil then
+                        total = total + value
+                        count = count + 1
+                    end
+                end
+            end
+
+            if count > 0 then
+                inputs["avgAdjDis" .. i] = mapToScale (total / count, self.varBounds.min, self.varBounds.max, -1, 1)
+            else
+                inputs["avgAdjDis" .. i] = 0
             end
         end
 
