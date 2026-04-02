@@ -7,6 +7,7 @@ local round = require ("Libraries.lume").round
 local cellActions = require ("Data.cellActions")
 local cellInputs = require ("Data.cellInputs")
 local lume = require ("Libraries.lume")
+local saveUi = require ("Managers.saveUi")
 
 local startTime
 
@@ -148,7 +149,7 @@ local function processPred ()
     end)
 end
 
-local mapSize = 50
+local mapSize = 22
 
 local camVelocity = 15
 local zoomVelocity = 2
@@ -211,6 +212,7 @@ local renderSelector = {
     target = "mode",
     selectedIndex = 1,
 }
+local saveUiManager = saveUi:new (map)
 
 local function openRenderSelector (target)
     renderSelector.active = true
@@ -296,7 +298,7 @@ local biomeYBarriers = 100000 * love.math.random()
 local bmultXBarrier = 0.03
 local bmultYBarrier = 0.03
 local function mapBarriers (tileX, tileY)
-    -- if true then return "blank" end
+    if true then return "blank" end
 
     if love.math.noise(biomeXBarriers+bmultXBarrier*tileX, biomeYBarriers+bmultYBarrier*tileY) >= 0.35 then
         return (love.math.noise(baseXBarriers+multXBarrier*tileX, baseYBarriers+multYBarrier*tileY) > 0.50) and "barrier" or "blank"
@@ -336,6 +338,8 @@ function mapDataGenerator ()
 end
 
 function thisScene:load (...)
+    saveUiManager = saveUi:new (map)
+
     cell:init (map, cellInputs, cellActions, {
         network = {
             layers = 6,
@@ -350,7 +354,7 @@ function thisScene:load (...)
             --     min = math.huge,
             --     max = math.huge,
             -- },
-        maxCells = 150,
+        maxCells = math.huge,
         maxWalls = math.huge,
         -- maxCells = {
         --     100,
@@ -442,6 +446,8 @@ function thisScene:load (...)
 end
 
 function thisScene:update (dt)
+    saveUiManager:update (dt)
+
     local camX, camY, zoom = map:getCamera ()
     local speedMult = (love.keyboard.isDown ("lshift") == true) and 5 or 1
 
@@ -700,8 +706,10 @@ function thisScene:draw ()
     if renderSelector.active then
         love.graphics.printf ("Selector: up/down move, tab switch, enter apply, esc cancel", 15, 575, 325, "left")
     else
-        love.graphics.printf ("Press M (mode) or N (submode) to open selector", 15, 575, 325, "left")
+        love.graphics.printf (saveUiManager:getHintText (), 15, 575, 325, "left")
     end
+
+    saveUiManager:draw ()
 
     if renderSelector.active then
         local selectorList = getSelectorList ()
@@ -782,6 +790,10 @@ function thisScene:draw ()
 end
 
 function thisScene:keypressed (key, scancode, isrepeat)
+    if saveUiManager:keypressed (key) == true then
+        return
+    end
+
     if renderSelector.active then
         if key == "up" or key == "w" then
             moveRenderSelector (-1)
@@ -800,6 +812,10 @@ function thisScene:keypressed (key, scancode, isrepeat)
             openRenderSelector ("submode")
         end
 
+        return
+    end
+
+    if saveUiManager:handleGlobalHotkeys (key) == true then
         return
     end
 
@@ -854,10 +870,6 @@ function thisScene:keypressed (key, scancode, isrepeat)
         else
             print ("No tile at (" .. tileX .. ", " .. tileY .. ")")
         end
-
-    -- Quick saves
-    elseif key == "g" then
-        map:quickSave ()
 
     -- Get time since start of the simulation
     elseif key == "t" then
@@ -970,6 +982,10 @@ function thisScene:keypressed (key, scancode, isrepeat)
         map.totalEnergy = map.totalEnergy - totalReduction
         print ("Tile energy reduced by 25% (total reduction: " .. totalReduction .. ")")
     end
+end
+
+function thisScene:textinput (text)
+    saveUiManager:textinput (text)
 end
 
 function thisScene:mousereleased (x, y, button)

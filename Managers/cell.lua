@@ -230,40 +230,41 @@ function cell:new (health, energy, superparent, type)
     -- Initializes the cell's network
     for inputID, _ in pairs (self.inputs) do
         -- Input layer: identity activation (raw sensor value after normalization)
-        newCell.network:addHidden (inputID, Neuron:new (actFuncs.identity), 1)
+        newCell.network:addHidden (inputID, Neuron:new (actFuncs.identity, {name = "identity"}), 1)
     end
 
     -- Output neurons
     local finalLayerIndex = self.network.layers + 2
     for i = 1, self.memVars do
-        newCell.network:addHidden ("getMem" .. i, Neuron:new (actFuncs.identity), 1)
-        newCell.network:addHidden ("memIncr" .. i, Neuron:new (actFuncs.tanh), finalLayerIndex)
-        newCell.network:addHidden ("memDecr" .. i, Neuron:new (actFuncs.tanh), finalLayerIndex)
+        newCell.network:addHidden ("getMem" .. i, Neuron:new (actFuncs.identity, {name = "identity"}), 1)
+        newCell.network:addHidden ("memIncr" .. i, Neuron:new (actFuncs.tanh, {name = "tanh"}), finalLayerIndex)
+        newCell.network:addHidden ("memDecr" .. i, Neuron:new (actFuncs.tanh, {name = "tanh"}), finalLayerIndex)
 
         if self.canZeroVars == true then
-            newCell.network:addHidden ("memZero" .. i, Neuron:new (actFuncs.tanh), finalLayerIndex)
+            newCell.network:addHidden ("memZero" .. i, Neuron:new (actFuncs.tanh, {name = "tanh"}), finalLayerIndex)
         end
     end
     for i = 1, self.displayVars do
-        newCell.network:addHidden ("disIncr" .. i, Neuron:new (actFuncs.tanh), finalLayerIndex)
-        newCell.network:addHidden ("disDecr" .. i, Neuron:new (actFuncs.tanh), finalLayerIndex)
-        newCell.network:addHidden ("getDis" .. i, Neuron:new (actFuncs.identity), 1)
-        newCell.network:addHidden ("avgAdjDis" .. i, Neuron:new (actFuncs.identity), 1)
+        newCell.network:addHidden ("disIncr" .. i, Neuron:new (actFuncs.tanh, {name = "tanh"}), finalLayerIndex)
+        newCell.network:addHidden ("disDecr" .. i, Neuron:new (actFuncs.tanh, {name = "tanh"}), finalLayerIndex)
+        newCell.network:addHidden ("getDis" .. i, Neuron:new (actFuncs.identity, {name = "identity"}), 1)
+        newCell.network:addHidden ("avgAdjDis" .. i, Neuron:new (actFuncs.identity, {name = "identity"}), 1)
 
         if self.canZeroVars == true then
-            newCell.network:addHidden ("disZero" .. i, Neuron:new (actFuncs.tanh), finalLayerIndex)
+            newCell.network:addHidden ("disZero" .. i, Neuron:new (actFuncs.tanh, {name = "tanh"}), finalLayerIndex)
         end
     end
     for i = 1, self.pheromones do
-        newCell.network:addHidden ("emitPhero" .. i, Neuron:new (actFuncs.tanh), finalLayerIndex)
-        newCell.network:addHidden ("getPhero" .. i, Neuron:new (actFuncs.identity), 1)
+        newCell.network:addHidden ("emitPhero" .. i, Neuron:new (actFuncs.tanh, {name = "tanh"}), finalLayerIndex)
+        newCell.network:addHidden ("getPhero" .. i, Neuron:new (actFuncs.identity, {name = "identity"}), 1)
     end
     for actionID, _ in pairs (self.actions) do
         -- Output layer: identity activation produces logits for softmax (or raw scores)
-        newCell.network:addHidden (actionID, Neuron:new (actFuncs.tanh), finalLayerIndex)
+        newCell.network:addHidden (actionID, Neuron:new (actFuncs.tanh, {name = "tanh"}), finalLayerIndex)
     end
     for i = 1, self.network.layers do
-        local newNeuron = Neuron:new(actFuncs.leaky()) -- Call the factory to get the actual function
+        local hiddenAlpha = 0.05
+        local newNeuron = Neuron:new(actFuncs.leaky(hiddenAlpha), {name = "leaky", params = {alpha = hiddenAlpha}}) -- Call the factory to get the actual function
         local newID = lume.uuid() -- stable unique key
         newCell.network:addHidden (newID, newNeuron, i + 1)
     end

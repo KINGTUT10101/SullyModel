@@ -1,13 +1,9 @@
-local bitser = require ("Libraries.bitser")
 local clamp = require ("Libraries.lume").clamp
 local round = require ("Libraries.lume").round
 local cycleValue = require ("Helpers.cycleValue")
 local mapToScale = require ("Helpers.mapToScale")
 local copyTable  = require("Helpers.copyTable")
-
-bitser.register("function", function()
-    return nil
-end)
+local SaveSystem = require ("Managers.saveSystem")
 
 local map = {
     cellGrid = {},
@@ -91,36 +87,19 @@ local map = {
     energyImbalanceMessagesEnabled = true,
     energyImbalanceLogInterval = 60 * 15,
     lastEnergyImbalanceLogTime = -math.huge,
+    saveSystem = nil,
 }
 
 function map:quickSave ()
-    -- local cellGridCopy = {}
+    return self.saveSystem:quickSave ()
+end
 
-    -- for i = 1, self.width do
-    --     local cellRow = {}
-    --     cellGridCopy[i] = cellRow -- Add row to cell grid
+function map:autoSave ()
+    return self.saveSystem:autoSave ()
+end
 
-    --     for j = 1, self.height do
-    --         if self.cellGrid[i][j] ~= nil then
-    --             cellRow[j] = copyTable (self.cellGrid[i][j])
-    --             cellRow[j].scriptFunc = nil
-    --             if cellRow[j].childCell ~= nil then
-    --                 cellRow[j].childCell.scriptFunc = nil
-    --             end
-    --         end
-    --     end
-    -- end
-    
-    -- local fileName = "quickSave_" .. os.date("%Y-%m-%d_%H-%M-%S") .. ".slf"
-    -- bitser.dumpLoveFile (fileName, {
-    --     envGrid = self.envGrid,
-    --     cellGrid = cellGridCopy,
-    --     stats = self.stats,
-    --     lastSave = self.lastSave,
-    --     resets = self.resets,
-    --     lastTick = self.lastTick,
-    -- })
-    -- print ("QUICK SAVE: " .. fileName)
+function map:getSaveSystem ()
+    return self.saveSystem
 end
 
 local foodTypes = {
@@ -155,6 +134,10 @@ end
 function map:init (cellManager, options)
     options = options or {}
     assert (type (options) == "table", "Provided options argument is not a table")
+
+    if self.saveSystem == nil then
+        self.saveSystem = SaveSystem:new (self)
+    end
 
     self.cellManager = cellManager
     self.title = options.title or "Untitled Map"
@@ -213,6 +196,7 @@ function map:init (cellManager, options)
     self.dataBounds.max = options.dataBounds.max or self.inputBounds.max
 
     self.tickSpeed = math.huge
+    self.lastSave = self.ticksBetweenSaves
 
     for i = 1, self.cellManager.superparents do
         self.stats.cells[i] = 0
@@ -363,7 +347,10 @@ function map:update (dt)
 
         -- Save the map and cells if enough ticks have passed
         if self.lastSave <= 0 then
-            self:quickSave ()
+            local autoOk, autoErr = self:autoSave ()
+            if autoOk == false then
+                print ("[SAVE ERROR] Autosave failed: " .. tostring (autoErr))
+            end
 
             self.lastSave = self.ticksBetweenSaves
         end

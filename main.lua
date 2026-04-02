@@ -68,6 +68,7 @@ end
 
 function love.textinput(text)
     tux.callbacks.textinput(text)
+    sceneMan:event("textinput", text)
 end
 
 function love.mousereleased(x, y, button)

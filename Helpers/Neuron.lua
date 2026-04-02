@@ -3,13 +3,27 @@ local KeyedArray = require("Helpers.keyedArray")
 
 local Neuron = {}
 
-function Neuron:new (actFunc)
+local function copyTable (orig)
+    if type (orig) ~= "table" then
+        return orig
+    end
+
+    local copy = {}
+    for key, value in pairs (orig) do
+        copy[copyTable (key)] = copyTable (value)
+    end
+
+    return copy
+end
+
+function Neuron:new (actFunc, actMeta)
     assert (type (actFunc) == "function", "actFunc must be a function")
 
     local newObj = {
         weights = KeyedArray:new (), -- Array of weights for inputs. Must contain at least one value for the bias
         inputs = KeyedArray:new (), -- References to the neurons this neuron gets input from. Should equal the number of weights minus one (bias)
         actFunc = actFunc, -- Activation function that is run after the weighted sum is calculated
+        actMeta = copyTable (actMeta), -- Metadata used to rebuild activation functions when loading saves
         lastOutput = 0, -- The last output value of the neuron
     }
 
@@ -28,7 +42,7 @@ end
 
 
 function Neuron:copy (inputNeurons)
-    local copyObj = Neuron:new(self.actFunc)
+    local copyObj = Neuron:new(self.actFunc, self.actMeta)
 
     -- Copy weights and inputs
     copyObj:setWeight ("bias", self.weights:get("bias", "key"))
