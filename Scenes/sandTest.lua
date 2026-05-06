@@ -71,9 +71,15 @@ local function processPred ()
         cellObj.vote = cellObj.vote or 0
         cellObj.totalVotes = cellObj.totalVotes or 0
         cellObj.accurateVotes = cellObj.accurateVotes or 0
+        cellObj.totalPosVotes = cellObj.totalPosVotes or 0
+        cellObj.accuratePosVotes = cellObj.accuratePosVotes or 0
+        cellObj.totalNegVotes = cellObj.totalNegVotes or 0
+        cellObj.accurateNegVotes = cellObj.accurateNegVotes or 0
         cellObj.predTokens = cellObj.predTokens or 0
 
-        local accuracy = (cellObj.totalVotes > 0) and (cellObj.accurateVotes / math.max (cellObj.totalVotes, minAccuracyDenom)) or 0
+        local posAccuracy = (cellObj.totalPosVotes > 0) and (cellObj.accuratePosVotes / math.max (cellObj.totalPosVotes, minAccuracyDenom)) or 0
+        local negAccuracy = (cellObj.totalNegVotes > 0) and (cellObj.accurateNegVotes / math.max (cellObj.totalNegVotes, minAccuracyDenom)) or 0
+        local accuracy = math.min (posAccuracy, negAccuracy)
 
         local cellVote = cellObj.vote
         metrics.totalCells = metrics.totalCells + 1
@@ -84,6 +90,7 @@ local function processPred ()
             metrics.posPreds = metrics.posPreds + 1
 
             cellObj.accurateVotes = cellObj.accurateVotes + 1
+            cellObj.accuratePosVotes = cellObj.accuratePosVotes + 1
             
             if math.random () < calcReproChance (accuracy) then
                 cellObj.predTokens = cellObj.predTokens + 1
@@ -101,6 +108,7 @@ local function processPred ()
             metrics.negPreds = metrics.negPreds + 1
 
             cellObj.accurateVotes = cellObj.accurateVotes + 1
+            cellObj.accurateNegVotes = cellObj.accurateNegVotes + 1
 
             if math.random () < calcReproChance (accuracy) then
                 cellObj.predTokens = cellObj.predTokens + 1
@@ -123,6 +131,11 @@ local function processPred ()
 
         cellObj.vote = 0 -- Reset vote for next round
         cellObj.totalVotes = cellObj.totalVotes + 1
+        if currLabel > 0 then
+            cellObj.totalPosVotes = cellObj.totalPosVotes + 1
+        elseif currLabel < 0 then
+            cellObj.totalNegVotes = cellObj.totalNegVotes + 1
+        end
     end)
 
     -- Print the metrics overall and for this round
@@ -424,6 +437,10 @@ function thisScene:load (...)
             cellObj.vote = 0
             cellObj.totalVotes = 0
             cellObj.accurateVotes = 0
+            cellObj.totalPosVotes = 0
+            cellObj.accuratePosVotes = 0
+            cellObj.totalNegVotes = 0
+            cellObj.accurateNegVotes = 0
         end
     })
 
