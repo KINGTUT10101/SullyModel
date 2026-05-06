@@ -543,9 +543,12 @@ function map:draw (mode, subMode)
             if self.energyImbalanceMessagesEnabled == true or (now - self.lastEnergyImbalanceLogTime) >= self.energyImbalanceLogInterval then
                 print ("Total energy mismatch detected! " .. math.floor (self.totalEnergy) .. " vs " .. math.floor (totalEnergy) .. " (Diff: " .. math.floor (self.totalEnergy) - math.floor (totalEnergy) .. ")") -- Add this back later
                 self.lastEnergyImbalanceLogTime = now
+
+                if self.energyImbalanceMessagesEnabled == true then
+                    self.tickSpeed = math.huge
+                end
             end
         end
-        self.tickSpeed = math.huge
     end
 
     love.graphics.pop ()
