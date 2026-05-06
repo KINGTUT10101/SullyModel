@@ -792,7 +792,7 @@ function map:spawnCell (tileX, tileY, health, energy, superparent, parentCellObj
             end
             
             if math.random () < self.cellManager.globalMutChance then
-                for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 1, 15)) do
+                for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, 20)) do
                     self.cellManager:mutate (newCellObj)
                 end
             end
