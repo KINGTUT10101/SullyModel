@@ -61,6 +61,7 @@ local function processPred ()
     local metrics = {
         posPreds = 0,
         negPreds = 0,
+        abstains = 0,
         totalCells = 0,
         tokensAwarded = 0,
     }
@@ -101,6 +102,9 @@ local function processPred ()
         elseif currLabel < 0 and cellVote >= 0 then
             cm.fp = cm.fp + 1
             metrics.posPreds = metrics.posPreds + 1
+            if cellVote == 0 then
+                metrics.abstains = metrics.abstains + 1
+            end
         
         -- True negative
         elseif currLabel < 0 and cellVote < 0 then
@@ -119,6 +123,9 @@ local function processPred ()
         elseif currLabel > 0 and cellVote <= 0 then
             cm.fn = cm.fn + 1
             metrics.negPreds = metrics.negPreds + 1
+            if cellVote == 0 then
+                metrics.abstains = metrics.abstains + 1
+            end
 
         end
 
@@ -140,6 +147,12 @@ local function processPred ()
 
     -- Print the metrics overall and for this round
     print ("--- Prediction Metrics for Round #" .. predRounds .. "---")
+    local roundMatches = (currLabel > 0) and metrics.posPreds or metrics.negPreds
+    local roundMatchPct = (metrics.totalCells > 0) and ((roundMatches / metrics.totalCells) * 100) or 0
+    local overallMatches = cm.tp + cm.tn
+    local overallPreds = getTotalPreds ()
+    local overallMatchPct = (overallPreds > 0) and ((overallMatches / overallPreds) * 100) or 0
+
     if currLabel > 0 then
         print ("Current Label: POSITIVE")
         print ("Round Accuracy : " .. round ((metrics.posPreds / metrics.totalCells) * 100, 0.01) .. "%")
@@ -147,8 +160,11 @@ local function processPred ()
         print ("Current Label: NEGATIVE")
         print ("Round Accuracy : " .. round ((metrics.negPreds / metrics.totalCells) * 100, 0.01) .. "%")
     end
+    print ("Cells Matched Label (Round): " .. roundMatches .. "/" .. metrics.totalCells .. " (" .. round (roundMatchPct, 0.01) .. "%)")
+    print ("Cells Matched Label (Overall): " .. overallMatches .. "/" .. overallPreds .. " (" .. round (overallMatchPct, 0.01) .. "%)")
     print ("Round Total Cells: " .. metrics.totalCells)
     print ("Round Prediction Ratio: " .. round ((metrics.posPreds / metrics.totalCells) * 100, 0.01) .. "%")
+    print ("Round Abstains: " .. metrics.abstains)
     print ("Tokens Awarded This Round: " .. metrics.tokensAwarded)
     print ("Overall Accuracy : " .. round (getAccuracy () * 100, 0.01) .. "%")
     print ("Overall Prediction Ratio: " .. round (getPredRatio () * 100, 0.01) .. "%")
