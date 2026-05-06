@@ -348,7 +348,7 @@ function thisScene:load (...)
         },
         maxHealth = 500,
         maxEnergy = 500,
-        memVars = 6,
+        memVars = 4,
         displayVars = 2,
         tickCost = -0.5,
         -- cellAge = {
@@ -368,13 +368,16 @@ function thisScene:load (...)
             cost = 0,
         },
         pheromoneTime = 500,
-        pheromones = 2,
+        pheromones = 3,
+        usePheroBuffers = true,
+        pheromoneBufferSize = 35, -- How long the cell remembers that it encountered a certain pheromone, in ticks
+        canClearPheroBuffers = true,
         actionsPerTurn = lume.count (cellActions),
         -- actionThreshold = 0.5,
         canZeroVars = true,
         age = {
-            min = 50,
-            max = 20000,
+            min = 500,
+            max = 7000,
         },
         superparentFoodTypes = {
             "any",

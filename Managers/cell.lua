@@ -191,6 +191,9 @@ function cell:init (map, inputs, actions, options)
 
     self.pheromones = options.pheromones or 2
     self.pheromoneTime = options.pheromoneTime or 250
+    self.usePheroBuffers = options.usePheroBuffers or false
+    self.pheromoneBufferSize = options.pheromoneBufferSize or 25
+    self.canClearPheroBuffers = options.canClearPheroBuffers or false
 
     mutationHandlers.init (self)
 
@@ -228,6 +231,7 @@ function cell:new (health, energy, superparent, type)
         reproductionEnergy = self.reproductionEnergy.max * 0.5,
         consumes = self.superparentFoodTypes[superparent],
         actionThreshold = 0,
+        pheroBuffers = {},
     }
 
     -- Initializes the cell's network
@@ -260,6 +264,15 @@ function cell:new (health, energy, superparent, type)
     for i = 1, self.pheromones do
         newCell.network:addHidden ("emitPhero" .. i, Neuron:new (actFuncs.tanh, {name = "tanh"}), finalLayerIndex)
         newCell.network:addHidden ("getPhero" .. i, Neuron:new (actFuncs.identity, {name = "identity"}), 1)
+        newCell.pheroBuffers[i] = 0
+
+        if self.usePheroBuffers == true then
+            newCell.network:addHidden ("getPheroBuffer" .. i, Neuron:new (actFuncs.identity, {name = "identity"}), 1)
+
+            if self.canClearPheroBuffers == true then
+                newCell.network:addHidden ("clearPheroBuffer" .. i, Neuron:new (actFuncs.tanh, {name = "tanh"}), finalLayerIndex)
+            end
+        end
     end
     -- Shared output value for action functions to read without consuming an action slot.
     newCell.network:addHidden (actionDataOutputID, Neuron:new (actFuncs.tanh, {name = "tanh"}), finalLayerIndex)
@@ -333,6 +346,12 @@ function cell:update (tileX, tileY, cellObj, map)
         for i = 1, self.pheromones do
             local pheromoneValue = (envTile.pheromones and envTile.pheromones[i]) or 0
             inputs["getPhero" .. i] = (pheromoneValue > 0) and 1 or -1
+
+            if self.usePheroBuffers == true then
+                local bufferValue = cellObj.pheroBuffers[i]
+                inputs["getPheroBuffer" .. i] = (bufferValue > 0) and 1 or -1
+                cellObj.pheroBuffers[i] = math.max (bufferValue - 1, 0) -- Decay the pheromone buffer over time
+            end
         end
         for i = 1, self.displayVars do
             local otherTileX, otherTileY = map:getForwardPos (tileX, tileY, 1)
@@ -513,6 +532,10 @@ function cell:update (tileX, tileY, cellObj, map)
 
                     elseif string.sub (outputKey, 1, 9) == "emitPhero" then
                         envTile.pheromones[tonumber(string.sub(outputKey, 10))] = self.pheromoneTime
+
+                    elseif string.sub (outputKey, 1, 16) == "clearPheroBuffer" then
+                        local bufferIndex = tonumber(string.sub(outputKey, 17))
+                        cellObj.pheroBuffers[bufferIndex] = 0
 
                     else
                         cellX, cellY = self.actions[outputKey](cellX, cellY, cellObj, self.map)
