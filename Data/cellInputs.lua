@@ -40,6 +40,14 @@ function cellInputs.horizontalDir (tileX, tileY, cellObj, map)
     end
 end
 
+function cellInputs.xPos (tileX, tileY, cellObj, map)
+    return mapToScale (tileX, 1, map.width, -1, 1)
+end
+
+function cellInputs.yPos (tileX, tileY, cellObj, map)
+    return mapToScale (tileY, 1, map.height, -1, 1)
+end
+
 function cellInputs.otherCellResources (tileX, tileY, cellObj, map)
     local maxResources = map.cellManager.maxEnergy + map.cellManager.maxHealth
     local otherCellResources = map:getCellTotalResources (map:getForwardPos (tileX, tileY, 1)) or 0
