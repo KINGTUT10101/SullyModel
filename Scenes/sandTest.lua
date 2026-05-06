@@ -177,7 +177,7 @@ end
 local lastCells = {}
 local failsafeMutations = {
     min = 0,
-    max = 500,
+    max = 50,
 }
 
 local renderMap = true
@@ -451,6 +451,9 @@ end
 
 function thisScene:update (dt)
     saveUiManager:update (dt)
+
+    -- Update global mutation rate based on current accuracy
+    cell.globalMutChance = mapToScale (1 - getAccuracy (), 0, 1, 0, 0.45)
 
     local camX, camY, zoom = map:getCamera ()
     local speedMult = (love.keyboard.isDown ("lshift") == true) and 5 or 1

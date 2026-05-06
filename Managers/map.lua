@@ -791,8 +791,10 @@ function map:spawnCell (tileX, tileY, health, energy, superparent, parentCellObj
                 newCellObj.energy = energy
             end
             
-            for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 0, 25)) do
-                self.cellManager:mutate (newCellObj)
+            if math.random () < self.cellManager.globalMutChance then
+                for i = 1, round (mapToScale (love.math.randomNormal (), -0.5, 3, 1, 15)) do
+                    self.cellManager:mutate (newCellObj)
+                end
             end
         else
             newCellObj = self.cellManager:new (health, energy, superparent) -- Create default cell object

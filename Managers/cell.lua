@@ -73,6 +73,7 @@ local cell = {
         min = 0,
         max = 0,
     },
+    globalMutChance = 0,
 }
 
 --- Initializes the cell class
@@ -180,6 +181,8 @@ function cell:init (map, inputs, actions, options)
     self.initialMutRates.age = clamp (options.initialMutRates.age or 10, self.minMutRate, 100)
     self.initialMutRates.reproductionEnergy = clamp (options.initialMutRates.reproductionEnergy or 10, self.minMutRate, 100)
     self.initialMutRates.actionThreshold = clamp (options.initialMutRates.actionThreshold or 25, self.minMutRate, 100)
+
+    self.globalMutChance = options.globalMutChance or 0.05
 
     options.age = options.age or {}
     self.age.min = options.age.min or 50
