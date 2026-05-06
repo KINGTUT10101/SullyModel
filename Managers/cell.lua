@@ -18,6 +18,8 @@ local adjacentOffsets = {
     {-1, 0},
 }
 
+local actionDataOutputID = "actionData"
+
 local cell = {
     map = nil, -- A reference to the map manager
     actionsByKey = nil,
@@ -212,6 +214,7 @@ function cell:new (health, energy, superparent, type)
         color = {0.5, 0.5, 0.5, 1},
         vars = {},
         displayVars = {},
+        actionData = 0,
         health = clamp (health or self.maxHealth, 0, self.maxHealth),
         energy = clamp (energy or self.maxEnergy, 0, self.maxEnergy),
         wasteBuffer = 0,
@@ -258,6 +261,8 @@ function cell:new (health, energy, superparent, type)
         newCell.network:addHidden ("emitPhero" .. i, Neuron:new (actFuncs.tanh, {name = "tanh"}), finalLayerIndex)
         newCell.network:addHidden ("getPhero" .. i, Neuron:new (actFuncs.identity, {name = "identity"}), 1)
     end
+    -- Shared output value for action functions to read without consuming an action slot.
+    newCell.network:addHidden (actionDataOutputID, Neuron:new (actFuncs.tanh, {name = "tanh"}), finalLayerIndex)
     for actionID, _ in pairs (self.actions) do
         -- Output layer: identity activation produces logits for softmax (or raw scores)
         newCell.network:addHidden (actionID, Neuron:new (actFuncs.tanh, {name = "tanh"}), finalLayerIndex)
@@ -361,6 +366,23 @@ function cell:update (tileX, tileY, cellObj, map)
 
         -- Run the NN and get outputs
         local outputs = cellObj.network:predict(inputs)
+        local actionOutputs = {}
+
+        -- Pull out non-action output channels first, then keep only executable outputs.
+        for i = 1, #outputs do
+            local outputKey = outputs[i][1]
+            local outputValue = outputs[i][2]
+
+            if outputKey == actionDataOutputID then
+                cellObj.actionData = outputValue
+            else
+                table.insert (actionOutputs, outputs[i])
+            end
+        end
+
+        if cellObj.actionData == nil then
+            cellObj.actionData = 0
+        end
 
         -- Consume energy automatically
         if self.consumeOnTick.amount > 0 then
@@ -435,7 +457,7 @@ function cell:update (tileX, tileY, cellObj, map)
             -- Choose argmax over raw outputs and act only if its above the threshold
 
             -- Sort the outputs array
-            table.sort (outputs, function(a, b) return a[2] > b[2] end)
+            table.sort (actionOutputs, function(a, b) return a[2] > b[2] end)
 
             local cellX, cellY = tileX, tileY
             for i = 1, self.actionsPerTurn do
@@ -443,12 +465,17 @@ function cell:update (tileX, tileY, cellObj, map)
                     break
                 end
 
+                local actionOutput = actionOutputs[i]
+                if actionOutput == nil then
+                    break
+                end
+
                 assert (map.cellGrid[cellX][cellY] == cellObj, "Cell object mismatch during action execution")
 
-                local outputValue = outputs[i][2]
+                local outputValue = actionOutput[2]
 
                 if outputValue > cellObj.actionThreshold then
-                    local outputKey = outputs[i][1]
+                    local outputKey = actionOutput[1]
 
                     -- -- TEMP
                     -- cellObj.actionsTaken = cellObj.actionsTaken or {}
