@@ -11,7 +11,7 @@ local saveUi = require ("Managers.saveUi")
 
 local startTime
 
-local voting = false
+local voting = true
 local maxTicksSinceVote = 1000
 local ticksSinceVote = 0
 local predRounds = 0
@@ -272,13 +272,13 @@ local function switchRenderSelectorTarget ()
     end
 end
 
-local baseXInput1 = 10000 * love.math.random()
-local baseYInput1 = 10000 * love.math.random()
+local baseXInput1 = 10 * love.math.random()
+local baseYInput1 = 10 * love.math.random()
 local baseXInput2 = 10000 * love.math.random()
 local baseYInput2 = 10000 * love.math.random()
 local baseXInput3 = 10000 * love.math.random()
 local baseYInput3 = 10000 * love.math.random()
-local maxInput = 25
+local maxInput = 1000
 local function mapInput (tileX, tileY)
     -- return (math.random () < 0.10) and maxInput or 0
 
@@ -286,6 +286,7 @@ local function mapInput (tileX, tileY)
         meat = 0, -- round (mapToScale (love.math.noise(baseXInput1+.05*tileX, baseYInput1+.02*tileY), 0, 1, 0, maxInput)),
         plants = 0, -- round (mapToScale (love.math.noise(baseXInput2+.05*tileX, baseYInput2+.02*tileY), 0, 1, 0, maxInput)),
         waste = 0, -- round (mapToScale (love.math.noise(baseXInput3+.05*tileX, baseYInput3+.02*tileY), 0, 1, 0, maxInput)),
+        any = 0, -- round (mapToScale (love.math.noise(baseXInput1+.05*tileX, baseYInput1+.02*tileY), 0, 1, 0, maxInput))
     }
 end
 
@@ -342,14 +343,14 @@ function thisScene:load (...)
 
     cell:init (map, cellInputs, cellActions, {
         network = {
-            layers = 6,
+            layers = 3,
             neuronsPerLayer = 10,
         },
-        maxHealth = 5000,
-        maxEnergy = 5000,
+        maxHealth = 500,
+        maxEnergy = 500,
         memVars = 6,
         displayVars = 2,
-        tickCost = 1,
+        tickCost = -0.5,
         -- cellAge = {
             --     min = math.huge,
             --     max = math.huge,
@@ -376,9 +377,9 @@ function thisScene:load (...)
             max = 20000,
         },
         superparentFoodTypes = {
-            "meat",
-            "plants",
-            "waste",
+            "any",
+            "any",
+            "any",
         },
         reproductionEnergy = {
             -- min = 3000,
@@ -425,7 +426,7 @@ function thisScene:load (...)
 
     map:reset (mapSize, mapSize, mapInput, mapBarriers, mapDataGenerator())
     map:setCamera (-110, -10, 3.8)
-    map:setTickSpeed (1/8)
+    map:setTickSpeed (math.huge)
     startTime = os.time()
 
     -- Adds a few heavily mutated cells to the initial captures lists
@@ -829,9 +830,10 @@ function thisScene:keypressed (key, scancode, isrepeat)
         local tileX, tileY = map:screenToMap (love.mouse.getPosition ())
 
         if love.keyboard.isDown ("lshift") then
-            print ("Meat input @ (" .. tileX .. ", " .. tileY .. "): " .. map:getInputTile (tileX, tileY, "meat"))
-            print ("Plants input @ (" .. tileX .. ", " .. tileY .. "): " .. map:getInputTile (tileX, tileY, "plants"))
-            print ("Waste input @ (" .. tileX .. ", " .. tileY .. "): " .. map:getInputTile (tileX, tileY, "waste"))
+            print ("Any input @ (" .. tileX .. ", " .. tileY .. "): " .. tostring(map:getInputTile (tileX, tileY, "any")))
+            print ("Meat input @ (" .. tileX .. ", " .. tileY .. "): " .. tostring(map:getInputTile (tileX, tileY, "meat")))
+            print ("Plants input @ (" .. tileX .. ", " .. tileY .. "): " .. tostring(map:getInputTile (tileX, tileY, "plants")))
+            print ("Waste input @ (" .. tileX .. ", " .. tileY .. "): " .. tostring(map:getInputTile (tileX, tileY, "waste")))
             print ()
         else
             local cellToPrint = map:getCell (tileX, tileY)
