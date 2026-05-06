@@ -409,6 +409,15 @@ function cell:update (tileX, tileY, cellObj, map)
             map:transferInputToCell (itx, ity, tileX, tileY, self.superparentFoodTypes[cellObj.superparent], self.consumeOnTick.amount, self.consumeOnTick.cost)
         end
 
+        -- Update pheromone buffers
+        if self.usePheroBuffers == true then
+            for i = 1, self.pheromones do
+                if envTile.pheromones[i] > 0 then
+                    cellObj.pheroBuffers[i] = self.pheromoneBufferSize
+                end
+            end
+        end
+
         -- Decide action from outputs: either softmax-based or raw argmax
         if self.decision.useSoftmax == true then
             error ("Not implemented: softmax-based action selection")
