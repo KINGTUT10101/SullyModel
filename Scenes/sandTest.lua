@@ -17,6 +17,9 @@ local ticksSinceVote = 0
 local predRounds = 0
 local startPredTokens = 1
 
+local accuracyHistoryWindow = 10 -- Number of past rounds to compare overall accuracy against
+local accuracyHistory = {} -- Stores overall accuracy after each prediction round
+
 local minReproChance, maxReproChance = 0.10, 1
 local alpha = 1.5
 local minAccuracyDenom = 5
@@ -145,6 +148,10 @@ local function processPred ()
         end
     end)
 
+    -- Snapshot accuracy before this round's results were applied (last round's accuracy)
+    local prevAccuracy = accuracyHistory[#accuracyHistory]
+    local windowAccuracy = accuracyHistory[math.max(1, #accuracyHistory - accuracyHistoryWindow + 1)]
+
     -- Print the metrics overall and for this round
     print ("--- Prediction Metrics for Round #" .. predRounds .. "---")
     local roundMatches = (currLabel > 0) and metrics.posPreds or metrics.negPreds
@@ -166,10 +173,21 @@ local function processPred ()
     print ("Round Prediction Ratio: " .. round ((metrics.posPreds / metrics.totalCells) * 100, 0.01) .. "%")
     print ("Round Abstains: " .. metrics.abstains)
     print ("Tokens Awarded This Round: " .. metrics.tokensAwarded)
-    print ("Overall Accuracy : " .. round (getAccuracy () * 100, 0.01) .. "%")
+    local currentAccuracy = getAccuracy ()
+    local deltaLast = prevAccuracy and (currentAccuracy - prevAccuracy) or nil
+    local deltaWindow = (windowAccuracy and #accuracyHistory >= accuracyHistoryWindow) and (currentAccuracy - windowAccuracy) or nil
+    local function fmtDelta (d)
+        if d == nil then return "N/A" end
+        local sign = d >= 0 and "+" or ""
+        return sign .. round (d * 100, 0.01) .. "%"
+    end
+    print ("Overall Accuracy : " .. round (currentAccuracy * 100, 0.01) .. "% (vs last: " .. fmtDelta (deltaLast) .. ", vs last " .. accuracyHistoryWindow .. ": " .. fmtDelta (deltaWindow) .. ")")
     print ("Overall Prediction Ratio: " .. round (getPredRatio () * 100, 0.01) .. "%")
     print ("Label Ratio: " .. round ((positiveLabels / predRounds) * 100, 0.01) .. "%")
     print ()
+
+    -- Record accuracy for future delta comparisons
+    table.insert (accuracyHistory, currentAccuracy)
 
     -- Reset data
     local rectFunc = mapDataGenerator ()
@@ -400,10 +418,10 @@ function thisScene:load (...)
         pheromones = 3,
         usePheroBuffers = true,
         pheromoneBufferSize = 35, -- How long the cell remembers that it encountered a certain pheromone, in ticks
-        canClearPheroBuffers = true,
+        canClearPheroBuffers = false,
         actionsPerTurn = lume.count (cellActions),
         -- actionThreshold = 0.5,
-        canZeroVars = true,
+        canZeroVars = false,
         age = {
             min = 500,
             max = 7000,
