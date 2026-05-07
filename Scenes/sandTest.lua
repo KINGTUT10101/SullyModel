@@ -171,7 +171,8 @@ local function processPred ()
     print ("Cells Matched Label (Overall): " .. overallMatches .. "/" .. overallPreds .. " (" .. round (overallMatchPct, 0.01) .. "%)")
     print ("Round Total Cells: " .. metrics.totalCells)
     print ("Round Prediction Ratio: " .. round ((metrics.posPreds / metrics.totalCells) * 100, 0.01) .. "%")
-    print ("Round Abstains: " .. metrics.abstains)
+    local abstainPct = (metrics.totalCells > 0) and ((metrics.abstains / metrics.totalCells) * 100) or 0
+    print ("Round Abstains: " .. metrics.abstains .. "/" .. metrics.totalCells .. " (" .. round (abstainPct, 0.01) .. "%)")
     print ("Tokens Awarded This Round: " .. metrics.tokensAwarded)
     local currentAccuracy = getAccuracy ()
     local deltaLast = prevAccuracy and (currentAccuracy - prevAccuracy) or nil
@@ -208,7 +209,7 @@ local maxCaptureCycles = 10000
 local captureTimer = maxCaptureCycles
 local captures = {}
 
-local superparents = 3
+local superparents = 1
 
 local totalCycles = 0
 local cyclesSinceLastFail = {}
@@ -391,7 +392,7 @@ function thisScene:load (...)
     cell:init (map, cellInputs, cellActions, {
         network = {
             layers = 3,
-            neuronsPerLayer = 10,
+            neuronsPerLayer = 5,
         },
         maxHealth = 500,
         maxEnergy = 500,
@@ -421,15 +422,15 @@ function thisScene:load (...)
         canClearPheroBuffers = false,
         actionsPerTurn = lume.count (cellActions),
         -- actionThreshold = 0.5,
-        canZeroVars = false,
+        canZeroVars = true,
         age = {
             min = 500,
             max = 7000,
         },
         superparentFoodTypes = {
             "any",
-            "any",
-            "any",
+            -- "any",
+            -- "any",
         },
         reproductionEnergy = {
             -- min = 3000,
