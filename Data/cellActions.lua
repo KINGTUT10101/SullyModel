@@ -61,17 +61,17 @@ local alpha = 2.5
 
 -- end
 
--- function cellActions.votePos (tileX, tileY, cellObj, map)
---     cellObj.vote = math.min ((cellObj.vote or 0) + 1, maxVote)
+function cellActions.votePos (tileX, tileY, cellObj, map)
+    cellObj.vote = math.min ((cellObj.vote or 0) + 1, maxVote)
 
---     return tileX, tileY
--- end
+    return tileX, tileY
+end
 
--- function cellActions.voteNeg (tileX, tileY, cellObj, map)
---     cellObj.vote = math.max ((cellObj.vote or 0) - 1, -maxVote)
+function cellActions.voteNeg (tileX, tileY, cellObj, map)
+    cellObj.vote = math.max ((cellObj.vote or 0) - 1, -maxVote)
 
---     return tileX, tileY
--- end
+    return tileX, tileY
+end
 
 function cellActions.moveForward (tileX, tileY, cellObj, map)
     return map:moveForward (tileX, tileY)
